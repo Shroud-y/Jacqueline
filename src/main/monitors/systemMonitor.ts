@@ -219,9 +219,12 @@ export class SystemMonitor implements Monitor {
         log.info('no battery on this machine — battery checks disabled');
         return;
       }
+      // On the charger the percentage says nothing about danger, and feeding
+      // the hysteresis a stand-in would either spend the alert or re-arm it on
+      // every jiggle of the cable — so the reading is skipped outright.
+      if (!battery.discharging) return;
       // Hysteresis works on "rising" values, so feed it the negated percentage.
-      const rose = this.battery.update(battery.discharging ? -battery.percent : 0);
-      if (rose && battery.discharging) {
+      if (this.battery.update(-battery.percent)) {
         bus.emit(
           createEvent(EventType.systemBatteryLow, 'urgent', { percent: battery.percent }, now)
         );

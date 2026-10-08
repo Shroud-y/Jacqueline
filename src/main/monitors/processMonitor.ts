@@ -28,9 +28,15 @@ export function processStem(name: string): string {
 export class ProcessMonitor implements Monitor {
   readonly id = 'process';
 
-  private running = new Map<string, number>();
+  /** Keyed by stem, so respelling a watchlist entry is not a stop and a start. */
+  private running = new Map<string, { label: string; startedAt: number }>();
   private longRunningReported = new Set<string>();
-  private primed = false;
+  /**
+   * Stems that were on the watchlist at the previous tick. A process that only
+   * now became watched is baseline, not news — it may have been running for
+   * hours. Empty before the first tick, which makes that tick the baseline.
+   */
+  private watched = new Set<string>();
   private unsubscribe: (() => void) | null = null;
 
   constructor(
@@ -56,7 +62,16 @@ export class ProcessMonitor implements Monitor {
       const stem = processStem(entry);
       if (stem.length > 0) watchlist.set(stem, entry.trim().toLowerCase());
     }
-    if (watchlist.size === 0) return;
+
+    // An entry taken off the list is forgotten quietly: it did not stop, the
+    // user just stopped asking about it.
+    for (const stem of [...this.running.keys()]) {
+      if (!watchlist.has(stem)) this.forget(stem);
+    }
+    if (watchlist.size === 0) {
+      this.watched = new Set();
+      return;
+    }
 
     let running: Set<string> | null;
     try {
@@ -69,47 +84,52 @@ export class ProcessMonitor implements Monitor {
     // empty set would fire a stopped event for everything on the watchlist.
     if (running === null) return;
 
-    const names = new Set<string>();
+    const present = new Set<string>();
     for (const entry of running) {
-      const label = watchlist.get(processStem(entry));
-      if (label !== undefined) names.add(label);
+      const stem = processStem(entry);
+      if (watchlist.has(stem)) present.add(stem);
     }
 
-    // The first tick establishes the baseline; everything already running is
-    // not news.
-    if (!this.primed) {
-      this.primed = true;
-      for (const name of names) this.running.set(name, now);
-      return;
-    }
+    const previouslyWatched = this.watched;
+    this.watched = new Set(watchlist.keys());
 
-    for (const name of names) {
-      if (!this.running.has(name)) {
-        this.running.set(name, now);
-        bus.emit(createEvent(EventType.processStarted, 'ambient', { name }, now));
+    for (const stem of present) {
+      const label = watchlist.get(stem)!;
+      const known = this.running.get(stem);
+      if (known) {
+        known.label = label;
+        continue;
+      }
+      this.running.set(stem, { label, startedAt: now });
+      if (previouslyWatched.has(stem)) {
+        bus.emit(createEvent(EventType.processStarted, 'ambient', { name: label }, now));
       }
     }
 
-    for (const [name, startedAt] of [...this.running]) {
-      if (!names.has(name)) {
-        this.running.delete(name);
-        this.longRunningReported.delete(name);
+    for (const [stem, { label, startedAt }] of [...this.running]) {
+      if (!present.has(stem)) {
+        this.forget(stem);
         bus.emit(
-          createEvent(EventType.processStopped, 'ambient', { name, ranForMs: now - startedAt }, now)
+          createEvent(EventType.processStopped, 'ambient', { name: label, ranForMs: now - startedAt }, now)
         );
         continue;
       }
-      if (now - startedAt >= LONG_RUNNING_MS && !this.longRunningReported.has(name)) {
-        this.longRunningReported.add(name);
+      if (now - startedAt >= LONG_RUNNING_MS && !this.longRunningReported.has(stem)) {
+        this.longRunningReported.add(stem);
         bus.emit(
           createEvent(
             EventType.processLongRunning,
             'ambient',
-            { name, ranForMs: now - startedAt, hours: (now - startedAt) / 3_600_000 },
+            { name: label, ranForMs: now - startedAt, hours: (now - startedAt) / 3_600_000 },
             now
           )
         );
       }
     }
+  }
+
+  private forget(stem: string): void {
+    this.running.delete(stem);
+    this.longRunningReported.delete(stem);
   }
 }

@@ -225,6 +225,31 @@ describe('SpeechDirector', () => {
     expect(deferring.voice.spoken).toHaveLength(1);
   });
 
+  it('keeps a deferred item queued across ticks while the block persists', async () => {
+    let suppressed = true;
+    const deferring = harness({
+      suppression: () =>
+        suppressed
+          ? { suppressed: true, reason: 'fullscreen', hardMute: false, reasons: ['fullscreen'] }
+          : clear()
+    });
+
+    deferring.director.submit(ambient({ priority: 'notable' }));
+    // The 5 s flush timer ticks several times while the game is still fullscreen.
+    for (let i = 0; i < 6; i += 1) {
+      deferring.advance(5_000);
+      deferring.director.flushDeferred();
+    }
+    expect(deferring.director.deferredSnapshot()).toHaveLength(1);
+
+    suppressed = false;
+    deferring.advance(5_000);
+    deferring.director.flushDeferred();
+    await flush();
+    expect(deferring.voice.spoken).toHaveLength(1);
+    expect(deferring.director.deferredSnapshot()).toHaveLength(0);
+  });
+
   it('discards deferred items past their 90 second TTL', async () => {
     const deferring = harness({
       suppression: () => ({

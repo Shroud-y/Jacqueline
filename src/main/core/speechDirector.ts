@@ -14,7 +14,7 @@ import { evaluateConditions } from './conditions';
 import { CooldownKey, type CooldownLedger } from './cooldown';
 import type { Phrase, PhraseBankIndex } from './phraseBank';
 import { RecentHistory, selectPhrase, type Rng } from './selector';
-import type { SuppressionState } from './suppression';
+import type { SuppressionReason, SuppressionState } from './suppression';
 import type { VoiceEngine } from '../voice/VoiceEngine';
 
 export interface SpeechRequest {
@@ -163,9 +163,7 @@ export class SpeechDirector {
     if (suppression.hardMute) return drop('muted');
 
     // 2. Suppression.
-    const reasons = request.bypassBootGrace
-      ? suppression.reasons.filter((reason) => reason !== 'bootGrace')
-      : suppression.reasons;
+    const reasons = activeReasons(request, suppression);
     if (reasons.length > 0 && !request.bypassSuppression) {
       if (request.priority === 'ambient') return drop('suppressed');
       if (request.priority === 'notable') {
@@ -346,14 +344,21 @@ export class SpeechDirector {
     return null;
   }
 
-  /** Fires the best non-expired deferred item and discards the rest. */
+  /**
+   * Fires the best non-expired deferred item and discards the rest. While the
+   * block that deferred them is still in place the queue is left alone: the
+   * timer ticks every 5 s, and retrying into the same block would drop every
+   * item on the first tick and make the 90 s TTL meaningless.
+   */
   flushDeferred(): void {
     if (this.deferred.length === 0) return;
     const now = this.now();
 
     const alive = this.deferred.filter((item) => item.expiresAt > now);
-    this.deferred = [];
-    if (alive.length === 0) return;
+    if (alive.length === 0) {
+      this.deferred = [];
+      return;
+    }
 
     alive.sort((a, b) => {
       const byPriority = PRIORITY_RANK[b.request.priority] - PRIORITY_RANK[a.request.priority];
@@ -362,6 +367,26 @@ export class SpeechDirector {
 
     const best = alive[0];
     if (!best) return;
+    if (this.stillDeferrable(best.request, now)) {
+      this.deferred = alive;
+      return;
+    }
+    this.deferred = [];
     this.submit(best.request, true);
   }
+
+  /** The gates `submit` defers on (suppression, global cooldown) still hold. */
+  private stillDeferrable(request: SpeechRequest, now: number): boolean {
+    const suppression = this.deps.getSuppression(now);
+    // Mute is not a deferral: let `submit` drop it with the right reason.
+    if (suppression.hardMute) return false;
+    if (activeReasons(request, suppression).length > 0 && !request.bypassSuppression) return true;
+    return !request.bypassCooldowns && !this.deps.ledger.canFire(CooldownKey.global(), now);
+  }
+}
+
+function activeReasons(request: SpeechRequest, suppression: SuppressionState): SuppressionReason[] {
+  return request.bypassBootGrace
+    ? suppression.reasons.filter((reason) => reason !== 'bootGrace')
+    : suppression.reasons;
 }

@@ -228,34 +228,20 @@ function SettingsPanel(): JSX.Element {
 
       <section className="box">
         <h2>Watched processes</h2>
-        <textarea
-          value={settings.watchedProcesses.join('\n')}
-          onChange={(event) =>
-            patch({
-              watchedProcesses: event.target.value
-                .split('\n')
-                .map((line) => line.trim())
-                .filter(Boolean)
-            })
-          }
+        <ListField
+          items={settings.watchedProcesses}
+          onChange={(items) => patch({ watchedProcesses: items })}
         />
         <div className="muted">One executable name per line.</div>
       </section>
 
       <section className="box">
         <h2>Watched folders</h2>
-        <textarea
-          value={settings.watchedFolders.join('\n')}
-          onChange={(event) =>
-            patch({
-              watchedFolders: event.target.value
-                .split('\n')
-                .map((line) => line.trim())
-                .filter(Boolean)
-            })
-          }
+        <ListField
+          items={settings.watchedFolders}
+          onChange={(items) => patch({ watchedFolders: items })}
         />
-        <div className="muted">One absolute path per line. Restart to re-watch.</div>
+        <div className="muted">One absolute path per line.</div>
       </section>
     </div>
   );
@@ -411,6 +397,48 @@ function PresetsSection({
         </button>
       </div>
     </section>
+  );
+}
+
+function parseLines(text: string): string[] {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+/**
+ * A one-entry-per-line list. The textarea keeps its own raw text: rendering
+ * the parsed list back on every keystroke would eat the newline that starts a
+ * new entry and the space in a name like "Docker Desktop.exe" as it is typed.
+ */
+function ListField({
+  items,
+  onChange
+}: {
+  items: string[];
+  onChange: (items: string[]) => void;
+}): JSX.Element {
+  const joined = items.join('\n');
+  const [draft, setDraft] = useState(joined);
+  const [seen, setSeen] = useState(joined);
+
+  // Follow outside changes (another window, a migration), but not the echo of
+  // our own edit, which would reformat the text under the caret.
+  if (joined !== seen) {
+    setSeen(joined);
+    if (parseLines(draft).join('\n') !== joined) setDraft(joined);
+  }
+
+  return (
+    <textarea
+      value={draft}
+      onChange={(event) => {
+        setDraft(event.target.value);
+        const next = parseLines(event.target.value);
+        if (next.join('\n') !== joined) onChange(next);
+      }}
+    />
   );
 }
 

@@ -309,7 +309,14 @@ async function bootstrap(): Promise<void> {
   };
 
   const started = new Set<string>();
-  const syncMonitors = async (settings: Settings): Promise<void> => {
+  // The file monitor reads its folders once, at start, so a change to the list
+  // is applied by restarting it.
+  let watchedFoldersKey = settingsStore.current.watchedFolders.join('\n');
+  const applyMonitors = async (settings: Settings): Promise<void> => {
+    const foldersKey = settings.watchedFolders.join('\n');
+    const foldersChanged = foldersKey !== watchedFoldersKey;
+    watchedFoldersKey = foldersKey;
+
     for (const [id, monitor] of Object.entries(monitors)) {
       const wanted = settings.monitors[id] !== false;
       if (wanted && !started.has(id)) {
@@ -320,8 +327,21 @@ async function bootstrap(): Promise<void> {
         await monitor.stop();
         started.delete(id);
         log.info(`monitor stopped: ${id}`);
+      } else if (wanted && id === 'file' && foldersChanged) {
+        await monitor.stop();
+        await monitor.start(bus);
+        log.info('monitor restarted: file (watched folders changed)');
       }
     }
+  };
+  // Settings change on every keystroke in the panel; overlapping runs would
+  // each see the monitor as started and both restart it, doubling watchers.
+  let monitorSync: Promise<void> = Promise.resolve();
+  const syncMonitors = (settings: Settings): Promise<void> => {
+    monitorSync = monitorSync
+      .then(() => applyMonitors(settings))
+      .catch((err) => log.warn(`monitor sync failed: ${String(err)}`));
+    return monitorSync;
   };
 
   await syncMonitors(settingsStore.current);
