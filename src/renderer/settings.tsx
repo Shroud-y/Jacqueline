@@ -26,7 +26,8 @@ const MONITOR_LABELS: Record<string, string> = {
   idle: 'Idle / return',
   schedule: 'Schedule (time of day, breaks, uptime)',
   session: 'Session (startup, lock, resume)',
-  file: 'Files (downloads, builds)'
+  file: 'Files (downloads, builds)',
+  focus: 'Active window (what you are doing — read locally, never stored)'
 };
 
 /** A config screen, not a product surface (§15). */
@@ -146,6 +147,31 @@ function SettingsPanel(): JSX.Element {
 
       <section className="box">
         <h2>Overlay</h2>
+        <div className="row">
+          <label>
+            <input
+              type="checkbox"
+              checked={settings.overlay.pinned}
+              onChange={(event) =>
+                patch({ overlay: { ...settings.overlay, pinned: event.target.checked } })
+              }
+            />
+            Keep the character on screen
+          </label>
+          <button
+            type="button"
+            disabled={!settings.overlay.pinned || settings.overlay.pinnedPosition === null}
+            onClick={() => patch({ overlay: { ...settings.overlay, pinnedPosition: null } })}
+          >
+            Reset position
+          </button>
+        </div>
+        <div className="row">
+          <span className="muted">
+            It rests between lines instead of leaving. Drag it anywhere; click it to make it speak;
+            right-click for the menu. It steps aside for fullscreen apps.
+          </span>
+        </div>
         <div className="row">
           <label>
             offset X

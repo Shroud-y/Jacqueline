@@ -5,6 +5,8 @@ import {
   EYE_MOTION,
   EYE_SHAPE,
   MODE_UNIFORMS,
+  PRESENCE,
+  blinkOpenness,
   bloomLevels,
   hexToRgb,
   opennessAt
@@ -146,5 +148,80 @@ describe('bloomLevels', () => {
 
   it('always returns at least one level, however small the canvas', () => {
     expect(bloomLevels(8, 8)).toBe(1);
+  });
+});
+
+describe('presence', () => {
+  it('holds still at rest and asleep, so a pinned eye mostly does not draw', () => {
+    // Every drawn frame costs about three milliseconds; the idle states are
+    // cheap only because nothing in them moves continuously.
+    expect(PRESENCE.resting.breathe).toBeNull();
+    expect(PRESENCE.asleep.breathe).toBeNull();
+    for (const elapsedMs of [0, 700, 2400, 9000]) {
+      expect(at(elapsedMs, { presence: 'resting' })).toBe(1);
+      expect(at(elapsedMs, { presence: 'asleep' })).toBe(1);
+    }
+  });
+
+  it('blinks at rest, and only at rest', () => {
+    expect(PRESENCE.resting.blink).not.toBeNull();
+    expect(PRESENCE.awake.blink).toBeNull();
+    expect(PRESENCE.asleep.blink).toBeNull();
+  });
+
+  it('spends far longer between blinks than blinking', () => {
+    const blink = PRESENCE.resting.blink!;
+    expect(blink.minGapMs).toBeLessThan(blink.maxGapMs);
+    expect(blink.durationMs * 8).toBeLessThan(blink.minGapMs);
+  });
+
+  it('closes and dims in order: awake, resting, asleep', () => {
+    expect(PRESENCE.awake.openness).toBe(1);
+    expect(PRESENCE.awake.exposure).toBe(1);
+    expect(PRESENCE.resting.openness).toBeLessThan(PRESENCE.awake.openness);
+    expect(PRESENCE.asleep.openness).toBeLessThan(PRESENCE.resting.openness);
+    expect(PRESENCE.resting.exposure).toBeLessThan(PRESENCE.awake.exposure);
+    expect(PRESENCE.asleep.exposure).toBeLessThan(PRESENCE.resting.exposure);
+  });
+
+  it('leaves an unpinned companion exactly as it was', () => {
+    // Awake is the default, and awake must be the old behaviour to the digit.
+    for (const elapsedMs of [0, 600, 1200, 5000]) {
+      expect(at(elapsedMs, { presence: 'awake' })).toBe(at(elapsedMs));
+    }
+  });
+
+  it('speaks with the speaking motion whatever it was doing before', () => {
+    expect(at(450, { presence: 'resting', speaking: true })).toBe(at(450, { speaking: true }));
+    expect(at(450, { presence: 'asleep', speaking: true })).toBe(at(450, { speaking: true }));
+  });
+});
+
+describe('blinkOpenness', () => {
+  it('starts and ends fully open, so a blink leaves no seam', () => {
+    expect(blinkOpenness(0, 0.9)).toBe(1);
+    expect(blinkOpenness(1, 0.9)).toBe(1);
+    expect(blinkOpenness(-0.2, 0.9)).toBe(1);
+    expect(blinkOpenness(1.4, 0.9)).toBe(1);
+  });
+
+  it('closes to its depth and no further', () => {
+    let lowest = 1;
+    for (let p = 0; p <= 1; p += 0.01) lowest = Math.min(lowest, blinkOpenness(p, 0.9));
+    expect(lowest).toBeCloseTo(0.1, 2);
+    expect(lowest).toBeGreaterThan(0);
+  });
+
+  it('drops the lid faster than it lifts it', () => {
+    let closedAt = 0;
+    let lowest = 1;
+    for (let p = 0; p <= 1; p += 0.005) {
+      const value = blinkOpenness(p, 0.9);
+      if (value < lowest) {
+        lowest = value;
+        closedAt = p;
+      }
+    }
+    expect(closedAt).toBeLessThan(0.5);
   });
 });

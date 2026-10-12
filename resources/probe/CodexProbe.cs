@@ -47,4 +47,58 @@ public class CodexProbe {
                && r.Right >= mi.rcMonitor.Right && r.Bottom >= mi.rcMonitor.Bottom;
     return covers ? "1" : "0";
   }
+
+  // ---- What the user is looking at (the focus monitor) -------------------
+  //
+  // One line per call: pid|process|hung|class|title|description, with the two
+  // free-text fields base64'd UTF-8. They are user-visible strings in any
+  // language, and the host's stdout is in whatever code page the console
+  // happens to have — plain text would arrive as mojibake, or split the line.
+  //
+  // Nothing here is written anywhere: the reply is read, classified and
+  // dropped by the Node side.
+
+  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+  [DllImport("user32.dll")] static extern bool IsHungAppWindow(IntPtr hWnd);
+
+  // The process name and file description cost a process handle and a module
+  // read; the window title changes far more often than the window's owner, so
+  // they are looked up once per pid.
+  static uint cachedPid = 0;
+  static string cachedName = "";
+  static string cachedDescription = "";
+
+  static string Encode(string value) {
+    return Convert.ToBase64String(Encoding.UTF8.GetBytes(value ?? ""));
+  }
+
+  public static string ForegroundInfo() {
+    IntPtr h = GetForegroundWindow();
+    if (h == IntPtr.Zero) return "";
+
+    uint pid;
+    GetWindowThreadProcessId(h, out pid);
+    if (pid == 0) return "";
+
+    if (pid != cachedPid) {
+      cachedPid = pid;
+      cachedName = "";
+      cachedDescription = "";
+      try {
+        System.Diagnostics.Process process = System.Diagnostics.Process.GetProcessById((int)pid);
+        cachedName = process.ProcessName.ToLowerInvariant();
+        // Fails for elevated and protected processes; the name alone is enough.
+        try { cachedDescription = process.MainModule.FileVersionInfo.FileDescription ?? ""; } catch { }
+      } catch { }
+    }
+
+    StringBuilder cls = new StringBuilder(256);
+    GetClassName(h, cls, cls.Capacity);
+    StringBuilder title = new StringBuilder(512);
+    GetWindowText(h, title, title.Capacity);
+
+    return pid + "|" + cachedName + "|" + (IsHungAppWindow(h) ? "1" : "0") + "|" + cls.ToString()
+         + "|" + Encode(title.ToString()) + "|" + Encode(cachedDescription);
+  }
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DEFAULT_LAYOUT, type OverlayLayout } from '@shared/overlayLayout';
 import type { CueSources, SkinId } from '@shared/types';
 
 /**
@@ -59,6 +60,41 @@ export function useAppearanceVideoUrl(): string | null | undefined {
   }, []);
 
   return videoUrl;
+}
+
+export interface PinnedState {
+  pinned: boolean;
+  dormant: boolean;
+  layout: OverlayLayout;
+}
+
+const UNPINNED: PinnedState = { pinned: false, dormant: false, layout: DEFAULT_LAYOUT };
+
+/**
+ * Whether the character lives on screen, whether it is silenced, and how the
+ * window is laid out around it. The same object comes back while nothing in
+ * it has changed, so the layout does not look new on every unrelated push.
+ */
+export function usePinnedState(): PinnedState {
+  const [state, setState] = useState<PinnedState>(UNPINNED);
+
+  useEffect(() => {
+    const api = window.codex;
+    if (!api) return;
+    return api.onStateUpdate((payload) =>
+      setState((previous) => {
+        const layout = payload.layout ?? DEFAULT_LAYOUT;
+        const unchanged =
+          previous.pinned === payload.pinned &&
+          previous.dormant === payload.dormant &&
+          previous.layout.anchor === layout.anchor &&
+          previous.layout.flow === layout.flow;
+        return unchanged ? previous : { pinned: payload.pinned, dormant: payload.dormant, layout };
+      })
+    );
+  }, []);
+
+  return state;
 }
 
 export interface AudioOptions {

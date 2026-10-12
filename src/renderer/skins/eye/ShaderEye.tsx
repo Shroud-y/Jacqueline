@@ -1,10 +1,14 @@
 import { useEffect, useRef } from 'react';
-import type { SpeechMode } from '@shared/types';
+import type { Presence, SpeechMode } from '@shared/types';
 import { CANVAS } from './geometry';
 import {
   EYE_CENTRE,
   EYE_SHAPE,
+  FRAME_MS,
   MODE_UNIFORMS,
+  PRESENCE,
+  PRESENCE_EASE_MS,
+  blinkOpenness,
   bloomLevels,
   hexToRgb,
   opennessAt,
@@ -45,6 +49,8 @@ export interface ShaderEyeProps {
   reducedMotion: boolean;
   /** §4.1 review mode. CSS hides the layer; this stops it rendering as well. */
   unlit: boolean;
+  /** How the eye holds itself with nothing to say. Absent means awake. */
+  presence?: Presence;
 }
 
 /*
@@ -57,8 +63,21 @@ export interface ShaderEyeProps {
  */
 const RENDER_SCALE = 2;
 
-/** 30 fps. See the note in the loop: the eye's slowest motion is a 2.4 s cycle. */
-const FRAME_MS = 1000 / 30 - 1;
+/**
+ * The timer undershoots the frame interval by this much, so the rAF it
+ * requests lands on the intended vsync rather than the one after.
+ */
+const FRAME_SLACK_MS = 1;
+
+/** An eased factor this close to its target is there. */
+const SETTLED = 0.004;
+
+/**
+ * The most one frame may advance the field's clock. The loop stops between
+ * blinks, and a field that jumped by the seconds it was not being drawn for
+ * would start every blink by snapping to a different contour.
+ */
+const MAX_FIELD_STEP_MS = 50;
 
 interface Target {
   tex: WebGLTexture;
@@ -231,7 +250,14 @@ export default function ShaderEye(props: ShaderEyeProps): JSX.Element {
       draw();
     };
 
-    const start = performance.now();
+    /* The field's own clock: it advances only while frames are being drawn,
+       so a still eye picks up exactly where it stopped. Awake, that is real
+       time to within a frame. */
+    let fieldMs = 0;
+    /* A blink in progress, and when the next one is due. Only a presence with
+       a `blink` uses either. */
+    let blinkStartedAt: number | null = null;
+    let nextBlinkAt = 0;
     let frame = 0;
     let timer = 0;
     let running = false;
@@ -242,17 +268,56 @@ export default function ShaderEye(props: ShaderEyeProps): JSX.Element {
        only when this key changes. */
     let uploadedKey = '';
     let compositeKey = '';
+    /* The presence factors as currently drawn, easing toward the presence
+       asked for. Null until the first frame, which starts where it means to
+       be instead of opening from nothing. */
+    let shownOpen: number | null = null;
+    let shownExposure: number | null = null;
+    let lastFrameAt = 0;
 
     const render = (now: number): void => {
       if (disposed) return;
-      const { baseHue, coreHue, mode, speaking, reducedMotion, unlit } = latest.current;
+      const { baseHue, coreHue, mode, speaking, reducedMotion, unlit, presence = 'awake' } = latest.current;
       if (unlit) {
         running = false;
         return;
       }
 
-      const elapsedMs = now - start;
       const u: EyeUniforms = MODE_UNIFORMS[mode];
+
+      const target = PRESENCE[presence];
+      const dt = lastFrameAt === 0 ? 0 : now - lastFrameAt;
+      lastFrameAt = now;
+      fieldMs += Math.min(dt, MAX_FIELD_STEP_MS);
+      const elapsedMs = fieldMs;
+      const ease = reducedMotion ? 1 : 1 - Math.exp(-dt / PRESENCE_EASE_MS);
+      shownOpen = shownOpen === null ? target.openness : shownOpen + (target.openness - shownOpen) * ease;
+      shownExposure =
+        shownExposure === null ? target.exposure : shownExposure + (target.exposure - shownExposure) * ease;
+      const settled =
+        Math.abs(shownOpen - target.openness) < SETTLED && Math.abs(shownExposure - target.exposure) < SETTLED;
+
+      // Blinks belong to a presence that has them and to an eye that has
+      // finished arriving there; anything else cancels one in flight.
+      let blink = 1;
+      const blinks = !reducedMotion && settled ? target.blink : null;
+      if (!blinks) {
+        blinkStartedAt = null;
+        nextBlinkAt = 0;
+      } else {
+        const gap = (): number => blinks.minGapMs + Math.random() * (blinks.maxGapMs - blinks.minGapMs);
+        if (nextBlinkAt === 0) nextBlinkAt = now + gap();
+        if (blinkStartedAt === null && now >= nextBlinkAt) blinkStartedAt = now;
+        if (blinkStartedAt !== null) {
+          const progress = (now - blinkStartedAt) / blinks.durationMs;
+          if (progress >= 1) {
+            blinkStartedAt = null;
+            nextBlinkAt = now + gap();
+          } else {
+            blink = blinkOpenness(progress, blinks.depth);
+          }
+        }
+      }
 
       // 1 — the eye, into HDR.
       bindPass(scene, eye);
@@ -279,7 +344,7 @@ export default function ShaderEye(props: ShaderEyeProps): JSX.Element {
       gl.uniform1f(eye.loc('uTime'), reducedMotion ? 0 : elapsedMs / 1000);
       gl.uniform1f(
         eye.loc('uOpenness'),
-        opennessAt({ mode, speaking, reducedMotion, elapsedMs })
+        opennessAt({ mode, speaking, reducedMotion, elapsedMs, presence }) * shownOpen * blink
       );
       draw();
 
@@ -305,8 +370,9 @@ export default function ShaderEye(props: ShaderEyeProps): JSX.Element {
         gl.uniform2f(composite.loc('uResolution'), width, height);
         gl.uniform1f(composite.loc('uStrengthA'), u.uStrengthA);
         gl.uniform1f(composite.loc('uStrengthB'), u.uStrengthB);
-        gl.uniform1f(composite.loc('uExposure'), u.uExposure);
       }
+      // Per frame, unlike its neighbours: it is what dims the eye to rest.
+      gl.uniform1f(composite.loc('uExposure'), u.uExposure * shownExposure);
       const bind = (tex: WebGLTexture, unit: number, name: string): void => {
         gl.activeTexture(gl.TEXTURE0 + unit);
         gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -324,6 +390,20 @@ export default function ShaderEye(props: ShaderEyeProps): JSX.Element {
         return;
       }
 
+      // Nothing is moving: the eye has arrived at a presence that holds
+      // still, it is not speaking, and no blink is in flight. One frame is all
+      // there is to show, so the loop ends here and costs nothing — until a
+      // prop change kicks it, or the next blink comes due.
+      const moving = speaking || mode === 'rage' || target.breathe !== null || blinkStartedAt !== null;
+      if (settled && !moving) {
+        running = false;
+        lastFrameAt = 0;
+        if (blinks) {
+          timer = window.setTimeout(() => kick.current(), Math.max(0, nextBlinkAt - now));
+        }
+        return;
+      }
+
       /* The next frame is requested from a timer rather than straight from
          here, so the callback itself only runs 30 times a second.
          Re-requesting immediately and skipping the work under a deadline still
@@ -334,7 +414,7 @@ export default function ShaderEye(props: ShaderEyeProps): JSX.Element {
          that is drawn stays aligned to vsync. */
       timer = window.setTimeout(() => {
         frame = requestAnimationFrame(render);
-      }, FRAME_MS);
+      }, FRAME_MS - FRAME_SLACK_MS);
     };
 
     kick.current = () => {

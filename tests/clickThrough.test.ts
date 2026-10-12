@@ -69,3 +69,65 @@ describe('click-through', () => {
     vi.useRealTimers();
   });
 });
+
+describe('grab — the pinned character taking the mouse', () => {
+  it('takes the mouse at once, with no debounce to wait out', () => {
+    vi.useFakeTimers();
+    try {
+      const { win, calls } = fakeWindow();
+      const controller = new ClickThroughController(win);
+
+      controller.grab();
+      // No timers advanced: a press that lands in the next millisecond must
+      // already find the window listening.
+      expect(calls[calls.length - 1]).toEqual([false, false]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does nothing when the window already has the mouse', () => {
+    const { win, calls } = fakeWindow();
+    const controller = new ClickThroughController(win);
+    controller.grab();
+    const before = calls.length;
+
+    controller.grab();
+    controller.grab();
+    expect(calls).toHaveLength(before);
+  });
+
+  it('cancels a release that was still waiting out its debounce', () => {
+    vi.useFakeTimers();
+    try {
+      const { win, calls } = fakeWindow();
+      const controller = new ClickThroughController(win);
+      controller.grab();
+
+      // The cursor slips off the character and comes straight back.
+      controller.request(false);
+      controller.grab();
+      vi.advanceTimersByTime(500);
+
+      expect(calls[calls.length - 1]).toEqual([false, false]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('still gives the mouse back through the debounce', () => {
+    vi.useFakeTimers();
+    try {
+      const { win, calls } = fakeWindow();
+      const controller = new ClickThroughController(win);
+      controller.grab();
+
+      controller.request(false);
+      expect(calls[calls.length - 1]).toEqual([false, false]);
+      vi.advanceTimersByTime(60);
+      expect(calls[calls.length - 1]).toEqual([true, false]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

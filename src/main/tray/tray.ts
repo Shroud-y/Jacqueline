@@ -1,4 +1,4 @@
-import { Menu, Tray, app, nativeImage } from 'electron';
+import { Menu, Tray, app, nativeImage, type Point } from 'electron';
 import { join } from 'node:path';
 import type { FrequencyProfile } from '@shared/types';
 import { createLogger } from '../log/logger';
@@ -10,6 +10,7 @@ export interface TrayActions {
   saySomethingNow(): void;
   setSnooze(choice: SnoozeChoice): void;
   setFrequency(profile: FrequencyProfile): void;
+  setPinned(pinned: boolean): void;
   openSettings(): void;
   openDebug(): void;
   quit(): void;
@@ -19,6 +20,13 @@ export interface TrayDeps {
   iconPath: string;
   state: RuntimeState;
   getFrequency: () => FrequencyProfile;
+  getPinned: () => boolean;
+  /**
+   * What the character is doing right now, in words. Supplied rather than
+   * worked out here because the tray only knows about mute and snooze, and
+   * used to say "Active" straight through quiet hours and fullscreen apps.
+   */
+  getStatusLabel: () => string;
   isDev: boolean;
   actions: TrayActions;
 }
@@ -53,6 +61,15 @@ export class CodexTray {
     this.tray = null;
   }
 
+  /**
+   * The same menu, opened somewhere other than the tray — under the cursor,
+   * when the pinned character is right-clicked. One menu rather than two, so
+   * the character can never offer something the tray does not.
+   */
+  popUpAt(point: Point): void {
+    this.tray?.popUpContextMenu(this.buildMenu(), point);
+  }
+
   refresh(): void {
     if (!this.tray) return;
     this.tray.setContextMenu(this.buildMenu());
@@ -60,15 +77,7 @@ export class CodexTray {
   }
 
   private statusLabel(): string {
-    const now = Date.now();
-    if (this.deps.state.isMuted) return 'Muted';
-    if (this.deps.state.snoozedForRestart) return 'Snoozed until restart';
-    const until = this.deps.state.snoozeUntil(now);
-    if (until !== null && Number.isFinite(until)) {
-      const time = new Date(until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      return `Snoozed until ${time}`;
-    }
-    return 'Active';
+    return this.deps.getStatusLabel();
   }
 
   private buildMenu(): Menu {
@@ -113,6 +122,15 @@ export class CodexTray {
             this.refresh();
           }
         }))
+      },
+      {
+        label: 'Keep on screen',
+        type: 'checkbox',
+        checked: this.deps.getPinned(),
+        click: (item) => {
+          actions.setPinned(item.checked);
+          this.refresh();
+        }
       },
       { type: 'separator' },
       { label: 'Settings…', click: () => actions.openSettings() },

@@ -42,6 +42,14 @@ if (-not $FullscreenReady) {
   [Console]::Error.WriteLine('probe: no fullscreen detector in ' + $ProbeDir + ' - reporting not fullscreen')
 }
 
+# A DLL built before the focus monitor existed loads fine and simply lacks the
+# method. Asking it anyway would print an error per poll; an empty reply reads
+# as "no reading" on the Node side, the same as a window with no owner.
+$ForegroundReady = $FullscreenReady -and ($null -ne [CodexProbe].GetMethod('ForegroundInfo'))
+if ($FullscreenReady -and -not $ForegroundReady) {
+  [Console]::Error.WriteLine('probe: CodexProbe has no ForegroundInfo - rebuild it with pnpm probe-dll; focus monitor disabled')
+}
+
 function Get-MicrophoneUsers {
   # LastUsedTimeStop == 0 means "still in use" (§8.5). The names are returned
   # rather than a bare flag, because some applications (Discord, Teams) hold
@@ -113,6 +121,7 @@ function Get-CpuTemperature {
   if ($null -eq $line) { break pump }
   switch ($line.Trim()) {
     'fs'    { if ($FullscreenReady) { [Console]::Out.WriteLine('fs=' + [CodexProbe]::ForegroundIsFullscreen()) } else { [Console]::Out.WriteLine('fs=0') } }
+    'fg'    { if ($ForegroundReady) { [Console]::Out.WriteLine('fg=' + [CodexProbe]::ForegroundInfo()) } else { [Console]::Out.WriteLine('fg=') } }
     'mic'   { [Console]::Out.WriteLine('mic=' + (Get-MicrophoneUsers)) }
     'procs' { [Console]::Out.WriteLine('procs=' + (Get-ProcessNames)) }
     'disk'  { [Console]::Out.WriteLine('disk=' + (Get-DriveSpace)) }

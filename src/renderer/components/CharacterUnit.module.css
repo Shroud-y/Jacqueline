@@ -17,6 +17,14 @@
   animation: none;
 }
 
+/* A pinned companion at rest holds still. The bob is cheap to draw but it is
+   a running animation on a window that is visible all day, and that keeps the
+   compositor producing frames for the whole of it. */
+.unit[data-presence='resting'],
+.unit[data-presence='asleep'] {
+  animation: none;
+}
+
 @keyframes bob {
   0%,
   100% {

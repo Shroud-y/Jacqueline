@@ -1,3 +1,5 @@
+import { parseForeground } from '../core/activity';
+import type { ForegroundReader } from '../monitors/focusMonitor';
 import type { ProcessLister } from '../monitors/processMonitor';
 import type {
   BatteryReading,
@@ -71,6 +73,10 @@ export function parseDrives(reply: string | null): DriveSpace[] | null {
 
 export function processListerFor(probe: PresenceProbe): ProcessLister {
   return async () => parseProcessNames(await probe.ask('procs', 'procs'));
+}
+
+export function foregroundReaderFor(probe: PresenceProbe): ForegroundReader {
+  return async () => parseForeground(await probe.ask('fg', 'fg'));
 }
 
 export function systemQueriesFor(probe: PresenceProbe): SystemQueries {

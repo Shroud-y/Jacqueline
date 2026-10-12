@@ -1,3 +1,4 @@
+import type { AppKind, WatchedApp } from '@shared/types';
 import type { EventBus } from '../core/eventBus';
 import { EventType, createEvent } from '../core/events';
 import { createLogger } from '../log/logger';
@@ -29,7 +30,7 @@ export class ProcessMonitor implements Monitor {
   readonly id = 'process';
 
   /** Keyed by stem, so respelling a watchlist entry is not a stop and a start. */
-  private running = new Map<string, { label: string; startedAt: number }>();
+  private running = new Map<string, { label: string; kind: AppKind; startedAt: number }>();
   private longRunningReported = new Set<string>();
   /**
    * Stems that were on the watchlist at the previous tick. A process that only
@@ -41,7 +42,7 @@ export class ProcessMonitor implements Monitor {
 
   constructor(
     private readonly scheduler: SharedScheduler,
-    private readonly getWatchlist: () => string[],
+    private readonly getWatchlist: () => readonly WatchedApp[],
     private readonly listProcesses: ProcessLister
   ) {}
 
@@ -56,11 +57,12 @@ export class ProcessMonitor implements Monitor {
 
   private async poll(bus: EventBus, now: number): Promise<void> {
     // Keyed by stem, valued by the spelling the user wrote — events carry the
-    // watchlist's own wording rather than whatever the reading happened to use.
-    const watchlist = new Map<string, string>();
+    // watchlist's own wording rather than whatever the reading happened to use
+    // — and by what the user says the thing is, which picks the lines it gets.
+    const watchlist = new Map<string, { label: string; kind: AppKind }>();
     for (const entry of this.getWatchlist()) {
-      const stem = processStem(entry);
-      if (stem.length > 0) watchlist.set(stem, entry.trim().toLowerCase());
+      const stem = processStem(entry.name);
+      if (stem.length > 0) watchlist.set(stem, { label: entry.name.trim().toLowerCase(), kind: entry.kind });
     }
 
     // An entry taken off the list is forgotten quietly: it did not stop, the
@@ -94,23 +96,26 @@ export class ProcessMonitor implements Monitor {
     this.watched = new Set(watchlist.keys());
 
     for (const stem of present) {
-      const label = watchlist.get(stem)!;
+      const { label, kind } = watchlist.get(stem)!;
       const known = this.running.get(stem);
       if (known) {
+        // Re-labelled or re-classified while running: the stop, when it
+        // comes, should speak of it as the user now describes it.
         known.label = label;
+        known.kind = kind;
         continue;
       }
-      this.running.set(stem, { label, startedAt: now });
+      this.running.set(stem, { label, kind, startedAt: now });
       if (previouslyWatched.has(stem)) {
-        bus.emit(createEvent(EventType.processStarted, 'ambient', { name: label }, now));
+        bus.emit(createEvent(EventType.processStarted, 'ambient', { name: label, kind }, now));
       }
     }
 
-    for (const [stem, { label, startedAt }] of [...this.running]) {
+    for (const [stem, { label, kind, startedAt }] of [...this.running]) {
       if (!present.has(stem)) {
         this.forget(stem);
         bus.emit(
-          createEvent(EventType.processStopped, 'ambient', { name: label, ranForMs: now - startedAt }, now)
+          createEvent(EventType.processStopped, 'ambient', { name: label, kind, ranForMs: now - startedAt }, now)
         );
         continue;
       }
@@ -120,7 +125,7 @@ export class ProcessMonitor implements Monitor {
           createEvent(
             EventType.processLongRunning,
             'ambient',
-            { name: label, ranForMs: now - startedAt, hours: (now - startedAt) / 3_600_000 },
+            { name: label, kind, ranForMs: now - startedAt, hours: (now - startedAt) / 3_600_000 },
             now
           )
         );

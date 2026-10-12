@@ -24,9 +24,38 @@
      phrase arriving with a toast already on screen overlapped it by 8 px; the
      two worst cases never occur together in a single harness scene, so this
      only shows up in the measurements. */
-  top: 24px;
-  right: 28px;
+  top: var(--unit-inset-y, 24px);
+  right: var(--unit-inset-x, 28px);
   animation: unit-in 320ms var(--ease-entry) both;
+}
+
+/* ---- Pinned · the unit lives here and the text finds room ---------- */
+
+/* A pinned companion can be dragged anywhere, so the text cannot always hang
+   down and to the left: in the bottom-right corner — where everyone puts it —
+   that is off the screen. Main picks the side with room and says so through
+   `data-anchor` (which side of the window the unit is on) and `data-flow`
+   (whether the text hangs below it or stacks above). Unpinned, both are
+   always right/down and none of these rules apply. */
+
+.root[data-anchor='left'] .unitSlot {
+  right: auto;
+  left: var(--unit-inset-x, 28px);
+}
+
+.root[data-flow='up'] .unitSlot {
+  top: auto;
+  bottom: var(--unit-inset-y, 24px);
+}
+
+/* It does not arrive and it does not leave: it is simply there, and fades up
+   once when it first appears. The same rule covers the 'out' state, so the
+   end of a line takes the text away and leaves the unit where it is — and
+   because the animation name does not change between the two, it does not
+   replay. */
+.root[data-pinned='true'] .unitSlot,
+.root[data-pinned='true'][data-state='out'] .unitSlot {
+  animation: fade-in 420ms ease-out both;
 }
 
 .root[data-state='out'] .unitSlot {
@@ -50,11 +79,36 @@
      optic's vertical centre so speech read as coming from the character. Below
      it reads as coming from underneath instead, and the label rather than the
      baseline is now the fixed point the text hangs off. */
-  top: calc(24px + var(--optic-y, 88px) + 38px);
+  top: calc(var(--unit-inset-y, 24px) + var(--optic-y, 88px) + 38px);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   max-width: 320px;
+}
+
+.root[data-anchor='left'] .speechZone {
+  right: auto;
+  left: var(--unit-inset-x, 28px);
+  align-items: flex-start;
+  --dialogue-align: left;
+  --dialogue-margin-left: 0;
+}
+
+/* Above the unit: the same distance from the optic, measured upward, and
+   stacked in reverse so the label stays the part nearest the eye. */
+.root[data-flow='up'] .speechZone {
+  top: auto;
+  bottom: calc(var(--unit-inset-y, 24px) + var(--unit-h, 175px) - var(--optic-y, 88px) + 38px);
+  flex-direction: column-reverse;
+}
+
+.root[data-flow='up'] .dialogueSlot {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.root[data-anchor='left'] .nameLabel {
+  margin-right: 0;
 }
 
 .dialogueSlot {

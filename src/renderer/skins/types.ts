@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import type { SkinId, SpeechMode } from '@shared/types';
+import type { Presence, SkinId, SpeechMode } from '@shared/types';
 import type { PersonaPalette } from '@renderer/personas/types';
 
 /**
@@ -50,6 +50,11 @@ export interface SkinProps {
   reducedMotion: boolean;
   /** §4.1 review mode — hides every emissive, bloom, halo and spill layer. */
   unlit?: boolean;
+  /**
+   * How the character holds itself when it is on screen with nothing to say.
+   * Only a pinned companion is ever anything but awake.
+   */
+  presence?: Presence;
 }
 
 export interface Skin {

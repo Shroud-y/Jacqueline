@@ -7,10 +7,11 @@
  */
 
 import { computeDurationMs } from '@shared/speechTiming';
-import type { SpeechShowPayload } from '@shared/types';
+import type { PhraseSegment, SpeechShowPayload } from '@shared/types';
 import type { AppEvent, EventPriority } from './events';
 import type { ConditionContext } from './conditions';
 import { evaluateConditions } from './conditions';
+import { fillSegments } from './slots';
 import { CooldownKey, type CooldownLedger } from './cooldown';
 import type { Phrase, PhraseBankIndex } from './phraseBank';
 import { RecentHistory, selectPhrase, type Rng } from './selector';
@@ -220,7 +221,10 @@ export class SpeechDirector {
 
     const speechId = `s${++this.speechCounter}-${phrase.id}`;
     this.current = { speechId, phraseId: phrase.id, priority: request.priority };
-    void this.perform(speechId, phrase);
+    // Eligibility already proved the slots fill; the fallback is for a
+    // caller-supplied `isEligible` that did not check.
+    const segments = fillSegments(phrase.segments, request.event?.payload) ?? phrase.segments;
+    void this.perform(speechId, phrase, segments);
 
     this.deps.logInfo?.(`[director] ${label} → speaking "${phrase.id}"`);
     return { said: true, speechId, phraseId: phrase.id };
@@ -235,6 +239,8 @@ export class SpeechDirector {
     if (!request.bypassCooldowns && !this.deps.ledger.canFire(CooldownKey.phrase(phrase.id), now)) {
       return false;
     }
+    // A line that names something the event did not supply cannot be said.
+    if (fillSegments(phrase.segments, request.event?.payload) === null) return false;
     return evaluateConditions(phrase.conditions, {
       ...base,
       now,
@@ -243,8 +249,9 @@ export class SpeechDirector {
     });
   }
 
-  private async perform(speechId: string, phrase: Phrase): Promise<void> {
-    const durationMs = computeDurationMs(phrase.segments);
+  /** `segments` is the phrase as it will be said: its slots already filled. */
+  private async perform(speechId: string, phrase: Phrase, segments: PhraseSegment[]): Promise<void> {
+    const durationMs = computeDurationMs(segments);
 
     let audioUrl: string | null = null;
     try {
@@ -257,14 +264,14 @@ export class SpeechDirector {
 
     const payload: SpeechShowPayload = {
       speechId,
-      segments: phrase.segments,
+      segments,
       durationMs,
       ...(audioUrl ? { audioUrl } : {})
     };
     this.deps.overlay.show(payload);
 
     try {
-      await this.deps.voice.speak({ phraseId: phrase.id, segments: phrase.segments });
+      await this.deps.voice.speak({ phraseId: phrase.id, segments });
     } catch (err) {
       this.deps.logDebug?.(`[director] voice.speak failed for ${phrase.id}: ${String(err)}`);
     }

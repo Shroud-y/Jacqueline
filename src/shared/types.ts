@@ -63,10 +63,40 @@ export interface CueSources {
   disappear: string | null;
 }
 
+/** The eye's bearing: speaking or attended to, on screen with nothing to say, or silenced. */
+export type Presence = 'awake' | 'resting' | 'asleep';
+
+/**
+ * Which side of the window the unit sits on, and which way the text runs from
+ * it. Structurally the same as `OverlayLayout` in `overlayLayout.ts`; declared
+ * here so this file stays free of imports.
+ */
+export interface OverlayLayoutPayload {
+  anchor: 'left' | 'right';
+  flow: 'down' | 'up';
+}
+
+/** A rectangle inside the overlay window, in CSS pixels. */
+export interface HotRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 /** main → renderer: 'state:update' */
 export interface StatePayload {
   muted: boolean;
   snoozedUntil: number | null;
+  /** The character stays on screen between lines instead of leaving. */
+  pinned: boolean;
+  /**
+   * Nothing will be said for now — muted, snoozed or inside quiet hours. A
+   * pinned eye shows it by closing rather than by vanishing.
+   */
+  dormant: boolean;
+  /** How the window is laid out around the unit. Only ever non-default when pinned. */
+  layout: OverlayLayoutPayload;
   /** Switchable at runtime from settings; no restart. */
   skinId: SkinId;
   cues: CueSources;
@@ -79,6 +109,9 @@ export interface StatePayload {
   appearSoundEnabled: boolean;
   disappearSoundEnabled: boolean;
 }
+
+/** The half of `state:update` that `RuntimeState` owns; `OverlayWindow` merges in the rest. */
+export type RuntimeStatePayload = Pick<StatePayload, 'muted' | 'snoozedUntil'>;
 
 /** renderer → main: 'speech:finished' / 'speech:dismissed' */
 export interface SpeechAckPayload {
@@ -95,14 +128,29 @@ export interface QuietHours {
   to: string;
 }
 
+/**
+ * Where the character turns up when it is not pinned: against the right edge
+ * of whichever screen the cursor is on, at one of three heights.
+ */
+export type OverlayPlacement = 'right' | 'bottomRight' | 'topRight';
+
+export const OVERLAY_PLACEMENTS: readonly OverlayPlacement[] = ['right', 'bottomRight', 'topRight'];
+
 export interface OverlaySettings {
-  scale: number;
-  offsetX: number;
-  offsetY: number;
+  /** Used only while the character is not pinned; a pinned one sits where it was dragged. */
+  placement: OverlayPlacement;
   /** 0 (silent) to 1 (full). Applies to both a file cue and the synthesised fallback. */
   cueVolume: number;
   appearSoundEnabled: boolean;
   disappearSoundEnabled: boolean;
+  /** Keep the character on screen between lines. */
+  pinned: boolean;
+  /**
+   * Where the pinned character was last dropped: the top-left of its unit, in
+   * screen coordinates. Null until it has been dragged, which means the
+   * bottom-right corner of the primary display.
+   */
+  pinnedPosition: { x: number; y: number } | null;
 }
 
 /**
@@ -135,19 +183,94 @@ export interface PresetAssetStatus {
   hasVideo: boolean;
 }
 
+/**
+ * What a watched application is, which decides the lines it gets: a game
+ * starting is not remarked on the way an editor starting is.
+ */
+export type AppKind = 'app' | 'game' | 'launcher' | 'notable';
+
+export const APP_KINDS: readonly AppKind[] = ['app', 'game', 'launcher', 'notable'];
+
+export interface WatchedApp {
+  /** Executable name as the user wrote it: 'Code.exe'. Matched without case or extension. */
+  name: string;
+  kind: AppKind;
+}
+
+/**
+ * The things the character can be told not to talk about. A topic switched
+ * off silences its lines and nothing else: whatever watches the machine keeps
+ * watching, because the topics lean on each other's readings (break reminders
+ * need to know the user is idle whether or not idleness is itself a topic).
+ */
+export type TopicId =
+  | 'greetings'
+  | 'system'
+  | 'apps'
+  | 'downloads'
+  | 'timeOfDay'
+  | 'breaks'
+  | 'chatter'
+  | 'activeWindow';
+
+export const TOPIC_IDS: readonly TopicId[] = [
+  'greetings',
+  'system',
+  'apps',
+  'downloads',
+  'timeOfDay',
+  'breaks',
+  'chatter',
+  'activeWindow'
+];
+
+/** The kinds of remark inside the active-window topic, each switchable on its own. */
+export type FocusRemarkId = 'settling' | 'drift' | 'long' | 'restless' | 'tools';
+
+export const FOCUS_REMARK_IDS: readonly FocusRemarkId[] = ['settling', 'drift', 'long', 'restless', 'tools'];
+
 export interface Settings {
-  version: 4;
+  version: 6;
   startWithSystem: boolean;
   presets: Preset[];
   activePresetId: string;
   frequencyProfile: FrequencyProfile;
   quietHours: QuietHours;
+  /** Silences the character while a fullscreen application is in front — and hides it, if pinned. */
   suppressOnFullscreen: boolean;
   suppressOnMicrophoneUse: boolean;
-  watchedProcesses: string[];
+  watchedApps: WatchedApp[];
   watchedFolders: string[];
-  monitors: Record<string, boolean>;
+  topics: Record<TopicId, boolean>;
+  /** Only consulted while the `activeWindow` topic is on. */
+  focusRemarks: Record<FocusRemarkId, boolean>;
   overlay: OverlaySettings;
+}
+
+/* ------------------------------------------------------------------ */
+/* Settings window                                                     */
+/* ------------------------------------------------------------------ */
+
+/** What `settings:set` answers with: the settings as they now stand, and why not if the change was refused. */
+export type SettingsResult =
+  | { ok: true; settings: Settings }
+  | { ok: false; settings: Settings; error: string };
+
+/** Why the character is not speaking right now. Several can hold at once. */
+export type SilenceReason = 'muted' | 'snoozed' | 'quietHours' | 'fullscreen' | 'microphone';
+
+export type SnoozeChoice = '30m' | '2h' | 'restart' | 'off';
+
+/** Live state for the settings window and the tray: what the character is doing and why. */
+export interface CompanionStatus {
+  /** Empty means it is free to speak. In the order they should be reported. */
+  reasons: SilenceReason[];
+  muted: boolean;
+  /** Epoch ms the snooze ends at; null when not snoozed or snoozed until restart. */
+  snoozedUntil: number | null;
+  snoozedUntilRestart: boolean;
+  /** 'HH:mm' the current quiet hours end at; null outside them. */
+  quietUntil: string | null;
 }
 
 /* ------------------------------------------------------------------ */

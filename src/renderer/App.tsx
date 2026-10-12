@@ -5,6 +5,7 @@ import {
   useAppearanceVideoUrl,
   useAudioOptions,
   useCueSources,
+  usePinnedState,
   usePresetName,
   useSkinId
 } from './hooks/useOverlayState';
@@ -18,6 +19,7 @@ export default function App(): JSX.Element {
   const presetName = usePresetName();
   const videoUrl = useAppearanceVideoUrl();
   const audioOptions = useAudioOptions();
+  const presence = usePinnedState();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastInteractive = useRef(false);
 
@@ -82,6 +84,11 @@ export default function App(): JSX.Element {
         onDismiss={view.dismiss}
         speechKey={speechId}
         toast={view.speech?.toast ?? null}
+        pinned={presence.pinned}
+        dormant={presence.dormant}
+        layout={presence.layout}
+        onPoke={() => window.codex?.poke()}
+        onMenu={() => window.codex?.openMenu()}
       />
       <audio
         ref={audioRef}

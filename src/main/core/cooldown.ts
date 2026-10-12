@@ -100,6 +100,14 @@ export const DEFAULT_COOLDOWNS = {
     chatter: 20 * 60_000,
     system: 20 * 60_000,
     process: 15 * 60_000,
+    /** Remarks on what is in front of the user. Short: they are the ones that land. */
+    focus: 10 * 60_000,
+    /**
+     * Answers to the user handling the pinned character. Those are asked for,
+     * so in practice they bypass this; it is here so the category is a known
+     * one rather than falling through to the default.
+     */
+    interaction: 2 * 60_000,
     schedule: 60 * 60_000,
     wellbeing: 90 * 60_000
   } as Record<string, number>,

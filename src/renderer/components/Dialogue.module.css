@@ -6,8 +6,10 @@
   /* Grows leftward and upward from a fixed bottom-right corner, so the window
      never has to move (§3). */
   max-width: 320px;
-  margin-left: auto;
-  text-align: right;
+  /* Right-aligned unless the companion is pinned on the left of the screen,
+     where the text runs the other way (`Companion.module.css`). */
+  margin-left: var(--dialogue-margin-left, auto);
+  text-align: var(--dialogue-align, right);
   pointer-events: auto;
   cursor: pointer;
 }
@@ -53,7 +55,7 @@
   content: attr(data-text);
   position: absolute;
   inset: 0;
-  text-align: right;
+  text-align: var(--dialogue-align, right);
   white-space: pre-wrap;
   overflow-wrap: break-word;
   text-shadow: none;

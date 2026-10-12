@@ -1,10 +1,12 @@
-import { app, dialog, globalShortcut, ipcMain, net, protocol } from 'electron';
+import { app, dialog, globalShortcut, ipcMain, net, protocol, screen, shell } from 'electron';
+import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import {
   mkdirSync,
   existsSync,
   statSync,
   copyFileSync,
+  cpSync,
   renameSync,
   rmSync,
   readFileSync,
@@ -14,8 +16,10 @@ import { join } from 'node:path';
 import { z } from 'zod';
 
 import { IPC } from '@shared/ipc';
+import { REASON_ORDER, describeStatus } from '@shared/status';
 import {
   BUILTIN_PRESET_ID,
+  type CompanionStatus,
   type CueSources,
   type DebugSnapshot,
   type FrequencyProfile,
@@ -24,7 +28,10 @@ import {
   type PresetAssetKind,
   type PresetAssetResult,
   type PresetAssetStatus,
-  type Settings
+  type Settings,
+  type SettingsResult,
+  type SilenceReason,
+  type SnoozeChoice
 } from '@shared/types';
 
 import { EventBus } from './core/eventBus';
@@ -51,7 +58,7 @@ import {
 } from './core/phraseBank';
 import { TriggerEngine } from './core/triggerEngine';
 import { SpeechDirector } from './core/speechDirector';
-import { RuntimeState, type SnoozeChoice } from './core/runtimeState';
+import { RuntimeState } from './core/runtimeState';
 import {
   DEFAULT_BOOT_GRACE_MS,
   evaluateSuppression,
@@ -63,6 +70,7 @@ import { SystemMonitor } from './monitors/systemMonitor';
 import { ProcessMonitor } from './monitors/processMonitor';
 import { IdleMonitor } from './monitors/idleMonitor';
 import { ScheduleMonitor } from './monitors/scheduleMonitor';
+import { FocusMonitor } from './monitors/focusMonitor';
 import { SessionMonitor } from './monitors/sessionMonitor';
 import { FileMonitor } from './monitors/fileMonitor';
 import type { Monitor } from './monitors/Monitor';
@@ -71,7 +79,7 @@ import { OverlayWindow } from './window/overlayWindow';
 import { debugWindow, settingsWindow } from './window/panelWindows';
 import { CodexTray, isDevBuild, startTrayRefreshLoop } from './tray/tray';
 import { PresenceProbe } from './system/presenceProbe';
-import { processListerFor, systemQueriesFor } from './system/systemQueries';
+import { foregroundReaderFor, processListerFor, systemQueriesFor } from './system/systemQueries';
 import { SettingsStore, defaultSettings } from './settings/settings';
 import { StateStore } from './settings/stateStore';
 import { configureLogger, createLogger } from './log/logger';
@@ -91,6 +99,18 @@ const log = createLogger('main');
 
 /** The group the tray's "Say something now" draws from. */
 const UNPROMPTED_GROUP = 'ambient.unprompted';
+
+/* Lines for when the user handles the pinned character directly. */
+const POKE_GROUP = 'interaction.poke';
+const MOVED_GROUP = 'interaction.moved';
+const PINNED_GROUP = 'interaction.pinned';
+/** Being dragged about is worth a remark now and then, not every time. */
+const MOVED_REMARK_CHANCE = 0.6;
+const MOVED_REMARK_INTERVAL_MS = 3 * 60_000;
+/** How often a pinned character checks whether a fullscreen application has taken the screen. */
+const CONCEAL_POLL_MS = 5_000;
+/** Quiet hours begin and end on the clock, with no event to hang the change on. */
+const DORMANT_POLL_MS = 30_000;
 /** Phase 2's command palette gets a home now so it costs nothing later (§19). */
 const COMMAND_PALETTE_ACCELERATOR = 'CommandOrControl+Alt+Shift+C';
 
@@ -164,7 +184,7 @@ async function bootstrap(): Promise<void> {
   const runtime = new RuntimeState();
   const overlay = new OverlayWindow();
   overlay.create(OverlayWindow.preloadPath());
-  overlay.setOffsets(settingsStore.current.overlay);
+  overlay.setPlacement(settingsStore.current.overlay.placement);
   overlay.setAudioOptions(audioOptionsFrom(settingsStore.current.overlay));
 
   // Files win over the synthesised cues, checked once here — same bargain as
@@ -243,7 +263,16 @@ async function bootstrap(): Promise<void> {
   /* Event pipeline                                                    */
   /* ---------------------------------------------------------------- */
   const bus = new EventBus();
-  const triggers = new TriggerEngine(defaultBank);
+  // The topic switches act here, on the rules, rather than on the monitors
+  // behind them: the monitors feed each other (break reminders and the focus
+  // monitor both need to know the user is idle), so stopping one to silence
+  // its own lines used to break another's.
+  const triggers = new TriggerEngine(defaultBank, {
+    isEnabled: (rule) => {
+      const { topics, focusRemarks } = settingsStore.current;
+      return topics[rule.topic] && (rule.focusRemark === undefined || focusRemarks[rule.focusRemark]);
+    }
+  });
 
   const dangling = triggers.danglingRules();
   if (dangling.length > 0) {
@@ -292,7 +321,7 @@ async function bootstrap(): Promise<void> {
     system: new SystemMonitor(scheduler, systemQueriesFor(probe)),
     process: new ProcessMonitor(
       scheduler,
-      () => settingsStore.current.watchedProcesses,
+      () => settingsStore.current.watchedApps,
       processListerFor(probe)
     ),
     idle: idleMonitor,
@@ -305,37 +334,35 @@ async function bootstrap(): Promise<void> {
       () => FREQUENCY_MULTIPLIER[settingsStore.current.frequencyProfile]
     ),
     session: new SessionMonitor(),
-    file: new FileMonitor(() => settingsStore.current.watchedFolders)
+    file: new FileMonitor(() => settingsStore.current.watchedFolders),
+    focus: new FocusMonitor(scheduler, foregroundReaderFor(probe), () => idleMonitor.isIdle, process.pid)
   };
 
-  const started = new Set<string>();
-  // The file monitor reads its folders once, at start, so a change to the list
-  // is applied by restarting it.
+  // Every monitor runs for the life of the app. What the user switches is the
+  // topics (see the trigger engine above), not the things doing the watching.
+  //
+  // The file monitor is the one that has to be restarted: it reads its
+  // folders once, at start, so a change to the list is applied that way.
+  let monitorsStarted = false;
   let watchedFoldersKey = settingsStore.current.watchedFolders.join('\n');
   const applyMonitors = async (settings: Settings): Promise<void> => {
-    const foldersKey = settings.watchedFolders.join('\n');
-    const foldersChanged = foldersKey !== watchedFoldersKey;
-    watchedFoldersKey = foldersKey;
-
-    for (const [id, monitor] of Object.entries(monitors)) {
-      const wanted = settings.monitors[id] !== false;
-      if (wanted && !started.has(id)) {
+    if (!monitorsStarted) {
+      monitorsStarted = true;
+      for (const [id, monitor] of Object.entries(monitors)) {
         await monitor.start(bus);
-        started.add(id);
         log.info(`monitor started: ${id}`);
-      } else if (!wanted && started.has(id)) {
-        await monitor.stop();
-        started.delete(id);
-        log.info(`monitor stopped: ${id}`);
-      } else if (wanted && id === 'file' && foldersChanged) {
-        await monitor.stop();
-        await monitor.start(bus);
-        log.info('monitor restarted: file (watched folders changed)');
       }
+      return;
     }
+    const foldersKey = settings.watchedFolders.join('\n');
+    if (foldersKey === watchedFoldersKey) return;
+    watchedFoldersKey = foldersKey;
+    await monitors.file.stop();
+    await monitors.file.start(bus);
+    log.info('monitor restarted: file (watched folders changed)');
   };
-  // Settings change on every keystroke in the panel; overlapping runs would
-  // each see the monitor as started and both restart it, doubling watchers.
+  // Overlapping runs would each see the folders as changed and both restart
+  // the watcher, doubling it.
   let monitorSync: Promise<void> = Promise.resolve();
   const syncMonitors = (settings: Settings): Promise<void> => {
     monitorSync = monitorSync
@@ -350,25 +377,49 @@ async function bootstrap(): Promise<void> {
   /* ---------------------------------------------------------------- */
   /* Tray                                                              */
   /* ---------------------------------------------------------------- */
+  /** Asked for directly, so it answers through a cooldown or quiet hours. Mute is still absolute. */
+  const sayNow = (origin: string): boolean =>
+    director.submit({
+      origin,
+      groupId: UNPROMPTED_GROUP,
+      category: 'ambient',
+      priority: 'notable',
+      bypassCooldowns: true,
+      bypassSuppression: true
+    }).said;
+
+  /* ---------------------------------------------------------------- */
+  /* Status — what it is doing right now, and why it may be quiet      */
+  /* ---------------------------------------------------------------- */
+  const companionStatus = (): CompanionStatus => {
+    const now = Date.now();
+    const active = new Set<string>(getSuppression(now).reasons);
+    const until = runtime.snoozeUntil(now);
+    return {
+      // The post-launch grace period is not something the user did or can
+      // undo, and it is over in half a minute: it is not a reason to report.
+      reasons: REASON_ORDER.filter((reason: SilenceReason) => active.has(reason)),
+      muted: runtime.isMuted,
+      snoozedUntil: until !== null && Number.isFinite(until) ? until : null,
+      snoozedUntilRestart: runtime.snoozedForRestart,
+      quietUntil: active.has('quietHours') ? settingsStore.current.quietHours.to : null
+    };
+  };
+
   const tray = new CodexTray({
     iconPath: CodexTray.defaultIconPath(paths.iconsDir()),
     state: runtime,
     getFrequency: () => settingsStore.current.frequencyProfile,
+    getPinned: () => settingsStore.current.overlay.pinned,
+    getStatusLabel: () => describeStatus(companionStatus()),
     isDev: isDevBuild(),
     actions: {
-      saySomethingNow: () => {
-        director.submit({
-          origin: 'tray',
-          groupId: UNPROMPTED_GROUP,
-          category: 'ambient',
-          priority: 'notable',
-          bypassCooldowns: true,
-          bypassSuppression: true
-        });
-      },
+      saySomethingNow: () => sayNow('tray'),
       setSnooze: (choice: SnoozeChoice) => runtime.setSnooze(choice, Date.now()),
       setFrequency: (profile: FrequencyProfile) =>
         settingsStore.update({ frequencyProfile: profile }),
+      setPinned: (pinned: boolean) =>
+        settingsStore.update({ overlay: { ...settingsStore.current.overlay, pinned } }),
       openSettings: () => settingsWindow.open(),
       openDebug: () => debugWindow.open(),
       quit: () => {
@@ -380,14 +431,92 @@ async function bootstrap(): Promise<void> {
   tray.create();
   const stopTrayLoop = startTrayRefreshLoop(tray);
 
+  /* ---------------------------------------------------------------- */
+  /* Pinned presence                                                   */
+  /* ---------------------------------------------------------------- */
+  // Silenced on purpose — as opposed to merely on a cooldown, or stepping
+  // aside for a call. The pinned eye closes for these and only these.
+  const refreshDormant = (): void => {
+    const { reasons } = getSuppression(Date.now());
+    overlay.setDormant(
+      reasons.includes('muted') || reasons.includes('snoozed') || reasons.includes('quietHours')
+    );
+  };
+  // The settings window shows the status live. Pushed only when it has
+  // actually changed, so a timer can ask as often as it likes.
+  let lastStatus = '';
+  const refreshStatus = (): void => {
+    refreshDormant();
+    const status = companionStatus();
+    const key = JSON.stringify(status);
+    if (key === lastStatus) return;
+    lastStatus = key;
+    settingsWindow.send(IPC.statusUpdated, status);
+    tray.refresh();
+  };
+  refreshStatus();
+  const dormantTimer = setInterval(refreshStatus, DORMANT_POLL_MS);
+  dormantTimer.unref?.();
+
+  // The probe's own fullscreen reading is refreshed every thirty seconds,
+  // which is fine for deciding whether to speak and far too slow for a
+  // character sitting on top of a film that just went fullscreen.
+  scheduler.every(CONCEAL_POLL_MS, async () => {
+    const settings = settingsStore.current;
+    if (!settings.overlay.pinned || !settings.suppressOnFullscreen) {
+      overlay.setConcealed(false);
+      return;
+    }
+    await probe.ask('fs', 'fs');
+    overlay.setConcealed(probe.fullscreenActive);
+    refreshStatus();
+  });
+
+  let lastMovedRemarkAt = 0;
+  overlay.onPinnedMoved = (position) => {
+    settingsStore.update({ overlay: { ...settingsStore.current.overlay, pinnedPosition: position } });
+
+    const now = Date.now();
+    if (now - lastMovedRemarkAt < MOVED_REMARK_INTERVAL_MS || Math.random() >= MOVED_REMARK_CHANCE) return;
+    lastMovedRemarkAt = now;
+    director.submit({
+      origin: 'interaction',
+      groupId: MOVED_GROUP,
+      category: 'interaction',
+      priority: 'ambient',
+      bypassCooldowns: true
+    });
+  };
+  overlay.setPinned({
+    pinned: settingsStore.current.overlay.pinned,
+    position: settingsStore.current.overlay.pinnedPosition
+  });
+
   runtime.onChange((state) => {
     overlay.sendState(state);
+    refreshStatus();
     tray.refresh();
     if (state.muted) director.interrupt();
   });
 
+  let wasPinned = settingsStore.current.overlay.pinned;
   settingsStore.onChange((settings) => {
-    overlay.setOffsets(settings.overlay);
+    overlay.setPlacement(settings.overlay.placement);
+    overlay.setPinned({ pinned: settings.overlay.pinned, position: settings.overlay.pinnedPosition });
+    refreshStatus();
+    if (settings.overlay.pinned && !wasPinned) {
+      // Said once the eye is actually there to say it.
+      setTimeout(() => {
+        director.submit({
+          origin: 'interaction',
+          groupId: PINNED_GROUP,
+          category: 'interaction',
+          priority: 'notable',
+          bypassCooldowns: true
+        });
+      }, 700);
+    }
+    wasPinned = settings.overlay.pinned;
     overlay.setAudioOptions(audioOptionsFrom(settings.overlay));
     applyPreset(settings.activePresetId);
     void syncMonitors(settings);
@@ -408,6 +537,39 @@ async function bootstrap(): Promise<void> {
     overlay.setInteractive(payload);
   });
 
+  const hotRectSchema = z
+    .object({
+      x: z.number().finite(),
+      y: z.number().finite(),
+      width: z.number().finite().positive(),
+      height: z.number().finite().positive()
+    })
+    .nullable();
+
+  ipcMain.on(IPC.overlaySetHotRect, (_event, payload: unknown) => {
+    const parsed = hotRectSchema.safeParse(payload);
+    if (!parsed.success) return;
+    overlay.setHotRect(parsed.data);
+  });
+
+  ipcMain.on(IPC.overlayDragStart, () => overlay.beginDrag());
+  ipcMain.on(IPC.overlayDragEnd, () => overlay.endDrag());
+
+  ipcMain.on(IPC.overlayPoke, () => {
+    // Asked for directly, so it answers through a cooldown or quiet hours the
+    // way "Say something now" does. Mute is still absolute.
+    director.submit({
+      origin: 'interaction',
+      groupId: POKE_GROUP,
+      category: 'interaction',
+      priority: 'notable',
+      bypassCooldowns: true,
+      bypassSuppression: true
+    });
+  });
+
+  ipcMain.on(IPC.overlayMenu, () => tray.popUpAt(screen.getCursorScreenPoint()));
+
   ipcMain.on(IPC.speechFinished, (_event, payload: unknown) => {
     const parsed = speechAckSchema.safeParse(payload);
     if (!parsed.success) return;
@@ -422,9 +584,75 @@ async function bootstrap(): Promise<void> {
 
   ipcMain.handle(IPC.settingsGet, () => settingsStore.current);
 
-  ipcMain.handle(IPC.settingsSet, (_event, payload: unknown) => {
-    if (!payload || typeof payload !== 'object') return settingsStore.current;
-    return settingsStore.update(payload as Partial<Settings>);
+  ipcMain.handle(IPC.settingsSet, (_event, payload: unknown): SettingsResult => {
+    if (!payload || typeof payload !== 'object') {
+      return { ok: false, settings: settingsStore.current, error: 'That change could not be read.' };
+    }
+    return settingsStore.tryUpdate(payload as Partial<Settings>);
+  });
+
+  ipcMain.handle(IPC.settingsDefaults, () => settingsStore.defaults);
+  ipcMain.handle(IPC.settingsReset, () => settingsStore.reset());
+
+  ipcMain.handle(IPC.statusGet, () => companionStatus());
+
+  ipcMain.on(IPC.statusSetMuted, (_event, payload: unknown) => {
+    if (typeof payload === 'boolean') runtime.setMuted(payload);
+  });
+
+  ipcMain.on(IPC.statusSetSnooze, (_event, payload: unknown) => {
+    const parsed = z.enum(['30m', '2h', 'restart', 'off']).safeParse(payload);
+    if (parsed.success) runtime.setSnooze(parsed.data, Date.now());
+  });
+
+  /** True when a line was actually spoken; false when it is muted, or already speaking. */
+  ipcMain.handle(IPC.sayNow, () => sayNow('settings'));
+
+  ipcMain.handle(IPC.foldersPick, async (): Promise<string | null> => {
+    const parent = settingsWindow.browserWindow;
+    const options = { properties: ['openDirectory' as const], title: 'Choose a folder to watch' };
+    const picked = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options);
+    return picked.canceled ? null : (picked.filePaths[0] ?? null);
+  });
+
+  ipcMain.handle(IPC.presetsDuplicate, (_event, payload: unknown) => {
+    const parsed = z.object({ presetId: z.string().min(1) }).safeParse(payload);
+    if (!parsed.success) return { ok: false, error: 'invalid request' };
+    return duplicatePreset(parsed.data.presetId);
+  });
+
+  ipcMain.handle(IPC.presetsOpenFolder, async (_event, payload: unknown): Promise<PresetAssetResult> => {
+    const parsed = z.object({ presetId: z.string().min(1) }).safeParse(payload);
+    if (!parsed.success || !settingsStore.current.presets.some((p) => p.id === parsed.data.presetId)) {
+      return { ok: false, error: 'Unknown character.' };
+    }
+    const dir = paths.presetDir(parsed.data.presetId);
+    try {
+      // A preset with nothing customised has no folder yet; make it, so there
+      // is somewhere to open and to drop files into.
+      mkdirSync(dir, { recursive: true });
+      const failure = await shell.openPath(dir);
+      return failure ? { ok: false, error: failure } : { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message ?? err) };
+    }
+  });
+
+  ipcMain.handle(IPC.bankSaveTemplate, async (): Promise<PresetAssetResult> => {
+    const parent = settingsWindow.browserWindow;
+    const options = {
+      title: 'Save the default phrase bank',
+      defaultPath: join(app.getPath('documents'), 'shard-phrase-bank.json'),
+      filters: [{ name: 'Phrase bank', extensions: ['json'] }]
+    };
+    const picked = parent ? await dialog.showSaveDialog(parent, options) : await dialog.showSaveDialog(options);
+    if (picked.canceled || !picked.filePath) return { ok: false, error: 'cancelled' };
+    try {
+      copyFileSync(paths.phraseBank(), picked.filePath);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message ?? err) };
+    }
   });
 
   const presetAssetKindSchema = z.enum(['bank', 'appearSound', 'disappearSound', 'video']);
@@ -496,6 +724,7 @@ async function bootstrap(): Promise<void> {
     stateStore.save();
     director.stop();
     scheduler.stop();
+    clearInterval(dormantTimer);
     probe.stop();
     for (const monitor of Object.values(monitors)) void monitor.stop();
     globalShortcut.unregisterAll();
@@ -544,14 +773,30 @@ async function bootstrap(): Promise<void> {
       }
     }
 
-    const presetCues = resolvePresetCueSources(paths.presetDir(preset.id), preset.id, ASSET_SCHEME);
-    const cues: CueSources = {
-      appear: presetCues.appear ?? defaultCues.appear,
-      disappear: presetCues.disappear ?? defaultCues.disappear
+    // A preset's file keeps its name when it is replaced (`appear.ogg` stays
+    // `appear.ogg`), so the URL alone cannot tell the overlay anything
+    // changed: it would see the same address, skip the update, and go on
+    // playing the old file until the app restarted. The file's modification
+    // time rides along as a query, which the protocol handler ignores.
+    const dir = paths.presetDir(preset.id);
+    const versioned = (url: string | null): string | null => {
+      if (!url) return null;
+      try {
+        const fileName = decodeURIComponent(url.slice(url.lastIndexOf('/') + 1));
+        return `${url}?v=${Math.round(statSync(join(dir, fileName)).mtimeMs)}`;
+      } catch {
+        return url;
+      }
     };
 
-    const videoFileName = presetVideoFileName(paths.presetDir(preset.id));
-    const videoUrl = videoFileName ? `${ASSET_SCHEME}://video/${preset.id}/${videoFileName}` : null;
+    const presetCues = resolvePresetCueSources(dir, preset.id, ASSET_SCHEME);
+    const cues: CueSources = {
+      appear: versioned(presetCues.appear) ?? defaultCues.appear,
+      disappear: versioned(presetCues.disappear) ?? defaultCues.disappear
+    };
+
+    const videoFileName = presetVideoFileName(dir);
+    const videoUrl = versioned(videoFileName ? `${ASSET_SCHEME}://video/${preset.id}/${videoFileName}` : null);
 
     return { preset, bank, cues, videoUrl };
   }
@@ -658,17 +903,40 @@ async function bootstrap(): Promise<void> {
     }
 
     const dir = paths.presetDir(presetId);
-    if (kind === 'bank') {
-      const file = paths.presetBankFile(presetId);
-      if (existsSync(file)) unlinkSync(file);
-    } else if (kind === 'video') {
-      clearVideoFiles(dir);
-    } else {
-      clearCueFiles(dir, kind === 'appearSound' ? 'appear' : 'disappear');
+    try {
+      if (kind === 'bank') {
+        const file = paths.presetBankFile(presetId);
+        if (existsSync(file)) unlinkSync(file);
+      } else if (kind === 'video') {
+        clearVideoFiles(dir);
+      } else {
+        clearCueFiles(dir, kind === 'appearSound' ? 'appear' : 'disappear');
+      }
+    } catch (err) {
+      return { ok: false, error: `Could not remove the file: ${String((err as Error).message ?? err)}` };
     }
 
     if (presetId === settingsStore.current.activePresetId) applyPreset(presetId);
     return { ok: true };
+  }
+
+  /** A copy of a character: its name, its skin and every file it had customised. */
+  function duplicatePreset(sourceId: string): PresetAssetResult & { presetId?: string } {
+    const current = settingsStore.current;
+    const source = current.presets.find((p) => p.id === sourceId);
+    if (!source) return { ok: false, error: 'Unknown character.' };
+
+    const id = randomUUID();
+    const sourceDir = paths.presetDir(sourceId);
+    try {
+      if (existsSync(sourceDir)) cpSync(sourceDir, paths.presetDir(id), { recursive: true });
+    } catch (err) {
+      return { ok: false, error: `Could not copy its files: ${String((err as Error).message ?? err)}` };
+    }
+
+    const name = `${source.name} copy`.slice(0, 40);
+    const result = settingsStore.tryUpdate({ presets: [...current.presets, { ...source, id, name }] });
+    return result.ok ? { ok: true, presetId: id } : { ok: false, error: result.error };
   }
 
   function assetStatusFor(presetId: string): PresetAssetStatus {
@@ -697,6 +965,9 @@ async function bootstrap(): Promise<void> {
       rmSync(paths.presetDir(id), { recursive: true, force: true });
     } catch (err) {
       log.warn(`could not remove assets for deleted preset "${id}": ${String(err)}`);
+      // The character is gone from the list either way; what is left is
+      // files, and the user should know they are still there.
+      return { ok: false, error: 'Deleted, but some of its files could not be removed.' };
     }
 
     return { ok: true };
@@ -818,9 +1089,9 @@ function syntheticPayload(type: string): Record<string, unknown> {
       return { percent: 14, synthetic: true };
     case EventType.processStarted:
     case EventType.processStopped:
-      return { name: 'Code.exe', synthetic: true };
+      return { name: 'Code.exe', kind: 'app', synthetic: true };
     case EventType.processLongRunning:
-      return { name: 'Code.exe', hours: 5, synthetic: true };
+      return { name: 'Code.exe', kind: 'app', hours: 5, synthetic: true };
     case EventType.scheduleWorkBreak:
       return { activeMinutes: 92, synthetic: true };
     case EventType.scheduleUptimeMilestone:
@@ -828,6 +1099,20 @@ function syntheticPayload(type: string): Record<string, unknown> {
     case EventType.fileDownloadComplete:
     case EventType.fileBuildComplete:
       return { name: 'artifact.zip', count: 1, synthetic: true };
+    case EventType.focusEnter:
+      return { activity: 'coding', app: 'Visual Studio Code', subject: 'Visual Studio Code', synthetic: true };
+    case EventType.focusDrift:
+      return { activity: 'video', app: 'Chrome', site: 'YouTube', subject: 'YouTube', from: 'coding', minutes: 70, synthetic: true };
+    case EventType.focusReturn:
+      return { activity: 'coding', app: 'Visual Studio Code', subject: 'Visual Studio Code', from: 'video', minutes: 25, synthetic: true };
+    case EventType.focusLong:
+      return { activity: 'coding', app: 'Visual Studio Code', subject: 'Visual Studio Code', minutes: 90, synthetic: true };
+    case EventType.focusRestless:
+      return { activity: 'browsing', app: 'Chrome', subject: 'Chrome', count: 12, synthetic: true };
+    case EventType.focusHung:
+      return { activity: 'browsing', app: 'Chrome', subject: 'Chrome', synthetic: true };
+    case EventType.focusTool:
+      return { activity: 'other', app: 'Task Manager', subject: 'Task Manager', tool: 'taskmgr', synthetic: true };
     default:
       return { synthetic: true };
   }
@@ -861,6 +1146,11 @@ function registerAudioProtocol(): void {
 
 /** §11 — read the real value and reconcile, rather than assuming. */
 function reconcileAutostart(wanted: boolean): void {
+  // A development run is `electron.exe` with the project as an argument. The
+  // login item it would register is the bare binary — which opens Electron's
+  // welcome window at every login — under the same name as the installed
+  // app's entry, which it would overwrite.
+  if (!app.isPackaged) return;
   try {
     const current = app.getLoginItemSettings({ args: ['--hidden'] });
     if (current.openAtLogin === wanted) return;

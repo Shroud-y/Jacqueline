@@ -1,20 +1,10 @@
-import type { StatePayload } from '@shared/types';
+import type { RuntimeStatePayload, SnoozeChoice } from '@shared/types';
 
-/** Everything `state:update` carries except the preset-level facts (skin,
- *  cue sources, name, appearance video) and the audio settings (volume,
- *  per-cue on/off), which `OverlayWindow` merges in on the way out. */
-type RuntimePayload = Omit<
-  StatePayload,
-  | 'skinId'
-  | 'cues'
-  | 'presetName'
-  | 'appearanceVideoUrl'
-  | 'cueVolume'
-  | 'appearSoundEnabled'
-  | 'disappearSoundEnabled'
->;
+/** Everything `state:update` carries that is neither a preset-level fact nor
+ *  a setting; `OverlayWindow` merges those in on the way out. */
+type RuntimePayload = RuntimeStatePayload;
 
-export type SnoozeChoice = '30m' | '2h' | 'restart' | 'off';
+export type { SnoozeChoice };
 
 /** Mute and snooze — the two user-facing kill switches (§11). */
 export class RuntimeState {

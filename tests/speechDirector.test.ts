@@ -24,6 +24,19 @@ const bank = new PhraseBankIndex(
         id: 'g.system',
         category: 'system',
         phrases: [{ id: 's.one', segments: [{ text: 'Hot.', mode: 'normal' }] }]
+      },
+      {
+        id: 'g.slot',
+        category: 'focus',
+        phrases: [
+          {
+            id: 'slot.frozen',
+            segments: [
+              { text: '{app} has frozen.', mode: 'normal' },
+              { text: 'UNACCEPTABLE, {app}', mode: 'rage' }
+            ]
+          }
+        ]
       }
     ]
   })
@@ -120,6 +133,28 @@ describe('SpeechDirector', () => {
     await Promise.resolve();
     expect(h.overlay.show).toHaveBeenCalledOnce();
     expect(h.overlay.show.mock.calls[0]?.[0].segments).toEqual([{ text: 'One.', mode: 'normal' }]);
+  });
+
+  it('fills the slots of a line from the event that triggered it', async () => {
+    const event = { id: 'e1', type: 'focus.hung', at: h.now, priority: 'notable' as const, payload: { app: 'Chrome' } };
+    const decision = h.director.submit(ambient({ groupId: 'g.slot', category: 'focus', event }));
+    await flush();
+
+    expect(decision.said).toBe(true);
+    expect(h.overlay.show.mock.calls[0]?.[0].segments).toEqual([
+      { text: 'Chrome has frozen.', mode: 'normal' },
+      { text: 'UNACCEPTABLE, CHROME', mode: 'rage' }
+    ]);
+  });
+
+  it('stays silent rather than say a line with a hole in it', () => {
+    // Same group, but nothing on the event to name.
+    expect(h.director.submit(ambient({ groupId: 'g.slot', category: 'focus' }))).toEqual({
+      said: false,
+      reason: 'noPhrase',
+      deferred: false
+    });
+    expect(h.overlay.show).not.toHaveBeenCalled();
   });
 
   it('drops everything under hard mute, including urgent', () => {

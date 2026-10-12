@@ -36,6 +36,24 @@ export class ClickThroughController {
     if (!this.interactive) this.apply(false);
   }
 
+  /**
+   * Takes the mouse now, with no debounce. For the pinned character, where
+   * the request comes from a cursor poll rather than from a mouse move, and
+   * every millisecond spent waiting is one in which a press on the character
+   * falls through to whatever is underneath. Giving the mouse back still goes
+   * through `request`, so the flipping the debounce exists to prevent cannot
+   * happen: this only ever moves one way.
+   */
+  grab(): void {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    if (this.interactive) return;
+    this.interactive = true;
+    this.apply(true);
+  }
+
   request(interactive: boolean): void {
     if (interactive === this.interactive) {
       if (this.timer) {

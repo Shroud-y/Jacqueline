@@ -1,11 +1,15 @@
 /// <reference types="vite/client" />
 
 import type {
+  CompanionStatus,
   DebugSnapshot,
+  HotRect,
   PresetAssetKind,
   PresetAssetResult,
   PresetAssetStatus,
   Settings,
+  SettingsResult,
+  SnoozeChoice,
   SpeechShowPayload,
   StatePayload
 } from '@shared/types';
@@ -20,13 +24,26 @@ export interface CodexOverlayApi {
   onSpeechInterrupt(handler: () => void): () => void;
   onStateUpdate(handler: (payload: StatePayload) => void): () => void;
   setInteractive(interactive: boolean): void;
+  setHotRect(rect: HotRect | null): void;
+  dragStart(): void;
+  dragEnd(): void;
+  poke(): void;
+  openMenu(): void;
   speechFinished(speechId: string): void;
   speechDismissed(speechId: string): void;
 }
 
 export interface CodexPanelApi {
   getSettings(): Promise<Settings>;
-  setSettings(patch: Partial<Settings>): Promise<Settings>;
+  setSettings(patch: Partial<Settings>): Promise<SettingsResult>;
+  getDefaultSettings(): Promise<Settings>;
+  resetSettings(): Promise<SettingsResult>;
+  getStatus(): Promise<CompanionStatus>;
+  onStatusUpdated(handler: (status: CompanionStatus) => void): () => void;
+  setMuted(muted: boolean): void;
+  setSnooze(choice: SnoozeChoice): void;
+  sayNow(): Promise<boolean>;
+  pickFolder(): Promise<string | null>;
   onSettingsUpdated(handler: (settings: Settings) => void): () => void;
   getDebugSnapshot(): Promise<DebugSnapshot>;
   onDebugSnapshot(handler: (snapshot: DebugSnapshot) => void): () => void;
@@ -35,6 +52,9 @@ export interface CodexPanelApi {
   clearPresetAsset(presetId: string, kind: PresetAssetKind): Promise<PresetAssetResult>;
   getPresetAssetStatus(presetId: string): Promise<PresetAssetStatus>;
   deletePreset(presetId: string): Promise<PresetAssetResult>;
+  duplicatePreset(presetId: string): Promise<PresetAssetResult & { presetId?: string }>;
+  openPresetFolder(presetId: string): Promise<PresetAssetResult>;
+  saveBankTemplate(): Promise<PresetAssetResult>;
 }
 
 declare global {

@@ -37,6 +37,11 @@ describe('preload channel literals', () => {
         IPC.speechInterrupt,
         IPC.stateUpdate,
         IPC.overlaySetInteractive,
+        IPC.overlaySetHotRect,
+        IPC.overlayDragStart,
+        IPC.overlayDragEnd,
+        IPC.overlayPoke,
+        IPC.overlayMenu,
         IPC.speechFinished,
         IPC.speechDismissed
       ])
@@ -49,13 +54,24 @@ describe('preload channel literals', () => {
         IPC.settingsGet,
         IPC.settingsSet,
         IPC.settingsUpdated,
+        IPC.settingsDefaults,
+        IPC.settingsReset,
+        IPC.statusGet,
+        IPC.statusUpdated,
+        IPC.statusSetMuted,
+        IPC.statusSetSnooze,
+        IPC.sayNow,
+        IPC.foldersPick,
         IPC.debugSnapshot,
         IPC.debugRequestSnapshot,
         IPC.debugFireEvent,
         IPC.presetsPickAsset,
         IPC.presetsClearAsset,
         IPC.presetsAssetStatus,
-        IPC.presetsDelete
+        IPC.presetsDelete,
+        IPC.presetsDuplicate,
+        IPC.presetsOpenFolder,
+        IPC.bankSaveTemplate
       ])
     );
   });

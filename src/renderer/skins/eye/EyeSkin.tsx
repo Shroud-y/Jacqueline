@@ -26,7 +26,8 @@ export default function EyeSkin({
   mode,
   speaking,
   reducedMotion,
-  unlit = false
+  unlit = false,
+  presence = 'awake'
 }: SkinProps): JSX.Element {
   const p = effectivePalette(palette, mode);
 
@@ -42,6 +43,7 @@ export default function EyeSkin({
           speaking={speaking}
           reducedMotion={reducedMotion}
           unlit={unlit}
+          presence={presence}
         />
       </div>
     </div>

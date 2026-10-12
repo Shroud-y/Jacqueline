@@ -218,7 +218,9 @@ export class PresenceProbe {
   }
 
   private handleLine(line: string): void {
-    log.debug(`probe line: ${line}`);
+    // The foreground reply carries the title of whatever the user has open.
+    // It is classified and dropped; it does not belong in a log, even a debug one.
+    log.debug(line.startsWith('fg=') ? 'probe line: fg=<redacted>' : `probe line: ${line}`);
     if (line === 'ready=1') {
       log.info('presence probe ready');
       return;

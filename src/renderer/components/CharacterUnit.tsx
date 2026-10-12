@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import type { SkinId, SpeechMode } from '@shared/types';
+import type { Presence, SkinId, SpeechMode } from '@shared/types';
 import type { Persona } from '@renderer/personas';
 import { getSkin } from '@renderer/skins';
 import VideoAppearance from './VideoAppearance';
@@ -24,6 +24,8 @@ export interface CharacterUnitProps {
    * harness; the overlay never sets it.
    */
   unlit?: boolean;
+  /** Only a pinned companion is ever anything but awake. */
+  presence?: Presence;
 }
 
 /**
@@ -38,7 +40,8 @@ export default function CharacterUnit({
   mode,
   speaking,
   reducedMotion,
-  unlit = false
+  unlit = false,
+  presence = 'awake'
 }: CharacterUnitProps): JSX.Element {
   const skin = getSkin(skinId ?? persona.defaultSkin);
 
@@ -66,12 +69,20 @@ export default function CharacterUnit({
       data-unlit={unlit ? 'true' : 'false'}
       data-reduced={reducedMotion ? 'true' : 'false'}
       data-bob={bob ? 'true' : 'false'}
+      data-presence={presence}
       aria-hidden="true"
     >
       {videoUrl ? (
         <VideoAppearance src={videoUrl} canvas={skin.canvas} />
       ) : (
-        <Skin palette={palette} mode={mode ?? 'normal'} speaking={speaking} reducedMotion={reducedMotion} unlit={unlit} />
+        <Skin
+          palette={palette}
+          mode={mode ?? 'normal'}
+          speaking={speaking}
+          reducedMotion={reducedMotion}
+          unlit={unlit}
+          presence={presence}
+        />
       )}
     </div>
   );

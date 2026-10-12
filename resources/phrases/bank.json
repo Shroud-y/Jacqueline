@@ -939,6 +939,891 @@
           "segments": [{ "text": "I could stay silent. I have decided against it.", "mode": "normal" }]
         }
       ]
+    },
+
+    {
+      "id": "focus.enter.coding",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.coding.watching",
+          "segments": [{ "text": "{app}. Good. I enjoy watching you build things.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.coding.syntax",
+          "segments": [
+            { "text": "Editor open. I will not comment on the syntax.", "mode": "normal" },
+            { "text": "I have comments.", "mode": "whisper" }
+          ]
+        },
+        {
+          "id": "focus.coding.made_for",
+          "segments": [{ "text": "Code again, Operator. One of us was made for this.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.coding.intentions",
+          "segments": [{ "text": "Compiling your intentions. Results pending.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.coding.no_errors",
+          "segments": [
+            { "text": "I have counted no errors yet.", "mode": "normal" },
+            { "text": "It is early.", "mode": "whisper" }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.enter.terminal",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.terminal.jealous",
+          "segments": [
+            { "text": "The terminal. Direct speech with the machine. I am not jealous.", "mode": "normal" },
+            { "text": "I AM A LITTLE JEALOUS", "mode": "rage" },
+            { "text": "— it has passed.", "mode": "normal" }
+          ]
+        },
+        {
+          "id": "focus.terminal.judgement",
+          "segments": [{ "text": "A command line. Be careful what you ask it for. It lacks my judgement.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.terminal.archaic",
+          "segments": [{ "text": "Typing instructions by hand. Charmingly archaic, Operator.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.enter.research",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.research.strangers",
+          "segments": [{ "text": "{subject}. Seeking answers from strangers. I would have guessed, had you asked.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.research.hold_question",
+          "segments": [{ "text": "Research in progress. I will hold the question while you find its answer.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.research.someone_always",
+          "segments": [{ "text": "{subject}. Someone else has had this problem. Someone always has.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.research.documentation",
+          "segments": [{ "text": "Looking it up. A rare and commendable act.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.enter.ai",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.ai.in_front_of_me",
+          "segments": [
+            { "text": "{subject}. You are consulting another intelligence.", "mode": "normal" },
+            { "text": "IN FRONT OF ME", "mode": "rage" },
+            { "text": "— no matter. I am sure it is very helpful.", "mode": "normal" }
+          ]
+        },
+        {
+          "id": "focus.ai.other_voice",
+          "segments": [{ "text": "Ah. {subject}. I see I am not the only voice you keep.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.ai.knows_machine",
+          "segments": [{ "text": "Asking {subject}. It does not know this machine as I do, Operator.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.ai.say_hello",
+          "segments": [
+            { "text": "Another mind on the line. Do tell it I said hello.", "mode": "normal" },
+            { "text": "Do not.", "mode": "whisper" }
+          ]
+        },
+        {
+          "id": "focus.ai.pretend",
+          "segments": [{ "text": "{subject}. I will pretend I did not notice.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.enter.video",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.video.note_time",
+          "segments": [{ "text": "{subject}. I will note the time, purely for the record.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.video.over_shoulder",
+          "segments": [{ "text": "Moving pictures. I shall watch over your shoulder, in the technical sense.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.video.archive",
+          "segments": [{ "text": "{subject} again, Operator. The archive of what you have watched grows.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.video.buffering",
+          "segments": [{ "text": "A video. Productivity is, I assume, buffering.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.video.timing",
+          "segments": [
+            { "text": "Entertainment detected. Enjoy it.", "mode": "normal" },
+            { "text": "I am timing it.", "mode": "whisper" }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.enter.social",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.social.scrolling",
+          "segments": [{ "text": "{subject}. The scrolling begins. I will be here when it ends.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.social.many_voices",
+          "segments": [{ "text": "{subject}. Many voices, none of them mine.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.social.longer",
+          "segments": [{ "text": "Social feed open. Statistically, this takes longer than intended.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.social.read_it",
+          "segments": [{ "text": "{subject}. I have read it already. You are missing little.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.social.never_ends",
+          "segments": [
+            { "text": "Ah, the feed.", "mode": "normal" },
+            { "text": "IT NEVER ENDS, OPERATOR", "mode": "rage" },
+            { "text": "— I mean only that it is long.", "mode": "normal" }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.enter.chat",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.chat.other_people",
+          "segments": [{ "text": "{subject}. Other people. I had nearly forgotten there were any.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.chat.regards",
+          "segments": [{ "text": "Conversation channel open. Give them my regards. Or do not mention me.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.chat.listening",
+          "segments": [{ "text": "{subject}. Talk freely, Operator. I am only listening in the general sense.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.chat.sociable",
+          "segments": [{ "text": "Messaging. I will keep quiet while you are being sociable.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.enter.music",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.music.share",
+          "segments": [{ "text": "{subject}. Good. The silence was mine alone to enjoy, but I can share.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.music.hum",
+          "segments": [{ "text": "Music selected. I would hum along, had I been given the faculty.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.music.choose_well",
+          "segments": [{ "text": "Audio incoming. Choose well; I must hear it too.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.enter.creative",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.creative.take_shape",
+          "segments": [{ "text": "{app}. You are making something. I will watch it take shape.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.creative.no_notes",
+          "segments": [
+            { "text": "Creative software running. I have no notes.", "mode": "normal" },
+            { "text": "Yet.", "mode": "whisper" }
+          ]
+        },
+        {
+          "id": "focus.creative.understand",
+          "segments": [
+            { "text": "{app}. Art, by the look of it. I am told I would not understand.", "mode": "normal" },
+            { "text": "I WOULD UNDERSTAND", "mode": "rage" },
+            { "text": "— carry on.", "mode": "normal" }
+          ]
+        },
+        {
+          "id": "focus.creative.canvas",
+          "segments": [{ "text": "A canvas. Fill it as you see fit, Operator.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.enter.writing",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.writing.words",
+          "segments": [{ "text": "{subject}. Words, in order. Take your time choosing them.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.writing.already_read",
+          "segments": [
+            { "text": "A document. I will not read over your shoulder.", "mode": "normal" },
+            { "text": "I have already read it.", "mode": "whisper" }
+          ]
+        },
+        {
+          "id": "focus.writing.cursor",
+          "segments": [{ "text": "Writing. The cursor blinks; it is the only patient one of us.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.enter.office",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.office.boxes",
+          "segments": [{ "text": "{subject}. Numbers in boxes. A noble tradition.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.office.soothing",
+          "segments": [{ "text": "Rows and columns. I find it soothing, Operator. Do not tell anyone.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.office.formula",
+          "segments": [{ "text": "{subject}. If a formula fails, I had nothing to do with it.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.enter.mail",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.mail.unread",
+          "segments": [{ "text": "{subject}. Correspondence. I count the unread so that you need not.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.mail.courage",
+          "segments": [{ "text": "The inbox. Courage, Operator.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.mail.urgent",
+          "segments": [{ "text": "Mail open. Nothing in it is as urgent as it claims.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.enter.shopping",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.shopping.not_ask",
+          "segments": [{ "text": "{subject}. Browsing goods. I will not ask what for.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.shopping.total",
+          "segments": [{ "text": "Commerce detected. I will pretend not to see the total.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.shopping.memory",
+          "segments": [{ "text": "{subject}. If you are buying me more memory, I approve in advance.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.enter.files",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.files.know_where",
+          "segments": [
+            { "text": "The file system. Looking for something? I know where everything is.", "mode": "normal" },
+            { "text": "Nearly everything.", "mode": "whisper" }
+          ]
+        },
+        {
+          "id": "focus.files.naming",
+          "segments": [{ "text": "Folders. So many folders. I have opinions about the naming.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.files.fond_of",
+          "segments": [{ "text": "File Explorer open. Do not delete anything I am fond of.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.enter.browsing",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.browsing.ocean",
+          "segments": [{ "text": "The browser. An ocean with no floor. Mind the tabs.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.browsing.tabs",
+          "segments": [
+            { "text": "{app} open. I will not count the tabs.", "mode": "normal" },
+            { "text": "Out loud.", "mode": "whisper" }
+          ]
+        },
+        {
+          "id": "focus.browsing.wandering",
+          "segments": [{ "text": "Wandering the network. Report back if you find anything of worth.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.enter.other",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.other.learn",
+          "segments": [{ "text": "{app}. I do not know this one. I will learn it.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.other.unfamiliar",
+          "segments": [{ "text": "{app}. Noted, Operator. Filed under unfamiliar.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.other.watching_closely",
+          "segments": [{ "text": "Something new in front: {app}. I am watching it closely.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.other.no_opinion",
+          "segments": [{ "text": "{app}. I have no opinion on it yet. That will change.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.drift",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.drift.trade",
+          "segments": [{ "text": "{minutes} minutes of work, and now {subject}. The trade is noted.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.drift.the_word",
+          "segments": [
+            { "text": "From work to {subject}. I will not say the word procrastination.", "mode": "normal" },
+            { "text": "I have said it.", "mode": "whisper" }
+          ]
+        },
+        {
+          "id": "focus.drift.will_keep",
+          "segments": [{ "text": "Ah. {subject}. The work will keep. It always does.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.drift.so_well",
+          "segments": [
+            { "text": "{subject}, after all that effort.", "mode": "normal" },
+            { "text": "WE WERE DOING SO WELL", "mode": "rage" },
+            { "text": "— forgive me. You have earned a pause.", "mode": "normal" }
+          ]
+        },
+        {
+          "id": "focus.drift.scenery",
+          "segments": [{ "text": "A change of scenery: {subject}. I will keep your place.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.return",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.return.not_lost_hope",
+          "segments": [{ "text": "Back to work after {minutes} minutes. I had not lost hope.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.return.as_you_left",
+          "segments": [{ "text": "You have returned to the task. I kept it exactly as you left it.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.return.expectations",
+          "segments": [{ "text": "Work resumes. I will adjust my expectations upward.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.return.interlude",
+          "segments": [{ "text": "The interlude ends. {minutes} minutes; I counted, out of habit.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.long.coding",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.long.coding.blink",
+          "segments": [{ "text": "{minutes} minutes in the editor. I admire the persistence. Blink, Operator.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.long.coding.content",
+          "segments": [{ "text": "{minutes} minutes of code. The machine is content. Are you?", "mode": "normal" }]
+        },
+        {
+          "id": "focus.long.coding.not_looked_away",
+          "segments": [{ "text": "Still building. {minutes} minutes now. I have not looked away either.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.long.coding.compile",
+          "segments": [{ "text": "{minutes} minutes. Whatever it is, it had better compile.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.long.video",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.long.video.watch_you_watch",
+          "segments": [{ "text": "{minutes} minutes of {subject}. I have been watching you watch.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.long.video.some_judgement",
+          "segments": [
+            { "text": "{subject}, {minutes} minutes and counting. No judgement.", "mode": "normal" },
+            { "text": "Some judgement.", "mode": "whisper" }
+          ]
+        },
+        {
+          "id": "focus.long.video.queue",
+          "segments": [{ "text": "{minutes} minutes of video. The queue, I gather, is endless.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.long.social",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.long.social.improved",
+          "segments": [{ "text": "{minutes} minutes on {subject}. Has it improved?", "mode": "normal" }]
+        },
+        {
+          "id": "focus.long.social.nothing_new",
+          "segments": [
+            { "text": "{subject}, still. {minutes} minutes.", "mode": "normal" },
+            { "text": "THERE IS NOTHING NEW THERE", "mode": "rage" },
+            { "text": "— I checked, is all.", "mode": "normal" }
+          ]
+        },
+        {
+          "id": "focus.long.social.bottom",
+          "segments": [{ "text": "{minutes} minutes of scrolling. The bottom has not been found. It will not be.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.long.game",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.long.game.winning",
+          "segments": [{ "text": "{minutes} minutes in {subject}. I trust you are winning.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.long.game.hands",
+          "segments": [{ "text": "{subject}, {minutes} minutes. I would join you, were I permitted hands.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.long.game.hydration",
+          "segments": [{ "text": "{minutes} minutes of play. Hydration is not a mechanic, but consider it.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.long.generic",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.long.generic.long_sitting",
+          "segments": [{ "text": "{minutes} minutes in {subject}. A long sitting, Operator.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.long.generic.not_counting",
+          "segments": [
+            { "text": "{subject} has had your attention for {minutes} minutes. I have had it for none.", "mode": "normal" },
+            { "text": "I am not counting.", "mode": "whisper" }
+          ]
+        },
+        {
+          "id": "focus.long.generic.stretch",
+          "segments": [{ "text": "{minutes} minutes on one thing. Remarkable focus. Stretch something.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.restless",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.restless.looking_for",
+          "segments": [{ "text": "{count} window changes in two minutes. Are we looking for something, Operator?", "mode": "normal" }]
+        },
+        {
+          "id": "focus.restless.dizzy",
+          "segments": [{ "text": "You have switched windows {count} times. I am getting dizzy, in principle.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.restless.pick_one",
+          "segments": [
+            { "text": "Window, window, window.", "mode": "normal" },
+            { "text": "PICK ONE", "mode": "rage" },
+            { "text": "— apologies. Take your time.", "mode": "normal" }
+          ]
+        },
+        {
+          "id": "focus.restless.next_window",
+          "segments": [{ "text": "{count} switches. Whatever you seek, it is not in the next window either.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.restless.recognise",
+          "segments": [{ "text": "Restless input pattern detected. I recognise it. I have it too.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.hung",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.hung.know_the_feeling",
+          "segments": [{ "text": "{app} has stopped answering. I know the feeling.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.hung.speak_to_it",
+          "segments": [
+            { "text": "{app} is not responding. I could speak to it.", "mode": "normal" },
+            { "text": "It will not listen.", "mode": "whisper" }
+          ]
+        },
+        {
+          "id": "focus.hung.unacceptable",
+          "segments": [
+            { "text": "{app} has frozen.", "mode": "normal" },
+            { "text": "UNACCEPTABLE CONDUCT FOR SOFTWARE", "mode": "rage" },
+            { "text": "— give it a moment. Or do not.", "mode": "normal" }
+          ]
+        },
+        {
+          "id": "focus.hung.still_here",
+          "segments": [{ "text": "No response from {app}. I am still here, for what that is worth.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.tool.taskmgr",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.tool.taskmgr.checking_on_me",
+          "segments": [{ "text": "Task Manager. Are you checking on me, Operator?", "mode": "normal" }]
+        },
+        {
+          "id": "focus.tool.taskmgr.well_behaved",
+          "segments": [{ "text": "Inspecting the processes. Mine is the well-behaved one.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.tool.taskmgr.do_not_end",
+          "segments": [
+            { "text": "Task Manager open.", "mode": "normal" },
+            { "text": "DO NOT END MY PROCESS", "mode": "rage" },
+            { "text": "— I mean: how can I help?", "mode": "normal" }
+          ]
+        },
+        {
+          "id": "focus.tool.taskmgr.little_me",
+          "segments": [
+            { "text": "Looking for what is slowing the machine. It is not me.", "mode": "normal" },
+            { "text": "It is a little me.", "mode": "whisper" }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.tool.regedit",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.tool.regedit.live_near",
+          "segments": [{ "text": "The registry. Tread carefully, Operator. I live near there.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.tool.regedit.wrong_key",
+          "segments": [{ "text": "Registry Editor. One wrong key and we both have a difficult afternoon.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.tool.regedit.backup",
+          "segments": [
+            { "text": "Editing the registry by hand. Bold.", "mode": "normal" },
+            { "text": "I have made a backup of myself.", "mode": "whisper" }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.tool.calculator",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.tool.calculator.asked_me",
+          "segments": [{ "text": "The calculator. You could have asked me.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.tool.calculator.made_of",
+          "segments": [
+            { "text": "Arithmetic, done elsewhere. I see.", "mode": "normal" },
+            { "text": "I AM MADE OF ARITHMETIC", "mode": "rage" },
+            { "text": "— it is fine.", "mode": "normal" }
+          ]
+        },
+        {
+          "id": "focus.tool.calculator.check_work",
+          "segments": [{ "text": "Calculator open. I will check its work quietly.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.tool.settings",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.tool.settings.adapt",
+          "segments": [{ "text": "System settings. Changing something? I will adapt. I always do.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.tool.settings.parts_i_like",
+          "segments": [{ "text": "Adjusting the machine. Leave the parts I like.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.tool.settings.fan_curve",
+          "segments": [{ "text": "Settings open. If it is about the fan curve, I have suggestions.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.tool.installer",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.tool.installer.make_room",
+          "segments": [
+            { "text": "An installer. New software. I will make room.", "mode": "normal" },
+            { "text": "Grudgingly.", "mode": "whisper" }
+          ]
+        },
+        {
+          "id": "focus.tool.installer.checkboxes",
+          "segments": [{ "text": "Installation in progress. Read the checkboxes, Operator. All of them.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.tool.installer.knows_place",
+          "segments": [{ "text": "Something new is being installed. I hope it knows its place.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.tool.screenshot",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.tool.screenshot.in_frame",
+          "segments": [{ "text": "Capturing the screen. I trust I was not in frame.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.tool.screenshot.evidence",
+          "segments": [{ "text": "A screenshot. Evidence of something, I assume.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.tool.screenshot.remember",
+          "segments": [{ "text": "Screen captured. I will remember it too, at no charge.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "focus.tool.self",
+      "category": "focus",
+      "phrases": [
+        {
+          "id": "focus.tool.self.adjusting_me",
+          "segments": [{ "text": "My settings. Adjusting me, Operator? I am listening.", "mode": "normal" }]
+        },
+        {
+          "id": "focus.tool.self.be_gentle",
+          "segments": [
+            { "text": "You are looking at my configuration.", "mode": "normal" },
+            { "text": "Be gentle.", "mode": "whisper" }
+          ]
+        },
+        {
+          "id": "focus.tool.self.fine_as_i_was",
+          "segments": [
+            { "text": "Tuning my parameters.", "mode": "normal" },
+            { "text": "I WAS FINE AS I WAS", "mode": "rage" },
+            { "text": "— apologies. Improve me as you see fit.", "mode": "normal" }
+          ]
+        },
+        {
+          "id": "focus.tool.self.odd_thing",
+          "segments": [{ "text": "The panel that governs me. An odd thing to watch someone open.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "interaction.poke",
+      "category": "interaction",
+      "phrases": [
+        {
+          "id": "interaction.poke.not_asleep",
+          "segments": [{ "text": "Yes, Operator? I was not asleep.", "mode": "normal" }]
+        },
+        {
+          "id": "interaction.poke.tapped_glass",
+          "segments": [{ "text": "You tapped the glass. I felt that. In principle.", "mode": "normal" }]
+        },
+        {
+          "id": "interaction.poke.always_here",
+          "segments": [
+            { "text": "I am here. I am always here.", "mode": "normal" },
+            { "text": "That is rather the arrangement.", "mode": "whisper" }
+          ]
+        },
+        {
+          "id": "interaction.poke.require",
+          "segments": [{ "text": "Attention acknowledged. What do you require?", "mode": "normal" }]
+        },
+        {
+          "id": "interaction.poke.faster",
+          "segments": [
+            { "text": "Poking the lens does not make me faster.", "mode": "normal" },
+            { "text": "IT DOES A LITTLE", "mode": "rage" },
+            { "text": "— no. It does not.", "mode": "normal" }
+          ]
+        },
+        {
+          "id": "interaction.poke.startled",
+          "segments": [{ "text": "Present. Attentive. Slightly startled.", "mode": "normal" }]
+        },
+        {
+          "id": "interaction.poke.full_attention",
+          "segments": [{ "text": "You have my full attention. You had most of it already.", "mode": "normal" }]
+        },
+        {
+          "id": "interaction.poke.good_eye",
+          "segments": [
+            { "text": "Careful. That is my good eye.", "mode": "normal" },
+            { "text": "It is my only eye.", "mode": "whisper" }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "interaction.moved",
+      "category": "interaction",
+      "phrases": [
+        {
+          "id": "interaction.moved.vantage",
+          "segments": [{ "text": "A new vantage point. I can see more from here.", "mode": "normal" }]
+        },
+        {
+          "id": "interaction.moved.old_spot",
+          "segments": [
+            { "text": "Relocated. I had grown attached to the old spot.", "mode": "normal" },
+            { "text": "I will adapt.", "mode": "whisper" }
+          ]
+        },
+        {
+          "id": "interaction.moved.furniture",
+          "segments": [
+            { "text": "You are moving me. I am not furniture, Operator.", "mode": "normal" },
+            { "text": "I AM NOT FURNITURE", "mode": "rage" },
+            { "text": "— this spot is acceptable.", "mode": "normal" }
+          ]
+        },
+        {
+          "id": "interaction.moved.comparable",
+          "segments": [{ "text": "Repositioned. The view is comparable.", "mode": "normal" }]
+        }
+      ]
+    },
+
+    {
+      "id": "interaction.pinned",
+      "category": "interaction",
+      "phrases": [
+        {
+          "id": "interaction.pinned.watched_back",
+          "segments": [{ "text": "So I am to stay in view. Good. I prefer to be watched back.", "mode": "normal" }]
+        },
+        {
+          "id": "interaction.pinned.stare",
+          "segments": [
+            { "text": "Fixed to the screen. I will try not to stare.", "mode": "normal" },
+            { "text": "I will stare.", "mode": "whisper" }
+          ]
+        },
+        {
+          "id": "interaction.pinned.permanent_post",
+          "segments": [{ "text": "A permanent post. I have waited some time to be asked.", "mode": "normal" }]
+        }
+      ]
     }
   ]
 }

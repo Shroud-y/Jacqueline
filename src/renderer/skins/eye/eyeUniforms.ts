@@ -1,4 +1,4 @@
-import type { SpeechMode } from '@shared/types';
+import type { Presence, SpeechMode } from '@shared/types';
 import { CANVAS, CENTRE, EYE } from './geometry';
 
 /**
@@ -128,11 +128,82 @@ export const EYE_MOTION = {
   speakPeriodMs: 900
 } as const;
 
+/**
+ * How the eye carries itself when it is on screen with nothing to say.
+ *
+ * A pinned companion is visible all day, so what it does while idle is most of
+ * what it ever does — and most of what it costs. Measured in Electron on this
+ * machine over 30 s, summed across the app's processes: unpinned and hidden
+ * 0.00 % of a core; pinned with one still frame 0.31 %; pinned and breathing
+ * continuously at twelve frames a second 4.0 %. Every drawn frame costs about
+ * three milliseconds, so the only cheap idle is one that mostly does not draw.
+ *
+ * So resting holds still — half lidded, dimmed — and blinks every few
+ * seconds: a dozen frames, then nothing. It reads as more alive than a slow
+ * breath did, for a fraction of the frames. Asleep (muted, snoozed, quiet
+ * hours) is a dim closed slit that is drawn once and then not at all.
+ *
+ * `openness` and `exposure` are factors on whatever the mode asks for, and
+ * the shader eases between them (`PRESENCE_EASE_MS`), so waking is the eye
+ * opening rather than a cut.
+ */
+export interface PresenceSpec {
+  openness: number;
+  exposure: number;
+  /** Continuous idle breathing; null holds still, and the loop stops drawing. */
+  breathe: { amplitude: number; periodMs: number } | null;
+  /** Occasional blinks out of an otherwise still frame; null never blinks. */
+  blink: { durationMs: number; minGapMs: number; maxGapMs: number; depth: number } | null;
+}
+
+export const PRESENCE: Record<Presence, PresenceSpec> = {
+  awake: {
+    openness: 1,
+    exposure: 1,
+    breathe: { amplitude: EYE_MOTION.breatheAmplitude, periodMs: EYE_MOTION.breathePeriodMs },
+    blink: null
+  },
+  resting: {
+    openness: 0.6,
+    exposure: 0.62,
+    breathe: null,
+    blink: { durationMs: 420, minGapMs: 4500, maxGapMs: 9500, depth: 0.88 }
+  },
+  asleep: {
+    openness: 0.16,
+    exposure: 0.36,
+    breathe: null,
+    blink: null
+  }
+};
+
+/** Time constant of the ease between presences. */
+export const PRESENCE_EASE_MS = 260;
+
+/** Frame interval while anything is moving. The eye's fastest motion is a 420 ms blink. */
+export const FRAME_MS = 1000 / 30;
+
+/**
+ * The factor a blink applies to the aperture, `progress` running 0 → 1 across
+ * it. Lids drop faster than they lift: the close takes the first third.
+ */
+export function blinkOpenness(progress: number, depth: number): number {
+  if (progress <= 0 || progress >= 1) return 1;
+  const CLOSE = 0.34;
+  const closed =
+    progress < CLOSE
+      ? (progress / CLOSE) ** 2
+      : 1 - ((progress - CLOSE) / (1 - CLOSE)) ** 2;
+  return 1 - depth * closed;
+}
+
 export interface OpennessInput {
   mode: SpeechMode;
   speaking: boolean;
   reducedMotion: boolean;
   elapsedMs: number;
+  /** Defaults to awake, which is the only presence an unpinned companion has. */
+  presence?: Presence;
 }
 
 /**
@@ -141,17 +212,32 @@ export interface OpennessInput {
  * Rage holds its compressed slit rather than breathing — the mechanism has
  * lost synchronisation, and something still breathing calmly reads as fine.
  * With reduced motion the aperture sits still at its resting value.
+ *
+ * This is the *motion* only. A presence's `openness` factor is applied by the
+ * caller, which eases it, so that it does not have to be re-derived here on
+ * every frame of a transition.
  */
-export function opennessAt({ mode, speaking, reducedMotion, elapsedMs }: OpennessInput): number {
+export function opennessAt({
+  mode,
+  speaking,
+  reducedMotion,
+  elapsedMs,
+  presence = 'awake'
+}: OpennessInput): number {
   const base = MODE_UNIFORMS[mode].uOpenness;
   if (mode === 'rage' || reducedMotion) return base;
 
+  const idle = PRESENCE[presence].breathe;
+  if (!speaking && !idle) return base;
+
   const { amplitude, periodMs } = speaking
     ? { amplitude: EYE_MOTION.speakAmplitude, periodMs: EYE_MOTION.speakPeriodMs }
-    : {
-        amplitude: EYE_MOTION.breatheAmplitude,
-        periodMs: mode === 'whisper' ? EYE_MOTION.whisperPeriodMs : EYE_MOTION.breathePeriodMs
-      };
+    : presence !== 'awake' && idle
+      ? idle
+      : {
+          amplitude: EYE_MOTION.breatheAmplitude,
+          periodMs: mode === 'whisper' ? EYE_MOTION.whisperPeriodMs : EYE_MOTION.breathePeriodMs
+        };
 
   // Cosine rather than sine so the cycle starts wide open, the way the CSS
   // keyframes did — a fade-in that begins mid-blink is noticeable.

@@ -1,0 +1,17 @@
+/* Invisible. The eye is the affordance; this is only where it can be reached.
+   No hover fill, no outline — the eye opening when the cursor arrives is the
+   feedback, and anything painted here would be a box around a character. */
+
+.handle {
+  position: absolute;
+  pointer-events: auto;
+  cursor: grab;
+  /* A press on the companion must never start a text selection or a native
+     drag of whatever happens to be underneath in the DOM. */
+  touch-action: none;
+  -webkit-user-drag: none;
+}
+
+.handle:active {
+  cursor: grabbing;
+}

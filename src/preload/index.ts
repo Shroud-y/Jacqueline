@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { SpeechShowPayload, StatePayload } from '@shared/types';
+import type { HotRect, SpeechShowPayload, StatePayload } from '@shared/types';
 
 /**
  * §12 — the overlay's entire surface. Nothing else is exposed: no node, no
@@ -18,6 +18,11 @@ const CHANNEL = {
   speechInterrupt: 'speech:interrupt',
   stateUpdate: 'state:update',
   overlaySetInteractive: 'overlay:setInteractive',
+  overlaySetHotRect: 'overlay:setHotRect',
+  overlayDragStart: 'overlay:dragStart',
+  overlayDragEnd: 'overlay:dragEnd',
+  overlayPoke: 'overlay:poke',
+  overlayMenu: 'overlay:menu',
   speechFinished: 'speech:finished',
   speechDismissed: 'speech:dismissed'
 } as const;
@@ -49,6 +54,35 @@ const api = {
 
   setInteractive(interactive: boolean): void {
     ipcRenderer.send(CHANNEL.overlaySetInteractive, Boolean(interactive));
+  },
+
+  /** Where the pinned character takes the mouse, in window pixels; null for nowhere. */
+  setHotRect(rect: HotRect | null): void {
+    ipcRenderer.send(
+      CHANNEL.overlaySetHotRect,
+      rect
+        ? { x: Number(rect.x), y: Number(rect.y), width: Number(rect.width), height: Number(rect.height) }
+        : null
+    );
+  },
+
+  /** The pinned character is being dragged; main moves the window until `dragEnd`. */
+  dragStart(): void {
+    ipcRenderer.send(CHANNEL.overlayDragStart);
+  },
+
+  dragEnd(): void {
+    ipcRenderer.send(CHANNEL.overlayDragEnd);
+  },
+
+  /** The character was clicked while it had nothing to say. */
+  poke(): void {
+    ipcRenderer.send(CHANNEL.overlayPoke);
+  },
+
+  /** The character was right-clicked. */
+  openMenu(): void {
+    ipcRenderer.send(CHANNEL.overlayMenu);
   },
 
   speechFinished(speechId: string): void {

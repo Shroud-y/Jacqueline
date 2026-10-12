@@ -42,7 +42,22 @@ export const EventType = {
   scheduleQuiet: 'schedule.quiet',
 
   fileDownloadComplete: 'file.downloadComplete',
-  fileBuildComplete: 'file.buildComplete'
+  fileBuildComplete: 'file.buildComplete',
+
+  /** Settled into an application or site. */
+  focusEnter: 'focus.enter',
+  /** Settled into leisure after a long stretch of work. */
+  focusDrift: 'focus.drift',
+  /** Settled back into work after a long stretch of leisure. */
+  focusReturn: 'focus.return',
+  /** A long time in one activity. */
+  focusLong: 'focus.long',
+  /** Switching windows over and over. */
+  focusRestless: 'focus.restless',
+  /** The window in front has stopped responding. */
+  focusHung: 'focus.hung',
+  /** A short-lived system tool was opened. */
+  focusTool: 'focus.tool'
 } as const;
 
 export type KnownEventType = (typeof EventType)[keyof typeof EventType];
@@ -78,7 +93,19 @@ export const EVENT_PRIORITY: Record<string, EventPriority> = {
   [EventType.scheduleQuiet]: 'ambient',
 
   [EventType.fileDownloadComplete]: 'notable',
-  [EventType.fileBuildComplete]: 'notable'
+  [EventType.fileBuildComplete]: 'notable',
+
+  // A remark about what is on screen is only worth making while it is still
+  // on screen. Ambient means "now or never": it is dropped under a cooldown
+  // rather than held for ninety seconds and delivered about something gone.
+  [EventType.focusEnter]: 'ambient',
+  [EventType.focusDrift]: 'ambient',
+  [EventType.focusReturn]: 'ambient',
+  [EventType.focusRestless]: 'ambient',
+  [EventType.focusTool]: 'ambient',
+  // These two are still true a minute later.
+  [EventType.focusLong]: 'notable',
+  [EventType.focusHung]: 'notable'
 };
 
 export function defaultPriorityFor(type: string): EventPriority {
