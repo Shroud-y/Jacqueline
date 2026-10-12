@@ -7,3 +7,17 @@ export interface QuietHours {
   /** 'HH:mm' */
   to: string;
 }
+
+/** What applies to the app as a whole, as it sits in `settings.json`. */
+export interface Settings {
+  version: 1;
+  startWithSystem: boolean;
+  /** Nothing is said by anyone. Characters stay where they are. */
+  muted: boolean;
+  quietHours: QuietHours;
+}
+
+/** What a settings change answers with: the settings as they now stand, and why not if it was refused. */
+export type SettingsResult =
+  | { ok: true; settings: Settings }
+  | { ok: false; settings: Settings; error: string };

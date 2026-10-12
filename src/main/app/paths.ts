@@ -11,6 +11,8 @@ function resourceRoot(): string {
 
 export const paths = {
   iconsDir: (): string => join(resourceRoot(), 'icons'),
+  settingsFile: (): string => join(app.getPath('userData'), 'settings.json'),
+  charactersRoot: (): string => join(app.getPath('userData'), 'characters'),
   stateFile: (): string => join(app.getPath('userData'), 'state.json'),
   logDir: (): string => join(app.getPath('userData'), 'logs')
 };
