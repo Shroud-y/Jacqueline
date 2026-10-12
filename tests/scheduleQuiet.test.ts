@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { EventBus } from '@main/core/eventBus';
-import { EventType, type AppEvent } from '@main/core/events';
-import { ScheduleMonitor } from '@main/monitors/scheduleMonitor';
-import { SharedScheduler } from '@main/monitors/Monitor';
+import { EventBus } from '@main/engine/eventBus';
+import { EventType, type AppEvent } from '@main/engine/events';
+import { ScheduleMonitor } from '@main/sensors/scheduleMonitor';
+import { SharedScheduler } from '@main/sensors/scheduler';
 
 const MINUTE = 60_000;
 

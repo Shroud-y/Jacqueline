@@ -7,14 +7,8 @@ files:
   - out/**
   - package.json
 extraResources:
-  - from: resources/phrases
-    to: phrases
-  - from: resources/audio
-    to: audio
   - from: resources/icons
     to: icons
-  - from: resources/probe
-    to: probe
 win:
   target:
     - target: nsis

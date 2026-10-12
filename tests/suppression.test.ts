@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateSuppression, type SuppressionInput } from '@main/core/suppression';
-import { isWithinClockWindow } from '@main/core/conditions';
+import { evaluateSuppression, type SuppressionInput } from '@main/engine/suppression';
+import { isWithinClockWindow } from '@main/engine/conditions';
 
 /** Local time, so the tests match how quiet hours are actually evaluated. */
 function at(hour: number, minute = 0): number {

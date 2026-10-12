@@ -4,7 +4,7 @@ import {
   parseClock,
   type Condition,
   type ConditionContext
-} from '@main/core/conditions';
+} from '@main/engine/conditions';
 
 function ctx(overrides: Partial<ConditionContext> = {}): ConditionContext {
   return {

@@ -8,19 +8,17 @@
   "private": true,
   "scripts": {
     "dev": "electron-vite dev",
-    "design": "vite --config vite.design.config.mts",
     "start": "electron-vite preview",
-    "build": "pnpm typecheck && pnpm probe-dll && electron-vite build && electron-builder",
-    "build:unpack": "pnpm probe-dll && electron-vite build && electron-builder --dir",
+    "build": "pnpm typecheck && electron-vite build && electron-builder",
+    "build:unpack": "electron-vite build && electron-builder --dir",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "lint": "eslint .",
     "test": "vitest run --config vitest.config.mts",
     "test:watch": "vitest --config vitest.config.mts",
-    "icons": "node tools/make-icons.mjs",
-    "probe-dll": "node tools/make-probe-dll.mjs"
+    "icons": "node tools/make-icons.mjs"
   },
   "dependencies": {
-    "chokidar": "^5.0.0",
+    "koffi": "^3.3.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zod": "^4.4.3"

@@ -5,7 +5,7 @@ import {
   DEFAULT_COOLDOWNS,
   FREQUENCY_MULTIPLIER,
   createDurationResolver
-} from '@main/core/cooldown';
+} from '@main/engine/cooldown';
 
 const MINUTE = 60_000;
 

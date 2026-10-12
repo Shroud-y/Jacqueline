@@ -25,7 +25,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm typecheck
-      - run: pnpm probe-dll
       - run: pnpm exec electron-vite build
       - run: pnpm exec electron-builder --publish=never
 

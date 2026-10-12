@@ -39,12 +39,8 @@
     "src/main/**/*",
     "src/preload/**/*",
     "src/shared/**/*",
-    "src/renderer/personas/**/*",
-    "src/renderer/skins/eye/geometry.ts",
-    "src/renderer/skins/eye/eyeUniforms.ts",
     "tests/**/*",
     "electron.vite.config.ts",
-    "vite.design.config.mts",
     "vitest.config.mts"
   ]
 }

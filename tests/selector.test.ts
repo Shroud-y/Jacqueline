@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { RecentHistory, exclusionWindow, selectPhrase } from '@main/core/selector';
-import type { Phrase } from '@main/core/phraseBank';
+import { RecentHistory, exclusionWindow, selectPhrase, type Pickable } from '@main/engine/selector';
 
-function phrase(id: string, weight?: number): Phrase {
-  return { id, segments: [{ text: id, mode: 'normal' }], ...(weight === undefined ? {} : { weight }) };
+function phrase(id: string, weight?: number): Pickable {
+  return { id, ...(weight === undefined ? {} : { weight }) };
 }
 
 /** Deterministic RNG returning a fixed sequence, then its last value. */

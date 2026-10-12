@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { BrowserWindow } from 'electron';
-import { ClickThroughController } from '@main/window/clickThrough';
+import { ClickThroughController } from '@main/windows/clickThrough';
 
 /**
  * The flag under test is not a per-window setting: Electron implements
