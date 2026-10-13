@@ -1,4 +1,6 @@
-/** Types that cross the IPC boundary. Keep this file dependency-free. */
+/** Types that cross the IPC boundary. Type-only imports only, so it costs a bundle nothing. */
+
+import type { LayoutElement } from './character';
 
 export interface QuietHours {
   enabled: boolean;
@@ -21,3 +23,31 @@ export interface Settings {
 export type SettingsResult =
   | { ok: true; settings: Settings }
   | { ok: false; settings: Settings; error: string };
+
+/** A rectangle, in whatever space the field that carries it says. */
+export interface RectPayload {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** What a character looks like right now, as something the page can load. */
+export interface StageVisual {
+  type: 'image' | 'video';
+  url: string;
+}
+
+/** main → a character's window: everything it needs to draw itself. */
+export interface StagePayload {
+  id: string;
+  name: string;
+  /** The box that holds every element, in layout space. The window is this big. */
+  frame: RectPayload;
+  /** The character's layout elements, as in `character.json`. */
+  elements: LayoutElement[];
+  opacity: number;
+  flip: boolean;
+  /** Null until the character has been given something to look like. */
+  visual: StageVisual | null;
+}

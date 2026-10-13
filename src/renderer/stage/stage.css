@@ -1,0 +1,56 @@
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+}
+
+.stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.character {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  /* The browser must not start its own drag or scroll on a press. */
+  touch-action: none;
+}
+
+.character[data-dragging='true'] {
+  cursor: grabbing;
+}
+
+/* Sized in the component to the file's own shape, as large as fits the box.
+   Never letterboxed. */
+.visual {
+  display: block;
+  flex: none;
+  pointer-events: none;
+}
+
+/* A character with nothing to look like yet still has to be findable. */
+.placeholder {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  border: 2px dashed rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font: 14px/1.3 system-ui, sans-serif;
+  text-align: center;
+  overflow-wrap: anywhere;
+}

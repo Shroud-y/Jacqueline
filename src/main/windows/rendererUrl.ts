@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 
-export type RendererPage = 'stage' | 'editor';
+/** `host` is the empty page every character window is opened from. */
+export type RendererPage = 'host' | 'stage' | 'editor';
 
 const devUrl = (): string | undefined => process.env['ELECTRON_RENDERER_URL'];
 

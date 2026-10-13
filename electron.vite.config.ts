@@ -33,6 +33,25 @@ export default defineConfig({
       }
     }
   },
+  preload: {
+    resolve: {
+      alias: {
+        '@shared': resolve('src/shared')
+      }
+    },
+    build: {
+      rollupOptions: {
+        external: EXTERNAL,
+        input: { stage: resolve('src/preload/stage.ts') },
+        // A sandboxed preload must be CommonJS — ESM is not supported there.
+        output: {
+          format: 'cjs',
+          entryFileNames: '[name].js',
+          chunkFileNames: 'chunks/[name].js'
+        }
+      }
+    }
+  },
   renderer: {
     root: resolve('src/renderer'),
     plugins: [react()],
@@ -45,6 +64,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
+          host: resolve('src/renderer/host.html'),
           stage: resolve('src/renderer/stage.html'),
           editor: resolve('src/renderer/editor.html')
         }

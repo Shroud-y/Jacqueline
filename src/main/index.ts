@@ -1,4 +1,5 @@
 import { app } from 'electron';
+import { join } from 'node:path';
 
 import { configureLogger, createLogger } from './app/logger';
 import { paths } from './app/paths';
@@ -6,6 +7,7 @@ import { SettingsStore } from './app/settings';
 import { AppTray } from './app/tray';
 import { handleAssetProtocol, registerAssetScheme } from './characters/assetProtocol';
 import { CharacterStore } from './characters/store';
+import { CharacterWindows } from './windows/characterWindows';
 
 const log = createLogger('main');
 
@@ -30,7 +32,10 @@ async function bootstrap(): Promise<void> {
 
   const entries = characters.list();
   const broken = entries.filter((entry) => !entry.ok).length;
-  log.info(`characters: ${entries.length}${broken > 0 ? ` (${broken} unreadable)` : ''}`);
+  log.info(`characters: ${entries.length}${broken > 0 ? ` (${broken} unreadable)` : ''} in ${paths.charactersRoot()}`);
+
+  const windows = new CharacterWindows(characters, join(__dirname, '../preload/stage.js'));
+  windows.start();
 
   reconcileAutostart(settings.current.startWithSystem);
   settings.onChange((next) => reconcileAutostart(next.startWithSystem));
@@ -45,7 +50,10 @@ async function bootstrap(): Promise<void> {
     /* no-op by design */
   });
 
-  app.on('before-quit', () => tray.destroy());
+  app.on('before-quit', () => {
+    windows.stop();
+    tray.destroy();
+  });
 
   log.info('SHARD ready');
 }

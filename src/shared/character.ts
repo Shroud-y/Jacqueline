@@ -105,7 +105,11 @@ const presenceSchema = z.object({
   mode: z.enum(['always', 'whileRunning', 'whileFocused', 'onSpeech']),
   /** Executable names, 'dota2.exe'. Matched without case or extension. */
   apps: z.array(z.string().trim().min(1).max(260)).max(100),
-  /** Top-left of the layout on screen; null until the user has placed it. */
+  /**
+   * Where the `character` element's top-left is on screen; null until the
+   * user has placed it. The element rather than the whole layout, so moving
+   * the text around in the editor never makes the character jump.
+   */
   position: z.object({ x: z.number().finite(), y: z.number().finite() }).nullable(),
   hideOnFullscreen: z.boolean()
 });
