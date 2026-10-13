@@ -157,7 +157,10 @@ function CharacterElement({ stage, left, top, width, height }: CharacterElementP
       onPointerUp={finish}
       onPointerCancel={finish}
       onLostPointerCapture={finish}
-      onContextMenu={(event) => event.preventDefault()}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        window.shard?.menu();
+      }}
     >
       {visual?.type === 'image' ? (
         // An image that fails to load still gets its window, or it could never be fixed.

@@ -88,6 +88,8 @@ export interface PresenceSource {
   isPresent(character: Character, anchor: Rect): boolean;
   /** False while nobody is there to watch. */
   isWatching(): boolean;
+  /** A character was right-clicked. */
+  onMenu(id: string): void;
 }
 
 interface Drag {
@@ -114,7 +116,6 @@ export class CharacterWindows {
   private readonly opening = new Set<string>();
   private hotTimer: NodeJS.Timeout | null = null;
   private drag: Drag | null = null;
-  private unsubscribe: (() => void) | null = null;
 
   constructor(
     private readonly store: CharacterStore,
@@ -123,7 +124,6 @@ export class CharacterWindows {
   ) {}
 
   start(): void {
-    this.unsubscribe = this.store.onChange(() => this.sync());
 
     // A display changed size or went away: put everyone back inside what is left.
     screen.on('display-metrics-changed', this.onDisplaysChanged);
@@ -142,6 +142,10 @@ export class CharacterWindows {
       const live = this.bySender(event.sender);
       if (live) this.beginDrag(live);
     });
+    ipcMain.on(IPC.stageMenu, (event) => {
+      const live = this.bySender(event.sender);
+      if (live) this.presence.onMenu(live.id);
+    });
     ipcMain.on(IPC.stageDragEnd, (event) => {
       const live = this.bySender(event.sender);
       if (live && this.drag?.id === live.id) this.endDrag();
@@ -151,14 +155,13 @@ export class CharacterWindows {
   }
 
   stop(): void {
-    this.unsubscribe?.();
-    this.unsubscribe = null;
     screen.off('display-metrics-changed', this.onDisplaysChanged);
     screen.off('display-removed', this.onDisplaysChanged);
     ipcMain.removeHandler(IPC.stageGet);
     ipcMain.removeAllListeners(IPC.stagePainted);
     ipcMain.removeAllListeners(IPC.stageDragStart);
     ipcMain.removeAllListeners(IPC.stageDragEnd);
+    ipcMain.removeAllListeners(IPC.stageMenu);
     for (const live of [...this.live.values()]) this.close(live);
     this.destroyHost();
   }

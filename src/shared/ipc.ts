@@ -8,5 +8,7 @@ export const IPC = {
   stagePainted: 'stage:painted',
   /** renderer → main: the character has been picked up / put down. */
   stageDragStart: 'stage:dragStart',
-  stageDragEnd: 'stage:dragEnd'
+  stageDragEnd: 'stage:dragEnd',
+  /** renderer → main: the character was right-clicked. */
+  stageMenu: 'stage:menu'
 } as const;

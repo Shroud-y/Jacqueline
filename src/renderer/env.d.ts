@@ -12,6 +12,7 @@ interface StageApi {
   painted(): void;
   dragStart(): void;
   dragEnd(): void;
+  menu(): void;
 }
 
 declare global {

@@ -17,7 +17,8 @@ const CHANNEL = {
   stageUpdate: 'stage:update',
   stagePainted: 'stage:painted',
   stageDragStart: 'stage:dragStart',
-  stageDragEnd: 'stage:dragEnd'
+  stageDragEnd: 'stage:dragEnd',
+  stageMenu: 'stage:menu'
 } as const;
 
 const api = {
@@ -42,6 +43,11 @@ const api = {
 
   dragEnd(): void {
     ipcRenderer.send(CHANNEL.stageDragEnd);
+  },
+
+  /** The character was right-clicked. */
+  menu(): void {
+    ipcRenderer.send(CHANNEL.stageMenu);
   }
 };
 
