@@ -50,4 +50,8 @@ export interface StagePayload {
   flip: boolean;
   /** Null until the character has been given something to look like. */
   visual: StageVisual | null;
+  /** False while nobody is there to see it move: a video holds its frame. */
+  playing: boolean;
+  /** Seconds a video holds still between plays; 0 loops it. */
+  restSec: number;
 }

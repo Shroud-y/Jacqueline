@@ -82,6 +82,14 @@ interface Live {
   revealTimer: NodeJS.Timeout | null;
 }
 
+/** Who decides whether a character is on screen and whether it should be moving. */
+export interface PresenceSource {
+  /** `anchor` is where the character itself would sit, in screen coordinates. */
+  isPresent(character: Character, anchor: Rect): boolean;
+  /** False while nobody is there to watch. */
+  isWatching(): boolean;
+}
+
 interface Drag {
   id: string;
   timer: NodeJS.Timeout;
@@ -110,7 +118,8 @@ export class CharacterWindows {
 
   constructor(
     private readonly store: CharacterStore,
-    private readonly preloadPath: string
+    private readonly preloadPath: string,
+    private readonly presence: PresenceSource
   ) {}
 
   start(): void {
@@ -154,6 +163,11 @@ export class CharacterWindows {
     this.destroyHost();
   }
 
+  /** Something presence depends on has changed: look again at who should be on screen. */
+  refresh(): void {
+    this.sync();
+  }
+
   /** How many characters have a window right now. */
   get count(): number {
     return this.live.size;
@@ -169,7 +183,7 @@ export class CharacterWindows {
   private sync(): void {
     const wanted = new Map<string, Character>();
     for (const entry of this.store.list()) {
-      if (entry.ok && entry.character.enabled) wanted.set(entry.id, entry.character);
+      if (entry.ok && this.wants(entry.character)) wanted.set(entry.id, entry.character);
     }
 
     for (const live of [...this.live.values()]) {
@@ -184,13 +198,18 @@ export class CharacterWindows {
     if (wanted.size === 0 && this.opening.size === 0) this.destroyHost();
   }
 
+  private wants(character: Character): boolean {
+    const { anchor, position } = this.geometry(character);
+    return this.presence.isPresent(character, { x: position.x, y: position.y, width: anchor.width, height: anchor.height });
+  }
+
   private async open(id: string): Promise<void> {
     this.opening.add(id);
     try {
       const host = await this.ensureHost();
       // It may have been disabled or deleted while the host was loading.
       const character = this.store.get(id);
-      if (!character?.enabled || host.isDestroyed()) {
+      if (!character || !this.wants(character) || host.isDestroyed()) {
         this.opening.delete(id);
         this.sync();
         return;
@@ -269,7 +288,7 @@ export class CharacterWindows {
   private adopt(id: string, win: BrowserWindow): void {
     this.opening.delete(id);
     const character = this.store.get(id);
-    if (!character?.enabled) {
+    if (!character || !this.wants(character)) {
       win.destroy();
       this.sync();
       return;
@@ -344,6 +363,7 @@ export class CharacterWindows {
   }
 
   private close(live: Live): void {
+    log.debug(`"${live.id}" hidden`);
     this.forget(live);
     if (!live.win.isDestroyed()) live.win.destroy();
   }
@@ -393,7 +413,9 @@ export class CharacterWindows {
       elements: character.layout.elements,
       opacity: character.appearance.opacity,
       flip: character.appearance.flip,
-      visual: idle ? this.visual(character.id, idle.type, idle.src) : null
+      visual: idle ? this.visual(character.id, idle.type, idle.src) : null,
+      playing: this.presence.isWatching(),
+      restSec: character.appearance.restSec
     };
   }
 

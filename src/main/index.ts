@@ -1,12 +1,17 @@
-import { app } from 'electron';
+import { app, powerMonitor, screen } from 'electron';
 import { join } from 'node:path';
+
+import type { Character } from '@shared/character';
 
 import { configureLogger, createLogger } from './app/logger';
 import { paths } from './app/paths';
 import { SettingsStore } from './app/settings';
 import { AppTray } from './app/tray';
 import { handleAssetProtocol, registerAssetScheme } from './characters/assetProtocol';
+import { isPresent } from './characters/presence';
 import { CharacterStore } from './characters/store';
+import { PresenceWatcher } from './sensors/presenceWatcher';
+import { loadDesktopSensors } from './sensors/win32';
 import { CharacterWindows } from './windows/characterWindows';
 
 const log = createLogger('main');
@@ -34,7 +39,33 @@ async function bootstrap(): Promise<void> {
   const broken = entries.filter((entry) => !entry.ok).length;
   log.info(`characters: ${entries.length}${broken > 0 ? ` (${broken} unreadable)` : ''} in ${paths.charactersRoot()}`);
 
-  const windows = new CharacterWindows(characters, join(__dirname, '../preload/stage.js'));
+  const presence = new PresenceWatcher({
+    loadSensors: loadDesktopSensors,
+    activity: {
+      idleSeconds: () => powerMonitor.getSystemIdleTime(),
+      onLockChange: (listener) => {
+        const lock = (): void => listener(true);
+        const unlock = (): void => listener(false);
+        powerMonitor.on('lock-screen', lock);
+        powerMonitor.on('unlock-screen', unlock);
+        return () => {
+          powerMonitor.off('lock-screen', lock);
+          powerMonitor.off('unlock-screen', unlock);
+        };
+      }
+    },
+    // Windows answers in physical pixels; the windows are placed in Electron's scaled ones.
+    toScreen: (rect) => screen.screenToDipRect(null, rect)
+  });
+  const usable = (): Character[] => characters.list().flatMap((entry) => (entry.ok ? [entry.character] : []));
+
+  const windows = new CharacterWindows(characters, join(__dirname, '../preload/stage.js'), {
+    isPresent: (character, anchor) => isPresent(character, presence.facts, anchor),
+    isWatching: () => presence.watching
+  });
+  presence.onChange(() => windows.refresh());
+  characters.onChange(() => presence.setCharacters(usable()));
+  presence.setCharacters(usable());
   windows.start();
 
   reconcileAutostart(settings.current.startWithSystem);
@@ -52,6 +83,7 @@ async function bootstrap(): Promise<void> {
 
   app.on('before-quit', () => {
     windows.stop();
+    presence.stop();
     tray.destroy();
   });
 

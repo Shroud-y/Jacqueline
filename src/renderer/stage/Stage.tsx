@@ -52,6 +52,7 @@ interface CharacterElementProps {
 
 function CharacterElement({ stage, left, top, width, height }: CharacterElementProps): JSX.Element {
   const press = useRef<{ x: number; y: number; dragging: boolean } | null>(null);
+  const video = useRef<HTMLVideoElement>(null);
   const [dragging, setDragging] = useState(false);
   // The picture's own proportions, once it has told us. Per address: a new
   // file is a new shape.
@@ -63,6 +64,38 @@ function CharacterElement({ stage, left, top, width, height }: CharacterElementP
   useEffect(() => {
     if (!visual) window.shard?.painted();
   }, [visual]);
+
+  // A video moves only while someone is there to see it, and — if the
+  // character asks for it — rests on its last frame between plays. Every
+  // frame it does not draw is one the whole window does not composite.
+  const { playing, restSec } = stage;
+  const videoUrl = visual?.type === 'video' ? visual.url : null;
+  useEffect(() => {
+    const element = video.current;
+    if (!element || !videoUrl) return;
+    if (!playing) {
+      element.pause();
+      return;
+    }
+
+    let rest: ReturnType<typeof setTimeout> | null = null;
+    const play = (): void => void element.play().catch(() => undefined);
+    const onEnded = (): void => {
+      rest = setTimeout(() => {
+        element.currentTime = 0;
+        play();
+      }, restSec * 1000);
+    };
+    element.loop = restSec <= 0;
+    element.addEventListener('ended', onEnded);
+    // Stopped at its end is where a resting video is found again: start it over.
+    if (element.ended) element.currentTime = 0;
+    play();
+    return () => {
+      element.removeEventListener('ended', onEnded);
+      if (rest) clearTimeout(rest);
+    };
+  }, [playing, restSec, videoUrl]);
 
   useEffect(
     () => () => {
@@ -142,11 +175,10 @@ function CharacterElement({ stage, left, top, width, height }: CharacterElementP
         />
       ) : visual?.type === 'video' ? (
         <video
+          ref={video}
           className="visual"
           style={look}
           src={visual.url}
-          autoPlay
-          loop
           muted
           playsInline
           disablePictureInPicture

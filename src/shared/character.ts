@@ -42,7 +42,13 @@ const appearanceSchema = z.object({
   states: z.record(stateNameSchema, visualSchema),
   opacity: z.number().min(0).max(1),
   /** Mirrored left to right. */
-  flip: z.boolean()
+  flip: z.boolean(),
+  /**
+   * Seconds a video holds still after each time through, before it plays
+   * again. 0 plays it on a loop. A moving character costs ten times a still
+   * one for as long as it moves, so this is the cheapest way to have both.
+   */
+  restSec: z.number().min(0).max(3600).default(0)
 });
 
 /* ------------------------------------------------------------------ */
@@ -199,7 +205,7 @@ export function defaultCharacter(id: string, name: string): Character {
     id,
     name,
     enabled: true,
-    appearance: { states: {}, opacity: 1, flip: false },
+    appearance: { states: {}, opacity: 1, flip: false, restSec: 0 },
     layout: {
       elements: [
         { id: 'character', type: 'character', x: 260, y: 0, width: 240, height: 240 },
