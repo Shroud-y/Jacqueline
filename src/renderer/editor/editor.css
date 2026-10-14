@@ -862,3 +862,303 @@ input {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* ---- segmented, select, colour ------------------------------------------- */
+
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: var(--r);
+  background: var(--raised);
+}
+
+.segment {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.segment:hover {
+  color: var(--text);
+}
+
+.segment[aria-checked='true'] {
+  background: var(--hover);
+  color: var(--text);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.select {
+  position: relative;
+  display: block;
+}
+
+.select select {
+  width: 100%;
+  height: var(--field-h);
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--raised);
+  color: var(--text);
+  font: inherit;
+  appearance: none;
+  cursor: pointer;
+}
+
+.select select:focus-visible {
+  outline: 0;
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
+.select::after {
+  content: '';
+  position: absolute;
+  top: 14px;
+  right: 12px;
+  border: 4px solid transparent;
+  border-top-color: var(--text-3);
+  pointer-events: none;
+}
+
+.select option,
+.select optgroup {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.color {
+  display: flex;
+  gap: 8px;
+}
+
+.color-swatch {
+  position: relative;
+  flex: none;
+  width: var(--field-h);
+  height: var(--field-h);
+  border-radius: var(--r);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  cursor: pointer;
+}
+
+.color-swatch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.color-text {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- layout tab ------------------------------------------------------------ */
+
+.pane-body:has(.layout) {
+  padding: 0;
+  overflow: hidden;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  height: 100%;
+}
+
+.canvas {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg) conic-gradient(var(--surface) 25%, transparent 0 50%, var(--surface) 0 75%, transparent 0) 0 0 / 20px 20px;
+  cursor: grab;
+  outline: 0;
+}
+
+.canvas[data-panning='true'] {
+  cursor: grabbing;
+}
+
+.canvas-bar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  left: 10px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.canvas-bar > * {
+  pointer-events: auto;
+}
+
+.canvas-bar .grow {
+  flex: 1;
+  pointer-events: none;
+}
+
+.canvas-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 12px;
+  z-index: 2;
+  color: var(--text-3);
+  font-size: 12.5px;
+  pointer-events: none;
+}
+
+.world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+.el {
+  position: absolute;
+  cursor: move;
+}
+
+.el-character {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.el-character img,
+.el-character video {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  pointer-events: none;
+}
+
+.el-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r);
+  color: var(--text-3);
+}
+
+.el-text {
+  pointer-events: none;
+}
+
+.el-hit {
+  position: absolute;
+  inset: 0;
+}
+
+.el[data-selected='false']:hover .el-hit {
+  outline: 1px solid var(--line-strong);
+}
+
+.selection {
+  position: absolute;
+  outline: 1px solid var(--accent);
+  pointer-events: none;
+}
+
+.grip {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  margin: -5px 0 0 -5px;
+  background: var(--bg);
+  box-shadow: 0 0 0 1px var(--accent);
+  pointer-events: auto;
+}
+
+.guide {
+  position: absolute;
+  background: var(--accent);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.inspector {
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+}
+
+.inspector-empty {
+  padding: 20px 16px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.fold {
+  border-bottom: 1px solid var(--line);
+}
+
+.fold-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fold[data-open='false'] .fold-head {
+  color: var(--text-2);
+}
+
+.fold-mark {
+  width: 0;
+  height: 0;
+  border: 4px solid transparent;
+  border-left-color: var(--text-3);
+  transform-origin: 2px 4px;
+  transition: transform var(--ease);
+}
+
+.fold[data-open='true'] .fold-mark {
+  transform: rotate(90deg);
+}
+
+.fold-body {
+  display: grid;
+  gap: 12px;
+  padding: 0 16px 16px;
+}
+
+.fold-body .number {
+  width: 100%;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.sub {
+  display: grid;
+  gap: 8px;
+  padding-left: 26px;
+}
+
+.inspector-foot {
+  padding: 12px 8px;
+}

@@ -12,6 +12,7 @@ let store: CharacterStore;
 let picked: string | null;
 let askedFor: readonly AssetKind[][];
 let opened: string[];
+let previewed: (string | null)[];
 
 const handlers = (): ReturnType<typeof editorHandlers> =>
   editorHandlers(store, {
@@ -22,7 +23,8 @@ const handlers = (): ReturnType<typeof editorHandlers> =>
     openFolder: async (id) => {
       opened.push(id);
       return { ok: true };
-    }
+    },
+    setPreview: (id) => previewed.push(id)
   });
 
 beforeEach(() => {
@@ -32,6 +34,7 @@ beforeEach(() => {
   picked = null;
   askedFor = [];
   opened = [];
+  previewed = [];
 });
 
 afterEach(() => {
@@ -157,5 +160,14 @@ describe('editor requests', () => {
     expect((await handlers().releaseAsset({ id: created.id, file: '../character.json' })).ok).toBe(false);
     expect(existsSync(join(root, created.id, 'character.json'))).toBe(true);
   });
-});
 
+  it('previews a character that exists, and clears the preview, and nothing else', async () => {
+    const created = await make();
+    expect(await handlers().preview({ id: created.id })).toEqual({ ok: true });
+    expect(await handlers().preview({ id: null })).toEqual({ ok: true });
+    expect((await handlers().preview({ id: 'nobody' })).ok).toBe(false);
+    expect((await handlers().preview({ id: '../x' })).ok).toBe(false);
+    expect((await handlers().preview({})).ok).toBe(false);
+    expect(previewed).toEqual([created.id, null]);
+  });
+});

@@ -54,3 +54,8 @@ body,
   text-align: center;
   overflow-wrap: anywhere;
 }
+
+/* Text is never grabbed: only the character itself takes the mouse. */
+.text {
+  pointer-events: none;
+}

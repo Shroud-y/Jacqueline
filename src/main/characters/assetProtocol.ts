@@ -17,7 +17,10 @@ export { ASSET_SCHEME, assetUrl } from '@shared/assetUrl';
 /** Must run before `app.whenReady`. */
 export function registerAssetScheme(): void {
   protocol.registerSchemesAsPrivileged([
-    { scheme: ASSET_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
+    // `corsEnabled`: a font is always fetched in CORS mode, unlike a picture or a
+    // video, and the pages asking (`http://localhost` in development, `file://`
+    // when packaged) are never the same origin as this scheme.
+    { scheme: ASSET_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } }
   ]);
 }
 
@@ -50,7 +53,11 @@ export function handleAssetProtocol(store: CharacterStore): void {
     const path = resolveAssetRequest(request.url, store);
     if (!path) return new Response('not found', { status: 404 });
     try {
-      return await net.fetch(pathToFileURL(path).toString());
+      const response = await net.fetch(pathToFileURL(path).toString());
+      // Only our own pages can ask this scheme for anything, so any origin may read it.
+      const headers = new Headers(response.headers);
+      headers.set('Access-Control-Allow-Origin', '*');
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
     } catch (err) {
       log.debug(`asset request failed: ${String(err)}`);
       return new Response('not found', { status: 404 });

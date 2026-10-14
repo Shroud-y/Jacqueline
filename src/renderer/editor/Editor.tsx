@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Character, CharacterEntry } from '@shared/character';
 import AppearanceTab from './AppearanceTab';
 import GeneralTab from './GeneralTab';
+import LayoutTab from './layout/LayoutTab';
 import Thumbnail from './Thumbnail';
 import { MoreMenu, Notice, Switch, TextInput } from './fields';
 import { useCharacters, type Characters } from './useCharacters';
@@ -162,6 +163,8 @@ function CharacterPane({ character, characters, onSelect }: CharacterPaneProps):
           <GeneralTab character={character} onChange={characters.update} />
         ) : tab === 'appearance' ? (
           <AppearanceTab character={character} characters={characters} />
+        ) : tab === 'layout' ? (
+          <LayoutTab character={character} characters={characters} />
         ) : (
           <div className="blank">
             <h1>{TABS.find((entry) => entry.id === tab)?.label}</h1>

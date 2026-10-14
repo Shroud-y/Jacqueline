@@ -98,8 +98,10 @@ async function bootstrap(): Promise<void> {
     openFolder: async (id) => {
       const failure = await shell.openPath(paths.characterDir(id));
       return failure ? { ok: false, error: failure } : { ok: true };
-    }
+    },
+    setPreview: (id) => windows.setPreview(id)
   });
+  editor.onClosed = () => windows.setPreview(null);
 
   const menuState = (): MenuState => ({
     everyoneHidden: visibility.everyoneHidden,

@@ -54,6 +54,11 @@ export interface StagePayload {
   playing: boolean;
   /** Seconds a video holds still between plays; 0 loops it. */
   restSec: number;
+  /**
+   * Being laid out in the editor right now: the text elements show sample
+   * text, so the layout can be judged where it will actually be.
+   */
+  preview: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -82,6 +87,11 @@ export interface EditorApi {
   assets(payload: { id: string }): Promise<AssetInfo[]>;
   /** A file the character no longer points at: removed, unless something in it still does. */
   releaseAsset(payload: { id: string; file: string }): Promise<EditorResult>;
+  /**
+   * The character being laid out, or null. While set, that character is on
+   * screen whatever its presence rules say, with sample text in its text.
+   */
+  preview(payload: { id: string | null }): Promise<EditorResult>;
   /** Where on disk a file dropped on the window is. Not IPC — answered by the preload itself. */
   pathForFile(file: File): string;
   openFolder(payload: { id: string }): Promise<EditorResult>;

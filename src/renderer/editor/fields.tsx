@@ -392,3 +392,117 @@ export function Slider({ value, onCommit, min, max, unit, label }: NumberInputPr
     </div>
   );
 }
+
+/** Two to four short, exclusive choices side by side. */
+export function Segmented<T extends string | number>({
+  value,
+  options,
+  onChange,
+  label
+}: {
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (value: T) => void;
+  label: string;
+}): JSX.Element {
+  return (
+    <div className="segmented" role="radiogroup" aria-label={label}>
+      {options.map((option) => (
+        <button
+          key={String(option.value)}
+          type="button"
+          role="radio"
+          aria-checked={option.value === value}
+          className="segment"
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** A dropdown, as the system draws its list, dressed like the rest. */
+export function Select<T extends string>({
+  value,
+  options,
+  onChange,
+  label
+}: {
+  value: T;
+  options: { value: T; label: string; group?: string }[];
+  onChange: (value: T) => void;
+  label: string;
+}): JSX.Element {
+  const groups = [...new Set(options.map((option) => option.group ?? ''))];
+  const render = (option: { value: T; label: string }): JSX.Element => (
+    <option key={option.value} value={option.value}>
+      {option.label}
+    </option>
+  );
+  return (
+    <span className="select">
+      <select aria-label={label} value={value} onChange={(event) => onChange(event.target.value as T)}>
+        {groups.length === 1
+          ? options.map(render)
+          : groups.map((group) =>
+              group === '' ? (
+                options.filter((option) => !option.group).map(render)
+              ) : (
+                <optgroup key={group} label={group}>
+                  {options.filter((option) => option.group === group).map(render)}
+                </optgroup>
+              )
+            )}
+      </select>
+    </span>
+  );
+}
+
+/** "#ff8800" for anything the page can read as a colour; null when it cannot. */
+function toHex(color: string): string | null {
+  const probe = document.createElement('canvas').getContext('2d');
+  if (!probe || !CSS.supports('color', color)) return null;
+  probe.fillStyle = '#000';
+  probe.fillStyle = color;
+  const value = probe.fillStyle;
+  return value.startsWith('#') ? value : null;
+}
+
+/**
+ * A colour: a swatch that opens the system picker, and the value as text for
+ * anything the picker cannot say — `rgba(0, 0, 0, .6)` keeps its see-through.
+ */
+export function ColorField({ value, onCommit, label }: { value: string; onCommit: (value: string) => void; label: string }): JSX.Element {
+  const hex = toHex(value);
+  return (
+    <span className="color">
+      <label className="color-swatch" style={{ background: value }}>
+        <input type="color" aria-label={`${label} — pick`} value={hex ?? '#000000'} onChange={(event) => onCommit(event.target.value)} />
+      </label>
+      <TextInput
+        label={label}
+        className="color-text"
+        value={value}
+        maxLength={64}
+        validate={(text) => (CSS.supports('color', text.trim()) ? null : 'Not a colour.')}
+        onCommit={(text) => onCommit(text.trim())}
+      />
+    </span>
+  );
+}
+
+/** A titled part of an inspector that folds away. */
+export function Fold({ title, children, defaultOpen = true }: { title: string; children: ReactNode; defaultOpen?: boolean }): JSX.Element {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="fold" data-open={open}>
+      <button type="button" className="fold-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <span className="fold-mark" aria-hidden="true" />
+        {title}
+      </button>
+      {open ? <div className="fold-body">{children}</div> : null}
+    </section>
+  );
+}

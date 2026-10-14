@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import Stage from './Stage';
+import '../shared/fonts.css';
 import './stage.css';
 
 const container = document.getElementById('root');

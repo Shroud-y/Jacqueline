@@ -116,6 +116,7 @@ export class CharacterWindows {
   private readonly opening = new Set<string>();
   private hotTimer: NodeJS.Timeout | null = null;
   private drag: Drag | null = null;
+  private previewId: string | null = null;
 
   constructor(
     private readonly store: CharacterStore,
@@ -171,6 +172,24 @@ export class CharacterWindows {
     this.sync();
   }
 
+  /**
+   * The character being laid out in the editor, or null. It is put on screen
+   * whatever its presence rules say — the point is to see the layout where it
+   * will be — and its text elements show sample text.
+   */
+  setPreview(id: string | null): void {
+    if (id === this.previewId) return;
+    const before = this.previewId;
+    this.previewId = id;
+    this.sync();
+    // A character that stays on screen either way still has to drop or pick up its sample text.
+    for (const changed of [before, id]) {
+      const live = changed ? this.live.get(changed) : undefined;
+      const character = changed ? this.store.get(changed) : null;
+      if (live && character) this.update(live, character);
+    }
+  }
+
   /** How many characters have a window right now. */
   get count(): number {
     return this.live.size;
@@ -202,6 +221,7 @@ export class CharacterWindows {
   }
 
   private wants(character: Character): boolean {
+    if (character.id === this.previewId && character.enabled) return true;
     const { anchor, position } = this.geometry(character);
     return this.presence.isPresent(character, { x: position.x, y: position.y, width: anchor.width, height: anchor.height });
   }
@@ -418,7 +438,8 @@ export class CharacterWindows {
       flip: character.appearance.flip,
       visual: idle ? this.visual(character.id, idle.type, idle.src) : null,
       playing: this.presence.isWatching(),
-      restSec: character.appearance.restSec
+      restSec: character.appearance.restSec,
+      preview: character.id === this.previewId
     };
   }
 

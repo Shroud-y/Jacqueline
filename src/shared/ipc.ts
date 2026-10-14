@@ -24,5 +24,7 @@ export const IPC = {
   editorImportAsset: 'editor:importAsset',
   editorOpenFolder: 'editor:openFolder',
   editorAssets: 'editor:assets',
-  editorReleaseAsset: 'editor:releaseAsset'
+  editorReleaseAsset: 'editor:releaseAsset',
+  /** editor → main: which character is being laid out right now, or nobody. */
+  editorPreview: 'editor:preview'
 } as const;

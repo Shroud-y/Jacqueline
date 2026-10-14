@@ -10,6 +10,8 @@ export interface EditorIpcDeps {
   /** Shows a file picker; null when the user backs out. */
   pickFile: (kinds: readonly AssetKind[]) => Promise<string | null>;
   openFolder: (id: string) => Promise<EditorResult>;
+  /** Tells the character windows who is being laid out. */
+  setPreview: (id: string | null) => void;
 }
 
 const idPayload = z.object({ id: characterIdSchema });
@@ -20,6 +22,7 @@ const importPayload = z.object({
   path: z.string().min(1).max(4096).optional()
 });
 const assetPayload = z.object({ id: characterIdSchema, file: assetNameSchema });
+const previewPayload = z.object({ id: characterIdSchema.nullable() });
 
 const refused = { ok: false as const, error: 'That request could not be read.' };
 
@@ -81,6 +84,15 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
       return store.removeAsset(parsed.data.id, parsed.data.file);
     },
 
+    preview: (payload) => {
+      const parsed = previewPayload.safeParse(payload);
+      if (!parsed.success) return refused;
+      const { id } = parsed.data;
+      if (id !== null && !store.has(id)) return { ok: false, error: 'Unknown character.' };
+      deps.setPreview(id);
+      return { ok: true };
+    },
+
     openFolder: async (payload) => {
       const parsed = idPayload.safeParse(payload);
       if (!parsed.success) return refused;
@@ -104,7 +116,8 @@ const CHANNELS: { [K in keyof EditorHandlers]: string } = {
   importAsset: IPC.editorImportAsset,
   openFolder: IPC.editorOpenFolder,
   assets: IPC.editorAssets,
-  releaseAsset: IPC.editorReleaseAsset
+  releaseAsset: IPC.editorReleaseAsset,
+  preview: IPC.editorPreview
 };
 
 export function registerEditorIpc(store: CharacterStore, deps: EditorIpcDeps): void {

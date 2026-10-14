@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { SAMPLE_LINE } from '@shared/textStyle';
 import type { StagePayload } from '@shared/types';
+import TextElement from '../shared/TextElement';
 
 /** A press that travels less than this is a click, not a drag. */
 const DRAG_THRESHOLD_PX = 4;
@@ -26,18 +28,22 @@ export default function Stage(): JSX.Element | null {
 
   return (
     <div className="stage">
-      {stage.elements.map((element) =>
-        element.type === 'character' ? (
-          <CharacterElement
+      {stage.elements.map((element) => {
+        const box = { left: element.x - stage.frame.x, top: element.y - stage.frame.y, width: element.width, height: element.height };
+        if (element.type === 'character') return <CharacterElement key={element.id} stage={stage} {...box} />;
+        // Text shows only while it is being laid out — there are no real lines to show yet.
+        if (!stage.preview) return null;
+        return (
+          <TextElement
             key={element.id}
-            stage={stage}
-            left={element.x - stage.frame.x}
-            top={element.y - stage.frame.y}
-            width={element.width}
-            height={element.height}
+            className="text"
+            characterId={stage.id}
+            text={element.type === 'name' ? stage.name : SAMPLE_LINE}
+            style={element.style}
+            box={box}
           />
-        ) : null
-      )}
+        );
+      })}
     </div>
   );
 }

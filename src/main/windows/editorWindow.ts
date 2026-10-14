@@ -12,6 +12,9 @@ const log = createLogger('editor');
 export class EditorWindow {
   private win: BrowserWindow | null = null;
 
+  /** The editor went away: whatever it was showing on the desktop should stop. */
+  onClosed: (() => void) | null = null;
+
   constructor(
     private readonly preloadPath: string,
     private readonly iconPath: string
@@ -53,11 +56,15 @@ export class EditorWindow {
     win.once('ready-to-show', () => win.show());
     win.on('closed', () => {
       if (this.win === win) this.win = null;
+      this.onClosed?.();
     });
 
     // Nothing in the editor may navigate or open windows.
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     win.webContents.on('will-navigate', (event) => event.preventDefault());
+    win.webContents.on('did-start-navigation', (details) => {
+      if (details.isMainFrame && !details.isSameDocument) this.onClosed?.();
+    });
     win.webContents.on('preload-error', (_event, preload, error) => {
       log.error(`editor preload failed (${preload}): ${error.message}`);
     });
