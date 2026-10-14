@@ -691,3 +691,174 @@ input {
 ::-webkit-scrollbar-thumb:hover {
   background-color: var(--text-3);
 }
+
+/* ---- numbers and sliders ----------------------------------------------- */
+
+.number {
+  position: relative;
+  display: inline-block;
+  width: 96px;
+}
+
+.number .input {
+  padding-right: 30px;
+  font-variant-numeric: tabular-nums;
+}
+
+.number-unit {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  color: var(--text-3);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.slider {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.slider .number {
+  width: 76px;
+}
+
+.slider input[type='range'] {
+  flex: 1;
+  height: 16px;
+  margin: 0;
+  background: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.slider input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--text-2) var(--fill), var(--line) var(--fill));
+}
+
+.slider input[type='range']::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--text);
+  box-shadow: 0 0 0 3px var(--bg);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.slider input[type='range']:focus-visible {
+  outline: 0;
+}
+
+.slider input[type='range']:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
+.size-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+}
+
+.size-row .checkbox {
+  display: flex;
+  align-items: center;
+  height: var(--field-h);
+}
+
+/* ---- file slots --------------------------------------------------------- */
+
+.slots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.slot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
+  text-align: left;
+}
+
+.slot-empty {
+  justify-content: center;
+  height: 96px;
+  border: 1px dashed var(--line-strong);
+  background: none;
+  box-shadow: none;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: background-color var(--ease);
+}
+
+.slot-empty:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--text-2);
+}
+
+.slot[data-over='true'] {
+  border-color: var(--text-2);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--text-2);
+}
+
+.slot-thumb {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  overflow: hidden;
+  border-radius: var(--r);
+  background: var(--bg) conic-gradient(var(--raised) 25%, transparent 0 50%, var(--raised) 0 75%, transparent 0) 0 0 / 12px 12px;
+}
+
+.slot-thumb img,
+.slot-thumb video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.slot-meta {
+  display: grid;
+  min-width: 0;
+}
+
+.slot-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slot-detail {
+  color: var(--text-3);
+  font-size: 12.5px;
+  line-height: 18px;
+}
+
+.slot-actions {
+  display: flex;
+  gap: 4px;
+  margin: 6px 0 0 -8px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

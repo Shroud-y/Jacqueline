@@ -1,6 +1,6 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { z } from 'zod';
-import { ASSET_EXTENSIONS, characterIdSchema, type AssetKind } from '@shared/character';
+import { ASSET_EXTENSIONS, assetKindOf, assetNameSchema, characterIdSchema, referencedAssets, type AssetKind } from '@shared/character';
 import { IPC } from '@shared/ipc';
 import type { EditorApi, EditorResult } from '@shared/types';
 import type { CharacterStore } from './store';
@@ -16,8 +16,10 @@ const idPayload = z.object({ id: characterIdSchema });
 const namePayload = z.object({ name: z.string() });
 const importPayload = z.object({
   id: characterIdSchema,
-  kinds: z.array(z.enum(Object.keys(ASSET_EXTENSIONS) as [AssetKind, ...AssetKind[]])).min(1)
+  kinds: z.array(z.enum(Object.keys(ASSET_EXTENSIONS) as [AssetKind, ...AssetKind[]])).min(1),
+  path: z.string().min(1).max(4096).optional()
 });
+const assetPayload = z.object({ id: characterIdSchema, file: assetNameSchema });
 
 const refused = { ok: false as const, error: 'That request could not be read.' };
 
@@ -51,10 +53,32 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
       const parsed = importPayload.safeParse(payload);
       if (!parsed.success) return refused;
       if (!store.has(parsed.data.id)) return { ok: false, error: 'Unknown character.' };
-      const picked = await deps.pickFile(parsed.data.kinds);
+      const { id, kinds, path } = parsed.data;
+      if (path !== undefined) {
+        // Dropped on the window: the same rule the file picker's filter enforces.
+        const kind = assetKindOf(path);
+        if (!kind || !kinds.includes(kind)) return { ok: false, error: `That kind of file cannot go here.` };
+        return store.importAsset(id, path);
+      }
+      const picked = await deps.pickFile(kinds);
       // Backing out of the dialog is not a failure the editor should report.
       if (picked === null) return { ok: false, error: '' };
-      return store.importAsset(parsed.data.id, picked);
+      return store.importAsset(id, picked);
+    },
+
+    assets: (payload) => {
+      const parsed = idPayload.safeParse(payload);
+      return parsed.success ? store.assetInfo(parsed.data.id) : [];
+    },
+
+    releaseAsset: (payload) => {
+      const parsed = assetPayload.safeParse(payload);
+      if (!parsed.success) return refused;
+      const character = store.get(parsed.data.id);
+      if (!character) return { ok: false, error: 'Unknown character.' };
+      // Still used somewhere else in the character: it stays.
+      if (referencedAssets(character).has(parsed.data.file)) return { ok: true };
+      return store.removeAsset(parsed.data.id, parsed.data.file);
     },
 
     openFolder: async (payload) => {
@@ -68,7 +92,7 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
 
 /** The handlers take what came over the wire, not what the editor's types promise it sent. */
 type EditorHandlers = {
-  [K in Exclude<keyof EditorApi, 'onChanged'>]: (payload?: unknown) => ReturnType<EditorApi[K]> | Awaited<ReturnType<EditorApi[K]>>;
+  [K in Exclude<keyof EditorApi, 'onChanged' | 'pathForFile'>]: (payload?: unknown) => ReturnType<EditorApi[K]> | Awaited<ReturnType<EditorApi[K]>>;
 };
 
 const CHANNELS: { [K in keyof EditorHandlers]: string } = {
@@ -78,7 +102,9 @@ const CHANNELS: { [K in keyof EditorHandlers]: string } = {
   duplicate: IPC.editorDuplicate,
   remove: IPC.editorRemove,
   importAsset: IPC.editorImportAsset,
-  openFolder: IPC.editorOpenFolder
+  openFolder: IPC.editorOpenFolder,
+  assets: IPC.editorAssets,
+  releaseAsset: IPC.editorReleaseAsset
 };
 
 export function registerEditorIpc(store: CharacterStore, deps: EditorIpcDeps): void {

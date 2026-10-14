@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Character, CharacterEntry } from '@shared/character';
+import AppearanceTab from './AppearanceTab';
 import GeneralTab from './GeneralTab';
 import Thumbnail from './Thumbnail';
 import { MoreMenu, Notice, Switch, TextInput } from './fields';
@@ -159,6 +160,8 @@ function CharacterPane({ character, characters, onSelect }: CharacterPaneProps):
         ) : null}
         {tab === 'general' ? (
           <GeneralTab character={character} onChange={characters.update} />
+        ) : tab === 'appearance' ? (
+          <AppearanceTab character={character} characters={characters} />
         ) : (
           <div className="blank">
             <h1>{TABS.find((entry) => entry.id === tab)?.label}</h1>

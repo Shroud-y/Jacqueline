@@ -121,4 +121,41 @@ describe('editor requests', () => {
     expect((await handlers().openFolder({ id: 'nobody' })).ok).toBe(false);
     expect(opened).toEqual([created.id]);
   });
+
+  it('imports a dropped file by its path, but only of a kind that may go there', async () => {
+    const created = await make();
+    const png = join(outside, 'drop.png');
+    const ogg = join(outside, 'drop.ogg');
+    writeFileSync(png, 'pixels');
+    writeFileSync(ogg, 'sound');
+    expect(await handlers().importAsset({ id: created.id, kinds: ['image', 'video'], path: png })).toEqual({ ok: true, file: 'drop.png', kind: 'image' });
+    expect((await handlers().importAsset({ id: created.id, kinds: ['image', 'video'], path: ogg })).ok).toBe(false);
+    // No picker for a drop.
+    expect(askedFor).toEqual([]);
+    expect(store.listAssets(created.id)).toEqual(['drop.png']);
+  });
+
+  it('says what is in the assets folder and how big', async () => {
+    const created = await make();
+    writeFileSync(join(outside, 'idle.webm'), 'x'.repeat(2048));
+    await handlers().importAsset({ id: created.id, kinds: ['video'], path: join(outside, 'idle.webm') });
+    expect(await handlers().assets({ id: created.id })).toEqual([{ file: 'idle.webm', kind: 'video', bytes: 2048 }]);
+    expect(await handlers().assets({ id: '../x' })).toEqual([]);
+  });
+
+  it('removes a released file nothing points at, and keeps one something still does', async () => {
+    const created = await make();
+    writeFileSync(join(outside, 'a.png'), 'a');
+    writeFileSync(join(outside, 'b.png'), 'b');
+    await handlers().importAsset({ id: created.id, kinds: ['image'], path: join(outside, 'a.png') });
+    await handlers().importAsset({ id: created.id, kinds: ['image'], path: join(outside, 'b.png') });
+    await handlers().save({ ...created, appearance: { ...created.appearance, states: { speaking: { type: 'image', src: 'b.png' } } } });
+
+    expect(await handlers().releaseAsset({ id: created.id, file: 'a.png' })).toEqual({ ok: true });
+    expect(await handlers().releaseAsset({ id: created.id, file: 'b.png' })).toEqual({ ok: true });
+    expect(store.listAssets(created.id)).toEqual(['b.png']);
+    expect((await handlers().releaseAsset({ id: created.id, file: '../character.json' })).ok).toBe(false);
+    expect(existsSync(join(root, created.id, 'character.json'))).toBe(true);
+  });
 });
+

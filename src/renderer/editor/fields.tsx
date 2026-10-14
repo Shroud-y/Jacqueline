@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 
 /* Every piece the editor's forms are made of — docs/DESIGN.md §4. */
 
@@ -272,6 +272,123 @@ export function MoreMenu({ items, label }: { items: MenuItem[]; label: string })
           ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+interface NumberInputProps {
+  value: number;
+  onCommit: (value: number) => void;
+  min: number;
+  max: number;
+  /** Shown inside the box on the right: "px", "s", "%". */
+  unit?: string;
+  label: string;
+}
+
+/**
+ * A number that saves as it is typed, as long as it is one and in range. The
+ * arrow keys step by 1 (10 with Shift); so does the wheel, while the box has
+ * focus. Left with something that is not a usable number, it goes back.
+ */
+export function NumberInput({ value, onCommit, min, max, unit, label }: NumberInputProps): JSX.Element {
+  const [typed, setTyped] = useState<string | null>(null);
+  const text = typed ?? String(value);
+  const parsed = Number(text.replace(',', '.'));
+  const valid = text.trim() !== '' && Number.isFinite(parsed) && parsed >= min && parsed <= max;
+
+  const step = (delta: number): void => {
+    const base = valid ? parsed : value;
+    const next = Math.min(max, Math.max(min, Math.round((base + delta) * 100) / 100));
+    setTyped(String(next));
+    onCommit(next);
+  };
+
+  return (
+    <span className="number">
+      <input
+        className="input"
+        type="text"
+        inputMode="decimal"
+        aria-label={label}
+        aria-invalid={!valid}
+        value={text}
+        onFocus={() => setTyped(String(value))}
+        onBlur={() => setTyped(null)}
+        onChange={(event) => {
+          const next = event.target.value;
+          setTyped(next);
+          const number = Number(next.replace(',', '.'));
+          if (next.trim() !== '' && Number.isFinite(number) && number >= min && number <= max) onCommit(number);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+          event.preventDefault();
+          step((event.key === 'ArrowUp' ? 1 : -1) * (event.shiftKey ? 10 : 1));
+        }}
+        onWheel={(event) => {
+          if (document.activeElement !== event.currentTarget) return;
+          step(event.deltaY < 0 ? 1 : -1);
+        }}
+      />
+      {unit ? <span className="number-unit">{unit}</span> : null}
+    </span>
+  );
+}
+
+/** How often a slider being dragged saves. The character on screen follows at this rate. */
+const SLIDER_SAVE_MS = 120;
+
+/**
+ * A slider with the number beside it. While it is dragged the value is saved
+ * a few times a second, not on every pixel: each save is a file write and a
+ * redraw of the character on the desktop.
+ */
+export function Slider({ value, onCommit, min, max, unit, label }: NumberInputProps): JSX.Element {
+  const [dragged, setDragged] = useState<number | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latest = useRef(value);
+  const shown = dragged ?? value;
+
+  const flush = (): void => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    onCommit(latest.current);
+  };
+
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    []
+  );
+
+  const release = (): void => {
+    if (dragged === null) return;
+    flush();
+    setDragged(null);
+  };
+
+  return (
+    <div className="slider">
+      <input
+        type="range"
+        aria-label={label}
+        min={min}
+        max={max}
+        value={shown}
+        style={{ '--fill': `${((shown - min) / (max - min)) * 100}%` } as CSSProperties}
+        onChange={(event) => {
+          const next = Number(event.target.value);
+          latest.current = next;
+          setDragged(next);
+          timer.current ??= setTimeout(flush, SLIDER_SAVE_MS);
+        }}
+        onPointerUp={release}
+        onKeyUp={release}
+        onBlur={release}
+      />
+      <NumberInput label={label} value={shown} min={min} max={max} unit={unit} onCommit={onCommit} />
     </div>
   );
 }

@@ -10,6 +10,10 @@ export interface Characters {
   dismissError(): void;
   /** Saves the whole character as it should now be. */
   update(character: Character): void;
+  /** The same, for when what comes next depends on whether it went through. */
+  save(character: Character): Promise<boolean>;
+  /** Shows a refusal that came from somewhere other than a save. */
+  report(message: string): void;
   create(name: string): Promise<Character | null>;
   duplicate(id: string): Promise<Character | null>;
   remove(id: string): Promise<boolean>;
@@ -63,6 +67,14 @@ export function useCharacters(): Characters {
     [settle]
   );
 
+  const save = useCallback(
+    async (character: Character): Promise<boolean> => {
+      const result = await window.shardEditor?.save(character);
+      return result ? settle(result) : false;
+    },
+    [settle]
+  );
+
   const create = useCallback(
     async (name: string): Promise<Character | null> => {
       const result = await window.shardEditor?.create({ name });
@@ -94,5 +106,5 @@ export function useCharacters(): Characters {
     [settle]
   );
 
-  return { entries, error, dismissError: () => setError(null), update, create, duplicate, remove, openFolder };
+  return { entries, error, dismissError: () => setError(null), update, save, report: setError, create, duplicate, remove, openFolder };
 }

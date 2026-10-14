@@ -72,7 +72,24 @@ export interface EditorApi {
   save(character: Character): Promise<EditorResult<{ character: Character }>>;
   duplicate(payload: { id: string }): Promise<EditorResult<{ character: Character }>>;
   remove(payload: { id: string }): Promise<EditorResult>;
-  /** An empty `error` means the file picker was closed without choosing. */
-  importAsset(payload: { id: string; kinds: AssetKind[] }): Promise<EditorResult<{ file: string; kind: AssetKind }>>;
+  /**
+   * Copies a file into the character's assets: `path` when the file was
+   * dropped on the window, otherwise one the user picks. An empty `error`
+   * means the file picker was closed without choosing.
+   */
+  importAsset(payload: { id: string; kinds: AssetKind[]; path?: string }): Promise<EditorResult<{ file: string; kind: AssetKind }>>;
+  /** What is in the character's assets folder. */
+  assets(payload: { id: string }): Promise<AssetInfo[]>;
+  /** A file the character no longer points at: removed, unless something in it still does. */
+  releaseAsset(payload: { id: string; file: string }): Promise<EditorResult>;
+  /** Where on disk a file dropped on the window is. Not IPC — answered by the preload itself. */
+  pathForFile(file: File): string;
   openFolder(payload: { id: string }): Promise<EditorResult>;
+}
+
+/** One file in a character's assets folder. */
+export interface AssetInfo {
+  file: string;
+  kind: AssetKind;
+  bytes: number;
 }

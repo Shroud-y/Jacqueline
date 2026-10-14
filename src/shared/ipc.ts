@@ -22,5 +22,7 @@ export const IPC = {
   editorRemove: 'editor:remove',
   /** Opens a file picker and copies the chosen file into the character's assets. */
   editorImportAsset: 'editor:importAsset',
-  editorOpenFolder: 'editor:openFolder'
+  editorOpenFolder: 'editor:openFolder',
+  editorAssets: 'editor:assets',
+  editorReleaseAsset: 'editor:releaseAsset'
 } as const;

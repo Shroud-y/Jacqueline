@@ -260,3 +260,28 @@ export function assetKindOf(fileName: string): AssetKind | null {
   }
   return null;
 }
+
+/**
+ * Every asset the character points at. A file in `assets/` that is not in
+ * here is not used by anything — but only the editor, which knows a file was
+ * just let go, should act on that: a file dropped into the folder by hand to
+ * use later is the user's business.
+ */
+export function referencedAssets(character: Character): Set<string> {
+  const used = new Set<string>();
+  for (const visual of Object.values(character.appearance.states)) used.add(visual.src);
+  for (const lines of Object.values(character.lines)) {
+    for (const line of lines) if (line.audio) used.add(line.audio);
+  }
+  if (character.audio.appear) used.add(character.audio.appear);
+  if (character.audio.disappear) used.add(character.audio.disappear);
+  for (const element of character.layout.elements) {
+    if ('style' in element && assetKindOf(element.style.font) === 'font') used.add(element.style.font);
+  }
+  return used;
+}
+
+/** The `character` element of the layout — the box the picture or video is fitted into. */
+export function characterElement(character: Character): Extract<LayoutElement, { type: 'character' }> | null {
+  return character.layout.elements.find((element) => element.type === 'character') ?? null;
+}

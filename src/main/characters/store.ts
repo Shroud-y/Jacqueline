@@ -13,7 +13,7 @@ import {
   type Character,
   type CharacterEntry
 } from '@shared/character';
-import type { EditorResult } from '@shared/types';
+import type { AssetInfo, EditorResult } from '@shared/types';
 import { createLogger } from '../app/logger';
 import { readJson, writeJsonAtomic } from '../app/jsonFile';
 
@@ -155,6 +155,22 @@ export class CharacterStore {
     } catch (err) {
       return { ok: false, error: `Could not remove the file: ${(err as Error).message}` };
     }
+  }
+
+  /** Every usable file in the character's assets, with what it is and how big. */
+  assetInfo(id: string): AssetInfo[] {
+    const info: AssetInfo[] = [];
+    for (const file of this.listAssets(id)) {
+      const kind = assetKindOf(file);
+      const path = this.assetPath(id, file);
+      if (!kind || !path) continue;
+      try {
+        info.push({ file, kind, bytes: statSync(path).size });
+      } catch {
+        // Gone between the listing and the look: not there, then.
+      }
+    }
+    return info;
   }
 
   listAssets(id: string): string[] {

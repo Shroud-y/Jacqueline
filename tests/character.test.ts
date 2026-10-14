@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assetKindOf, assetNameSchema, characterIdSchema, characterSchema, defaultCharacter } from '@shared/character';
+import { assetKindOf, assetNameSchema, characterElement, characterIdSchema, characterSchema, defaultCharacter, referencedAssets } from '@shared/character';
 
 describe('character schema', () => {
   it('accepts a freshly made character', () => {
@@ -80,5 +80,35 @@ describe('ids and asset names', () => {
     expect(assetKindOf('anim.gif')).toBeNull();
     expect(assetKindOf('run.exe')).toBeNull();
     expect(assetKindOf('noextension')).toBeNull();
+  });
+});
+
+describe('referencedAssets', () => {
+  it('collects every file the character points at, and nothing else', () => {
+    const base = defaultCharacter('a1', 'Miku');
+    const character = {
+      ...base,
+      appearance: { ...base.appearance, states: { idle: { type: 'video' as const, src: 'idle.webm' }, speaking: { type: 'image' as const, src: 'talk.png' } } },
+      lines: { greet: [{ id: 'l1', text: 'hi', audio: 'hi.ogg' }, { id: 'l2', text: 'yo' }] },
+      audio: { volume: 1, appear: 'in.ogg', disappear: null },
+      layout: {
+        elements: base.layout.elements.map((element) =>
+          element.type === 'speech' ? { ...element, style: { ...element.style, font: 'Comic.ttf' } } : element
+        )
+      }
+    };
+    expect([...referencedAssets(character)].sort()).toEqual(['Comic.ttf', 'hi.ogg', 'idle.webm', 'in.ogg', 'talk.png']);
+  });
+
+  it('does not take a font family name for a file', () => {
+    expect(referencedAssets(defaultCharacter('a1', 'Miku')).size).toBe(0);
+  });
+});
+
+describe('characterElement', () => {
+  it('finds the box the picture goes in, or says there is none', () => {
+    const base = defaultCharacter('a1', 'Miku');
+    expect(characterElement(base)).toMatchObject({ type: 'character', width: 240 });
+    expect(characterElement({ ...base, layout: { elements: [] } })).toBeNull();
   });
 });

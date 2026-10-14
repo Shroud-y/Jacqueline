@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { CharacterEntry } from '@shared/character';
 import type { EditorApi } from '@shared/types';
 
@@ -15,7 +15,9 @@ const CHANNEL = {
   editorDuplicate: 'editor:duplicate',
   editorRemove: 'editor:remove',
   editorImportAsset: 'editor:importAsset',
-  editorOpenFolder: 'editor:openFolder'
+  editorOpenFolder: 'editor:openFolder',
+  editorAssets: 'editor:assets',
+  editorReleaseAsset: 'editor:releaseAsset'
 } as const;
 
 const api: EditorApi = {
@@ -32,7 +34,10 @@ const api: EditorApi = {
   duplicate: (payload) => ipcRenderer.invoke(CHANNEL.editorDuplicate, payload),
   remove: (payload) => ipcRenderer.invoke(CHANNEL.editorRemove, payload),
   importAsset: (payload) => ipcRenderer.invoke(CHANNEL.editorImportAsset, payload),
-  openFolder: (payload) => ipcRenderer.invoke(CHANNEL.editorOpenFolder, payload)
+  openFolder: (payload) => ipcRenderer.invoke(CHANNEL.editorOpenFolder, payload),
+  assets: (payload) => ipcRenderer.invoke(CHANNEL.editorAssets, payload),
+  releaseAsset: (payload) => ipcRenderer.invoke(CHANNEL.editorReleaseAsset, payload),
+  pathForFile: (file) => webUtils.getPathForFile(file)
 };
 
 contextBridge.exposeInMainWorld('shardEditor', api);
