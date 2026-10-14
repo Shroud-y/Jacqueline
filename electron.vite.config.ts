@@ -42,7 +42,10 @@ export default defineConfig({
     build: {
       rollupOptions: {
         external: EXTERNAL,
-        input: { stage: resolve('src/preload/stage.ts') },
+        input: {
+          stage: resolve('src/preload/stage.ts'),
+          editor: resolve('src/preload/editor.ts')
+        },
         // A sandboxed preload must be CommonJS — ESM is not supported there.
         output: {
           format: 'cjs',

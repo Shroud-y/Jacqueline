@@ -4,19 +4,20 @@ import { describe, expect, it } from 'vitest';
 import { IPC } from '@shared/ipc';
 
 /**
- * The preload writes its channel names out literally (see the note at the top
- * of it for why). This is what stops the two lists drifting apart.
+ * Each preload writes its channel names out literally (see the note at the
+ * top of `stage.ts` for why). This is what stops them drifting from `IPC`.
  */
-describe('stage preload', () => {
-  const source = readFileSync(join(process.cwd(), 'src/preload/stage.ts'), 'utf8');
+describe.each(['stage', 'editor'])('%s preload', (name) => {
+  const source = readFileSync(join(process.cwd(), `src/preload/${name}.ts`), 'utf8');
   const literal = source.slice(source.indexOf('const CHANNEL = {'), source.indexOf('} as const'));
   const declared = Object.fromEntries(
     [...literal.matchAll(/(\w+): '([^']+)'/g)].map((match) => [match[1], match[2]])
   );
 
-  it('names every stage channel exactly as `IPC` does', () => {
-    const stage = Object.fromEntries(Object.entries(IPC).filter(([key]) => key.startsWith('stage')));
-    expect(declared).toEqual(stage);
+  it('names every one of its channels exactly as `IPC` does', () => {
+    const own = Object.fromEntries(Object.entries(IPC).filter(([key]) => key.startsWith(name)));
+    expect(Object.keys(own).length).toBeGreaterThan(0);
+    expect(declared).toEqual(own);
   });
 
   it('imports nothing at runtime but electron', () => {

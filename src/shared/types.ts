@@ -1,6 +1,6 @@
 /** Types that cross the IPC boundary. Type-only imports only, so it costs a bundle nothing. */
 
-import type { LayoutElement } from './character';
+import type { AssetKind, Character, CharacterEntry, LayoutElement } from './character';
 
 export interface QuietHours {
   enabled: boolean;
@@ -54,4 +54,25 @@ export interface StagePayload {
   playing: boolean;
   /** Seconds a video holds still between plays; 0 loops it. */
   restSec: number;
+}
+
+/* ------------------------------------------------------------------ */
+/* Editor                                                              */
+/* ------------------------------------------------------------------ */
+
+/** What the editor is told after asking for something: done, or why not in words a person can act on. */
+export type EditorResult<T = object> = ({ ok: true } & T) | { ok: false; error: string };
+
+/** Everything the editor window can ask of main. */
+export interface EditorApi {
+  list(): Promise<CharacterEntry[]>;
+  onChanged(handler: (entries: CharacterEntry[]) => void): () => void;
+  create(payload: { name: string }): Promise<EditorResult<{ character: Character }>>;
+  /** The whole character, as it should now be. */
+  save(character: Character): Promise<EditorResult<{ character: Character }>>;
+  duplicate(payload: { id: string }): Promise<EditorResult<{ character: Character }>>;
+  remove(payload: { id: string }): Promise<EditorResult>;
+  /** An empty `error` means the file picker was closed without choosing. */
+  importAsset(payload: { id: string; kinds: AssetKind[] }): Promise<EditorResult<{ file: string; kind: AssetKind }>>;
+  openFolder(payload: { id: string }): Promise<EditorResult>;
 }

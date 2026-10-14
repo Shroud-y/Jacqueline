@@ -10,5 +10,17 @@ export const IPC = {
   stageDragStart: 'stage:dragStart',
   stageDragEnd: 'stage:dragEnd',
   /** renderer → main: the character was right-clicked. */
-  stageMenu: 'stage:menu'
+  stageMenu: 'stage:menu',
+
+  /** editor → main, invoke: every character, usable or not. */
+  editorList: 'editor:list',
+  /** main → editor: the same, whenever anything about any of them changes. */
+  editorChanged: 'editor:changed',
+  editorCreate: 'editor:create',
+  editorSave: 'editor:save',
+  editorDuplicate: 'editor:duplicate',
+  editorRemove: 'editor:remove',
+  /** Opens a file picker and copies the chosen file into the character's assets. */
+  editorImportAsset: 'editor:importAsset',
+  editorOpenFolder: 'editor:openFolder'
 } as const;

@@ -1,0 +1,89 @@
+import { ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { z } from 'zod';
+import { ASSET_EXTENSIONS, characterIdSchema, type AssetKind } from '@shared/character';
+import { IPC } from '@shared/ipc';
+import type { EditorApi, EditorResult } from '@shared/types';
+import type { CharacterStore } from './store';
+
+/** What the handlers need from the outside world, so they can be tested without it. */
+export interface EditorIpcDeps {
+  /** Shows a file picker; null when the user backs out. */
+  pickFile: (kinds: readonly AssetKind[]) => Promise<string | null>;
+  openFolder: (id: string) => Promise<EditorResult>;
+}
+
+const idPayload = z.object({ id: characterIdSchema });
+const namePayload = z.object({ name: z.string() });
+const importPayload = z.object({
+  id: characterIdSchema,
+  kinds: z.array(z.enum(Object.keys(ASSET_EXTENSIONS) as [AssetKind, ...AssetKind[]])).min(1)
+});
+
+const refused = { ok: false as const, error: 'That request could not be read.' };
+
+/**
+ * Everything the editor can ask for. The editor's page is ours, but what
+ * arrives over IPC is still checked: an id is what picks a folder on disk.
+ * The character itself is validated by the store on save.
+ */
+export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K in keyof EditorHandlers]: EditorHandlers[K] } {
+  return {
+    list: () => store.list(),
+
+    create: (payload) => {
+      const parsed = namePayload.safeParse(payload);
+      return parsed.success ? store.create(parsed.data.name) : refused;
+    },
+
+    save: (payload) => store.save(payload),
+
+    duplicate: (payload) => {
+      const parsed = idPayload.safeParse(payload);
+      return parsed.success ? store.duplicate(parsed.data.id) : refused;
+    },
+
+    remove: (payload) => {
+      const parsed = idPayload.safeParse(payload);
+      return parsed.success ? store.remove(parsed.data.id) : refused;
+    },
+
+    importAsset: async (payload) => {
+      const parsed = importPayload.safeParse(payload);
+      if (!parsed.success) return refused;
+      if (!store.has(parsed.data.id)) return { ok: false, error: 'Unknown character.' };
+      const picked = await deps.pickFile(parsed.data.kinds);
+      // Backing out of the dialog is not a failure the editor should report.
+      if (picked === null) return { ok: false, error: '' };
+      return store.importAsset(parsed.data.id, picked);
+    },
+
+    openFolder: async (payload) => {
+      const parsed = idPayload.safeParse(payload);
+      if (!parsed.success) return refused;
+      if (!store.has(parsed.data.id)) return { ok: false, error: 'Unknown character.' };
+      return deps.openFolder(parsed.data.id);
+    }
+  };
+}
+
+/** The handlers take what came over the wire, not what the editor's types promise it sent. */
+type EditorHandlers = {
+  [K in Exclude<keyof EditorApi, 'onChanged'>]: (payload?: unknown) => ReturnType<EditorApi[K]> | Awaited<ReturnType<EditorApi[K]>>;
+};
+
+const CHANNELS: { [K in keyof EditorHandlers]: string } = {
+  list: IPC.editorList,
+  create: IPC.editorCreate,
+  save: IPC.editorSave,
+  duplicate: IPC.editorDuplicate,
+  remove: IPC.editorRemove,
+  importAsset: IPC.editorImportAsset,
+  openFolder: IPC.editorOpenFolder
+};
+
+export function registerEditorIpc(store: CharacterStore, deps: EditorIpcDeps): void {
+  const handlers = editorHandlers(store, deps);
+  for (const key of Object.keys(CHANNELS) as (keyof EditorHandlers)[]) {
+    ipcMain.handle(CHANNELS[key], (_event: IpcMainInvokeEvent, payload: unknown) => handlers[key](payload));
+  }
+}

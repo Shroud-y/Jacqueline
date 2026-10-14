@@ -13,6 +13,7 @@ import {
   type Character,
   type CharacterEntry
 } from '@shared/character';
+import type { EditorResult } from '@shared/types';
 import { createLogger } from '../app/logger';
 import { readJson, writeJsonAtomic } from '../app/jsonFile';
 
@@ -21,7 +22,7 @@ const log = createLogger('characters');
 const CHARACTER_FILE = 'character.json';
 const ASSETS_DIR = 'assets';
 
-export type StoreResult<T = object> = ({ ok: true } & T) | { ok: false; error: string };
+export type StoreResult<T = object> = EditorResult<T>;
 
 /**
  * The characters on disk: one folder each under `root`, holding

@@ -1,5 +1,6 @@
 import { net, protocol } from 'electron';
 import { pathToFileURL } from 'node:url';
+import { ASSET_SCHEME } from '@shared/assetUrl';
 import { createLogger } from '../app/logger';
 import type { CharacterStore } from './store';
 
@@ -11,17 +12,13 @@ const log = createLogger('assets');
  * so a renderer can be handed exactly the assets folders and nothing else on
  * the disk.
  */
-export const ASSET_SCHEME = 'shard-asset';
+export { ASSET_SCHEME, assetUrl } from '@shared/assetUrl';
 
 /** Must run before `app.whenReady`. */
 export function registerAssetScheme(): void {
   protocol.registerSchemesAsPrivileged([
     { scheme: ASSET_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
   ]);
-}
-
-export function assetUrl(characterId: string, file: string): string {
-  return `${ASSET_SCHEME}://${characterId}/${encodeURIComponent(file)}`;
 }
 
 /**

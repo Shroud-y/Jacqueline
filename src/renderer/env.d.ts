@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import type { StagePayload } from '@shared/types';
+import type { EditorApi, StagePayload } from '@shared/types';
 
 /**
  * Structural mirror of the preload surface. Declared rather than imported so
@@ -19,5 +19,7 @@ declare global {
   interface Window {
     /** Absent when the page is opened outside Electron. */
     shard?: StageApi;
+    /** The editor window's bridge; absent everywhere else. */
+    shardEditor?: EditorApi;
   }
 }

@@ -1,0 +1,44 @@
+/*
+ * Design tokens — docs/DESIGN.md §2, palette A "Graphite + amber".
+ * Everything the editor paints comes from here; a colour written anywhere
+ * else is a bug.
+ */
+:root {
+  /* Neutrals: warm, never tinted toward the accent. */
+  --bg: #141312;
+  --surface: #1b1a18;
+  --raised: #232120;
+  --hover: #2c2a27;
+  --line: #302d2a;
+  --line-strong: #4a4640;
+  --text: #ece8e1;
+  --text-2: #a8a299;
+  --text-3: #8a847b;
+
+  /*
+   * Three roles only: the open tab or segment, the chosen option, the one
+   * main button. Plus the focus ring.
+   */
+  --accent: #e8a33d;
+  --on-accent: #1a1206;
+
+  --danger: #e5736a;
+  /* Only ever a 2 px bar beside a cost warning. */
+  --warn: #d9c36a;
+
+  --font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+
+  --r: 6px;
+  --r-lg: 10px;
+  --field-h: 32px;
+  --menu-shadow: 0 0 0 1px var(--line), 0 8px 24px rgba(0, 0, 0, 0.45);
+  --ease: 120ms ease-out;
+
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ease: 0ms linear;
+  }
+}

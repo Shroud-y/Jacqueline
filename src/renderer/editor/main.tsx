@@ -1,10 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-
-/** Where characters are built. Nothing to edit yet. */
-function Editor(): JSX.Element | null {
-  return null;
-}
+import Editor from './Editor';
+import './tokens.css';
+import './editor.css';
 
 const container = document.getElementById('root');
 if (container) {

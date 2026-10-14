@@ -1,7 +1,8 @@
-import { app, powerMonitor, screen, shell } from 'electron';
+import { app, dialog, powerMonitor, screen, shell } from 'electron';
 import { join } from 'node:path';
 
-import type { Character } from '@shared/character';
+import { ASSET_EXTENSIONS, type Character } from '@shared/character';
+import { IPC } from '@shared/ipc';
 
 import { configureLogger, createLogger } from './app/logger';
 import { characterMenu, trayMenu, trayTooltip, type MenuAction, type MenuState } from './app/menus';
@@ -9,12 +10,14 @@ import { paths } from './app/paths';
 import { SettingsStore } from './app/settings';
 import { AppTray } from './app/tray';
 import { handleAssetProtocol, registerAssetScheme } from './characters/assetProtocol';
+import { registerEditorIpc } from './characters/editorIpc';
 import { isPresent } from './characters/presence';
 import { CharacterStore } from './characters/store';
 import { Visibility } from './characters/visibility';
 import { PresenceWatcher } from './sensors/presenceWatcher';
 import { loadDesktopSensors } from './sensors/win32';
 import { CharacterWindows } from './windows/characterWindows';
+import { EditorWindow } from './windows/editorWindow';
 
 const log = createLogger('main');
 
@@ -81,6 +84,23 @@ async function bootstrap(): Promise<void> {
   reconcileAutostart(settings.current.startWithSystem);
   settings.onChange((next) => reconcileAutostart(next.startWithSystem));
 
+  const editor = new EditorWindow(join(__dirname, '../preload/editor.js'), join(paths.iconsDir(), 'app.ico'));
+  registerEditorIpc(characters, {
+    pickFile: async (kinds) => {
+      const options = {
+        properties: ['openFile' as const],
+        filters: [{ name: 'Files', extensions: kinds.flatMap((kind) => ASSET_EXTENSIONS[kind].map((ext) => ext.slice(1))) }]
+      };
+      const parent = editor.browserWindow;
+      const picked = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options);
+      return picked.canceled ? null : (picked.filePaths[0] ?? null);
+    },
+    openFolder: async (id) => {
+      const failure = await shell.openPath(paths.characterDir(id));
+      return failure ? { ok: false, error: failure } : { ok: true };
+    }
+  });
+
   const menuState = (): MenuState => ({
     everyoneHidden: visibility.everyoneHidden,
     muted: settings.current.muted,
@@ -107,6 +127,8 @@ async function bootstrap(): Promise<void> {
       case 'setMuted':
         settings.update({ muted: action.muted });
         return;
+      case 'openEditor':
+        return editor.open();
       case 'openCharactersFolder':
         void shell.openPath(paths.charactersRoot()).then((failure) => {
           if (failure) log.warn(`cannot open the characters folder: ${failure}`);
@@ -131,10 +153,16 @@ async function bootstrap(): Promise<void> {
     presence.setCharacters(watched());
     windows.refresh();
     tray.refresh();
+    editor.send(IPC.editorChanged, characters.list());
   };
   characters.onChange(resync);
   visibility.onChange(resync);
   settings.onChange(() => tray.refresh());
+
+  // Started again while already running: that is someone looking for the
+  // app, and the editor is the only window it has to show them.
+  app.on('second-instance', () => editor.open());
+  if (process.argv.includes('--editor')) editor.open();
 
   // The app lives in the tray; it never quits from window state.
   app.on('window-all-closed', () => {
@@ -142,6 +170,7 @@ async function bootstrap(): Promise<void> {
   });
 
   app.on('before-quit', () => {
+    editor.destroy();
     windows.stop();
     presence.stop();
     visibility.stop();
