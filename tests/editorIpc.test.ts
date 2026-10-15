@@ -13,6 +13,7 @@ let picked: string | null;
 let askedFor: readonly AssetKind[][];
 let opened: string[];
 let previewed: (string | null)[];
+let said: { id: string; text: string; line: string }[];
 
 const handlers = (): ReturnType<typeof editorHandlers> =>
   editorHandlers(store, {
@@ -24,7 +25,9 @@ const handlers = (): ReturnType<typeof editorHandlers> =>
       opened.push(id);
       return { ok: true };
     },
-    setPreview: (id) => previewed.push(id)
+    setPreview: (id) => previewed.push(id),
+    sayNow: (character, text, line) => said.push({ id: character.id, text, line: line.id }),
+    now: () => new Date(2026, 0, 1, 9, 5).getTime()
   });
 
 beforeEach(() => {
@@ -35,6 +38,7 @@ beforeEach(() => {
   askedFor = [];
   opened = [];
   previewed = [];
+  said = [];
 });
 
 afterEach(() => {
@@ -169,5 +173,31 @@ describe('editor requests', () => {
     expect((await handlers().preview({ id: '../x' })).ok).toBe(false);
     expect((await handlers().preview({})).ok).toBe(false);
     expect(previewed).toEqual([created.id, null]);
+  });
+
+  it('says a line now, its slots filled with what this moment gives and likely values for the rest', async () => {
+    const created = await make();
+    const lines = { hi: [{ id: 'a', text: '{name} at {time}, {program} for {minutes}.' }, { id: 'b', text: 'Hi {mood}.' }] };
+    await handlers().save({ ...created, lines, presence: { ...created.presence, apps: ['dota2.exe'] } });
+
+    expect(await handlers().testLine({ id: created.id, group: 'hi', line: 'a' })).toEqual({ ok: true });
+    expect(said).toEqual([{ id: created.id, text: 'Miku at 09:05, dota2.exe for 15.', line: 'a' }]);
+
+    // A slot nothing fills is the reason it is never said, and the editor is told so.
+    const unknown = await handlers().testLine({ id: created.id, group: 'hi', line: 'b' });
+    expect(unknown.ok).toBe(false);
+    if (!unknown.ok) expect(unknown.error).toContain('{mood}');
+    expect((await handlers().testLine({ id: created.id, group: 'hi', line: 'zzz' })).ok).toBe(false);
+    expect((await handlers().testLine({ id: created.id, group: 'nope', line: 'a' })).ok).toBe(false);
+    expect((await handlers().testLine({ id: 'nobody', group: 'hi', line: 'a' })).ok).toBe(false);
+    expect((await handlers().testLine({ id: created.id })).ok).toBe(false);
+    expect(said).toHaveLength(1);
+  });
+
+  it('does not say anything for a character that is off', async () => {
+    const created = await make();
+    await handlers().save({ ...created, enabled: false, lines: { hi: [{ id: 'a', text: 'Hi.' }] } });
+    expect((await handlers().testLine({ id: created.id, group: 'hi', line: 'a' })).ok).toBe(false);
+    expect(said).toEqual([]);
   });
 });

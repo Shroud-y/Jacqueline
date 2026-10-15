@@ -102,7 +102,8 @@ export function conditionPasses(condition: RuleCondition, ctx: RuleContext, rng:
   }
 }
 
-function clock(now: number): string {
+/** 'HH:mm', as `{time}` reads. */
+export function clock(now: number): string {
   const date = new Date(now);
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
@@ -113,6 +114,14 @@ function slotsFor(event: RuleEvent, character: Character, now: number): Record<s
   if ('program' in event) slots.program = event.program;
   if (event.type === 'returned') slots.minutes = Math.round(event.awayMinutes);
   return slots;
+}
+
+/**
+ * What a line tried from the editor is filled with: whatever this moment
+ * gives, and a likely value for what only an event could.
+ */
+export function sampleSlots(character: Character, now: number): Record<string, string | number> {
+  return { name: character.name, time: clock(now), program: character.presence.apps[0] ?? 'notepad.exe', minutes: 15 };
 }
 
 interface Planned {

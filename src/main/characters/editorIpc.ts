@@ -1,8 +1,11 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { z } from 'zod';
-import { ASSET_EXTENSIONS, assetKindOf, assetNameSchema, characterIdSchema, referencedAssets, type AssetKind } from '@shared/character';
+import { ASSET_EXTENSIONS, assetKindOf, assetNameSchema, characterIdSchema, referencedAssets, type AssetKind, type Character, type Line } from '@shared/character';
 import { IPC } from '@shared/ipc';
+import { unknownSlots } from '@shared/lines';
 import type { EditorApi, EditorResult } from '@shared/types';
+import { sampleSlots } from '../engine/ruleEngine';
+import { fillSlots } from '../engine/slots';
 import type { CharacterStore } from './store';
 
 /** What the handlers need from the outside world, so they can be tested without it. */
@@ -12,6 +15,9 @@ export interface EditorIpcDeps {
   openFolder: (id: string) => Promise<EditorResult>;
   /** Tells the character windows who is being laid out. */
   setPreview: (id: string | null) => void;
+  /** Puts a line on screen now, with its sound. */
+  sayNow: (character: Character, text: string, line: Line) => void;
+  now?: () => number;
 }
 
 const idPayload = z.object({ id: characterIdSchema });
@@ -23,6 +29,7 @@ const importPayload = z.object({
 });
 const assetPayload = z.object({ id: characterIdSchema, file: assetNameSchema });
 const previewPayload = z.object({ id: characterIdSchema.nullable() });
+const testLinePayload = z.object({ id: characterIdSchema, group: z.string().min(1).max(64), line: z.string().min(1).max(64) });
 
 const refused = { ok: false as const, error: 'That request could not be read.' };
 
@@ -93,6 +100,24 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
       return { ok: true };
     },
 
+    testLine: (payload) => {
+      const parsed = testLinePayload.safeParse(payload);
+      if (!parsed.success) return refused;
+      const character = store.get(parsed.data.id);
+      if (!character) return { ok: false, error: 'Unknown character.' };
+      const line = character.lines[parsed.data.group]?.find((entry) => entry.id === parsed.data.line);
+      if (!line) return { ok: false, error: 'That line is not there any more.' };
+      // Switched off means not on screen: a test should not quietly override that.
+      if (!character.enabled) return { ok: false, error: 'The character is off. Switch it on to try its lines.' };
+      const text = fillSlots(line.text, sampleSlots(character, (deps.now ?? Date.now)()));
+      if (text === null) {
+        const unknown = unknownSlots(line.text).map((slot) => `{${slot}}`);
+        return { ok: false, error: `Nothing fills ${unknown.join(', ') || 'a slot in it'}, so this line is never said.` };
+      }
+      deps.sayNow(character, text, line);
+      return { ok: true };
+    },
+
     openFolder: async (payload) => {
       const parsed = idPayload.safeParse(payload);
       if (!parsed.success) return refused;
@@ -117,7 +142,8 @@ const CHANNELS: { [K in keyof EditorHandlers]: string } = {
   openFolder: IPC.editorOpenFolder,
   assets: IPC.editorAssets,
   releaseAsset: IPC.editorReleaseAsset,
-  preview: IPC.editorPreview
+  preview: IPC.editorPreview,
+  testLine: IPC.editorTestLine
 };
 
 export function registerEditorIpc(store: CharacterStore, deps: EditorIpcDeps): void {

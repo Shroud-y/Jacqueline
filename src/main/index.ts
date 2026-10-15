@@ -90,7 +90,7 @@ async function bootstrap(): Promise<void> {
   const director = new SpeechDirector();
   director.onChange(() => windows.refresh());
 
-  // Behaviour. Lines are only written to the log for now; 3.2 puts them on screen.
+  // Behaviour: rules fire, their actions run, lines go to the director.
   const history = new RecentHistory();
   const isSilenced = (): boolean => {
     const { muted, quietHours } = settings.current;
@@ -140,7 +140,13 @@ async function bootstrap(): Promise<void> {
       const failure = await shell.openPath(paths.characterDir(id));
       return failure ? { ok: false, error: failure } : { ok: true };
     },
-    setPreview: (id) => windows.setPreview(id)
+    setPreview: (id) => windows.setPreview(id),
+    // Tried from the editor: now, in place of whatever it was saying, mute or not.
+    sayNow: (character, text, line) => {
+      director.dismiss(character.id);
+      director.say(character.id, text);
+      if (line.audio) windows.playSound(character.id, line.audio, character.audio.volume);
+    }
   });
   editor.onClosed = () => windows.setPreview(null);
 

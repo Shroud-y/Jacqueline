@@ -18,7 +18,8 @@ const CHANNEL = {
   editorOpenFolder: 'editor:openFolder',
   editorAssets: 'editor:assets',
   editorReleaseAsset: 'editor:releaseAsset',
-  editorPreview: 'editor:preview'
+  editorPreview: 'editor:preview',
+  editorTestLine: 'editor:testLine'
 } as const;
 
 const api: EditorApi = {
@@ -39,6 +40,7 @@ const api: EditorApi = {
   assets: (payload) => ipcRenderer.invoke(CHANNEL.editorAssets, payload),
   releaseAsset: (payload) => ipcRenderer.invoke(CHANNEL.editorReleaseAsset, payload),
   preview: (payload) => ipcRenderer.invoke(CHANNEL.editorPreview, payload),
+  testLine: (payload) => ipcRenderer.invoke(CHANNEL.editorTestLine, payload),
   pathForFile: (file) => webUtils.getPathForFile(file)
 };
 

@@ -101,6 +101,11 @@ export interface EditorApi {
    * screen whatever its presence rules say, with sample text in its text.
    */
   preview(payload: { id: string | null }): Promise<EditorResult>;
+  /**
+   * Says one of the character's lines now, sound and all, whatever its rules,
+   * mute or quiet hours say. Slots only an event fills get a likely value.
+   */
+  testLine(payload: { id: string; group: string; line: string }): Promise<EditorResult>;
   /** Where on disk a file dropped on the window is. Not IPC — answered by the preload itself. */
   pathForFile(file: File): string;
   openFolder(payload: { id: string }): Promise<EditorResult>;

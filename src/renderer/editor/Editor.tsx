@@ -3,6 +3,7 @@ import type { Character, CharacterEntry } from '@shared/character';
 import AppearanceTab from './AppearanceTab';
 import GeneralTab from './GeneralTab';
 import LayoutTab from './layout/LayoutTab';
+import LinesTab from './LinesTab';
 import Thumbnail from './Thumbnail';
 import { MoreMenu, Notice, Switch, TextInput } from './fields';
 import { useCharacters, type Characters } from './useCharacters';
@@ -165,6 +166,8 @@ function CharacterPane({ character, characters, onSelect }: CharacterPaneProps):
           <AppearanceTab character={character} characters={characters} />
         ) : tab === 'layout' ? (
           <LayoutTab character={character} characters={characters} />
+        ) : tab === 'lines' ? (
+          <LinesTab character={character} characters={characters} />
         ) : (
           <div className="blank">
             <h1>{TABS.find((entry) => entry.id === tab)?.label}</h1>

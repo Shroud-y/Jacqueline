@@ -11,7 +11,7 @@ import { fillSlots } from './slots';
 export interface ActionDeps {
   /** Muted, or inside quiet hours: nothing is said or played. */
   isSilenced(): boolean;
-  /** A line, with its slots filled. Shown in 3.2; for now it is written to the log. */
+  /** A line, with its slots filled, to put on screen. */
   say(character: Character, text: string, line: Line): void;
   /** False when there was nowhere to play it — the character is not on screen. */
   playSound(character: Character, file: string): boolean;

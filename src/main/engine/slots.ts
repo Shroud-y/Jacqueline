@@ -9,7 +9,7 @@
  * the screen with a hole or a raw `{brace}` in it.
  */
 
-const SLOT = /\{([A-Za-z][\w.]*)\}/g;
+import { SLOT_PATTERN } from '@shared/lines';
 
 function readPath(source: unknown, path: string): unknown {
   let cursor: unknown = source;
@@ -29,7 +29,7 @@ function render(value: unknown): string | null {
 /** Null when any slot in `text` has no usable value in `payload`. */
 export function fillSlots(text: string, payload: unknown): string | null {
   let missing = false;
-  const filled = text.replace(SLOT, (_match, path: string) => {
+  const filled = text.replace(SLOT_PATTERN, (_match, path: string) => {
     const value = render(readPath(payload, path));
     if (value === null) {
       missing = true;

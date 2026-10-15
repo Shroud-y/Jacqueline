@@ -1162,3 +1162,236 @@ input {
 .inspector-foot {
   padding: 12px 8px;
 }
+
+/* ---- lines tab ------------------------------------------------------------- */
+
+.lines {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 640px);
+  gap: 32px;
+  align-items: start;
+}
+
+.groups {
+  display: grid;
+  gap: 2px;
+}
+
+.group-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--field-h);
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r);
+  background: none;
+  color: var(--text-2);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--ease);
+}
+
+.group-item:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.group-item[aria-current='true'] {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.group-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-count {
+  color: var(--text-3);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.groups-new {
+  justify-self: start;
+  margin-top: 6px;
+}
+
+.group-pane {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.group-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.group-head-name {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Like the character's name: text until it is pointed at. */
+.group-name-input.input {
+  margin-left: -10px;
+  border-color: transparent;
+  background: none;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.group-name-input.input:hover {
+  border-color: var(--line);
+}
+
+.group-name-input.input:focus {
+  border-color: var(--line-strong);
+  background: var(--raised);
+}
+
+.group-users {
+  margin-top: -12px;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.group-confirm {
+  display: grid;
+  gap: 12px;
+}
+
+.line-table {
+  display: grid;
+}
+
+.line-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px 112px auto;
+  gap: 8px;
+  align-items: start;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.line-head {
+  padding: 0 0 6px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.line-cell {
+  display: grid;
+  min-width: 0;
+}
+
+/* The line as it reads, with its slots set apart; a click turns it into a box. */
+.line-text {
+  min-height: var(--field-h);
+  padding: 6px 10px;
+  margin-left: -10px;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  background: none;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: text;
+}
+
+.line-text:hover {
+  border-color: var(--line);
+}
+
+.slot-token {
+  color: var(--accent);
+}
+
+.slot-token[data-known='false'] {
+  color: var(--danger);
+}
+
+.line-problem {
+  margin-top: 2px;
+}
+
+/* No unit in the weight box, so no room kept for one. */
+.line-row .number {
+  width: 100%;
+}
+
+.line-row .number .input {
+  padding-right: 10px;
+}
+
+.line-actions {
+  display: flex;
+  align-items: center;
+  height: var(--field-h);
+}
+
+.line-delete {
+  margin-left: 2px;
+}
+
+.sound-cell {
+  display: flex;
+  align-items: center;
+  height: var(--field-h);
+  min-width: 0;
+  border-radius: var(--r);
+}
+
+.sound-cell[data-over='true'] {
+  outline: 1px dashed var(--line-strong);
+}
+
+.sound-busy {
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.sound-name {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--r);
+  background: none;
+  color: var(--text-2);
+  font-size: 13px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sound-name:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.sound-add {
+  margin-left: -2px;
+}
+
+.line-new {
+  padding-top: 10px;
+}
+
+.line-help {
+  color: var(--text-3);
+  font-size: 12.5px;
+  line-height: 18px;
+}
+
+.line-help p {
+  margin: 0 0 6px;
+}

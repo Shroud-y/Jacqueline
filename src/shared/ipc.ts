@@ -30,5 +30,7 @@ export const IPC = {
   editorAssets: 'editor:assets',
   editorReleaseAsset: 'editor:releaseAsset',
   /** editor → main: which character is being laid out right now, or nobody. */
-  editorPreview: 'editor:preview'
+  editorPreview: 'editor:preview',
+  /** editor → main: say this line now, to see and hear it where it will be. */
+  editorTestLine: 'editor:testLine'
 } as const;
