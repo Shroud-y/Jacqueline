@@ -21,7 +21,7 @@ import {
   type Point,
   type Rect
 } from '@shared/layout';
-import type { StagePayload, StageVisual } from '@shared/types';
+import type { StagePayload, StageSound, StageVisual } from '@shared/types';
 import { createLogger } from '../app/logger';
 import { assetUrl } from '../characters/assetProtocol';
 import type { CharacterStore } from '../characters/store';
@@ -90,6 +90,12 @@ export interface PresenceSource {
   isWatching(): boolean;
   /** A character was right-clicked. */
   onMenu(id: string): void;
+  /** A character was clicked. */
+  onClick(id: string): void;
+  /** The line a character is saying now, if any. */
+  speechFor(id: string): { id: string; text: string; durationMs: number } | null;
+  /** Speaking, or only just finished: on screen whatever its presence rules say. */
+  isOnStage(id: string): boolean;
 }
 
 interface Drag {
@@ -117,6 +123,9 @@ export class CharacterWindows {
   private hotTimer: NodeJS.Timeout | null = null;
   private drag: Drag | null = null;
   private previewId: string | null = null;
+  private readonly shownFor = new Map<string, { until: number; timer: NodeJS.Timeout }>();
+  /** Sounds asked for before their character's window was up. */
+  private readonly pendingSounds = new Map<string, StageSound[]>();
 
   constructor(
     private readonly store: CharacterStore,
@@ -143,6 +152,10 @@ export class CharacterWindows {
       const live = this.bySender(event.sender);
       if (live) this.beginDrag(live);
     });
+    ipcMain.on(IPC.stageClick, (event) => {
+      const live = this.bySender(event.sender);
+      if (live) this.presence.onClick(live.id);
+    });
     ipcMain.on(IPC.stageMenu, (event) => {
       const live = this.bySender(event.sender);
       if (live) this.presence.onMenu(live.id);
@@ -163,6 +176,9 @@ export class CharacterWindows {
     ipcMain.removeAllListeners(IPC.stageDragStart);
     ipcMain.removeAllListeners(IPC.stageDragEnd);
     ipcMain.removeAllListeners(IPC.stageMenu);
+    ipcMain.removeAllListeners(IPC.stageClick);
+    for (const timer of this.shownFor.values()) clearTimeout(timer.timer);
+    this.shownFor.clear();
     for (const live of [...this.live.values()]) this.close(live);
     this.destroyHost();
   }
@@ -220,8 +236,47 @@ export class CharacterWindows {
     if (wanted.size === 0 && this.opening.size === 0) this.destroyHost();
   }
 
+  /**
+   * On screen for a while whatever its presence rules say — a rule asked it
+   * to come out. Longer if it was already out for longer.
+   */
+  showFor(id: string, ms: number): void {
+    const until = Date.now() + ms;
+    const current = this.shownFor.get(id);
+    if (current && current.until >= until) return;
+    if (current) clearTimeout(current.timer);
+    const timer = setTimeout(() => {
+      this.shownFor.delete(id);
+      this.sync();
+    }, ms);
+    timer.unref?.();
+    this.shownFor.set(id, { until, timer });
+    this.sync();
+  }
+
+  /**
+   * Plays a sound from the character's own window. A window still on its way
+   * — a character coming out to say the line this sound goes with — plays it
+   * once it is up. False when there is no window and none coming.
+   */
+  playSound(id: string, file: string, volume: number): boolean {
+    if (!this.store.assetPath(id, file)) return false;
+    const sound: StageSound = { url: assetUrl(id, file), volume };
+    const live = this.live.get(id);
+    if (live?.shown && !live.win.isDestroyed()) {
+      live.win.webContents.send(IPC.stageSound, sound);
+      return true;
+    }
+    if (!live && !this.opening.has(id)) return false;
+    const waiting = this.pendingSounds.get(id) ?? [];
+    waiting.push(sound);
+    this.pendingSounds.set(id, waiting);
+    return true;
+  }
+
   private wants(character: Character): boolean {
-    if (character.id === this.previewId && character.enabled) return true;
+    if (!character.enabled) return false;
+    if (character.id === this.previewId || this.shownFor.has(character.id) || this.presence.isOnStage(character.id)) return true;
     const { anchor, position } = this.geometry(character);
     return this.presence.isPresent(character, { x: position.x, y: position.y, width: anchor.width, height: anchor.height });
   }
@@ -373,6 +428,8 @@ export class CharacterWindows {
     live.win.setAlwaysOnTop(true, 'screen-saver');
     live.win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     this.startHotPolling();
+    for (const sound of this.pendingSounds.get(live.id) ?? []) live.win.webContents.send(IPC.stageSound, sound);
+    this.pendingSounds.delete(live.id);
     const { x, y, width, height } = live.geometry.window;
     log.debug(`"${live.id}" shown at ${x},${y} ${width}x${height}`);
   }
@@ -395,6 +452,7 @@ export class CharacterWindows {
     if (live.revealTimer) clearTimeout(live.revealTimer);
     live.revealTimer = null;
     if (this.drag?.id === live.id) this.cancelDrag();
+    this.pendingSounds.delete(live.id);
     this.live.delete(live.id);
     if (this.live.size === 0) this.stopHotPolling();
   }
@@ -428,7 +486,9 @@ export class CharacterWindows {
 
   private payload(character: Character, geometry: Geometry): StagePayload {
     const states = character.appearance.states;
-    const idle = states.idle ?? Object.values(states)[0] ?? null;
+    const speech = this.presence.speechFor(character.id);
+    // While a line is up it wears its speaking look, if it has one.
+    const idle = (speech ? states.speaking : undefined) ?? states.idle ?? Object.values(states)[0] ?? null;
     return {
       id: character.id,
       name: character.name,
@@ -439,7 +499,8 @@ export class CharacterWindows {
       visual: idle ? this.visual(character.id, idle.type, idle.src) : null,
       playing: this.presence.isWatching(),
       restSec: character.appearance.restSec,
-      preview: character.id === this.previewId
+      preview: character.id === this.previewId,
+      speech
     };
   }
 

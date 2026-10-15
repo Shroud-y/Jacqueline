@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import type { EditorApi, StagePayload } from '@shared/types';
+import type { EditorApi, StagePayload, StageSound } from '@shared/types';
 
 /**
  * Structural mirror of the preload surface. Declared rather than imported so
@@ -13,6 +13,8 @@ interface StageApi {
   dragStart(): void;
   dragEnd(): void;
   menu(): void;
+  click(): void;
+  onSound(handler: (sound: StageSound) => void): () => void;
 }
 
 declare global {

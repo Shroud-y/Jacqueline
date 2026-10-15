@@ -23,8 +23,10 @@ export interface SelectInput<T extends Pickable> {
 
 /** How many recently-played ids a group of this size excludes outright. */
 export function exclusionWindow(groupSize: number): number {
-  if (groupSize <= 3) return 0;
-  return Math.ceil(groupSize / 3);
+  // A lone line has to be allowed to repeat; any other group never says the
+  // same line twice running — with two lines, that means taking turns.
+  if (groupSize <= 1) return 0;
+  return Math.max(1, Math.ceil(groupSize / 3));
 }
 
 export function selectPhrase<T extends Pickable>(input: SelectInput<T>): T | null {

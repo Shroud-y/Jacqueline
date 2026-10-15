@@ -65,7 +65,8 @@ export function isPresent(character: Character, facts: DesktopFacts, anchor: Rec
     case 'whileFocused':
       return facts.focused !== null && apps.some((app) => appStem(app) === facts.focused);
     case 'onSpeech':
-      // It comes out to say something, and nothing can make it speak yet.
+      // Out only to speak — and speaking is not a fact about the desktop. The
+      // window manager brings it out for its lines.
       return false;
   }
 }

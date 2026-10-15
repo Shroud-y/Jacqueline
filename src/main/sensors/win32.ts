@@ -48,8 +48,18 @@ interface RectStruct {
   bottom: number;
 }
 
-/** Null anywhere but Windows, and on Windows if the library will not load. */
-export async function loadDesktopSensors(): Promise<DesktopSensors | null> {
+let shared: Promise<DesktopSensors | null> | null = null;
+
+/**
+ * Null anywhere but Windows, and on Windows if the library will not load.
+ * Loaded once, however many ask: presence and rules share the same bindings.
+ */
+export function loadDesktopSensors(): Promise<DesktopSensors | null> {
+  shared ??= load();
+  return shared;
+}
+
+async function load(): Promise<DesktopSensors | null> {
   if (process.platform !== 'win32') return null;
   try {
     const koffi = (await import('koffi')).default;

@@ -32,6 +32,13 @@ export interface RectPayload {
   height: number;
 }
 
+/** main → a character's window: a sound to play now. */
+export interface StageSound {
+  url: string;
+  /** 0 to 1. */
+  volume: number;
+}
+
 /** What a character looks like right now, as something the page can load. */
 export interface StageVisual {
   type: 'image' | 'video';
@@ -59,6 +66,8 @@ export interface StagePayload {
    * text, so the layout can be judged where it will actually be.
    */
   preview: boolean;
+  /** The line it is saying now, or null. */
+  speech: { id: string; text: string; durationMs: number } | null;
 }
 
 /* ------------------------------------------------------------------ */

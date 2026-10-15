@@ -11,6 +11,10 @@ export const IPC = {
   stageDragEnd: 'stage:dragEnd',
   /** renderer → main: the character was right-clicked. */
   stageMenu: 'stage:menu',
+  /** renderer → main: the character was clicked (pressed and let go without dragging). */
+  stageClick: 'stage:click',
+  /** main → renderer: play this sound. */
+  stageSound: 'stage:sound',
 
   /** editor → main, invoke: every character, usable or not. */
   editorList: 'editor:list',

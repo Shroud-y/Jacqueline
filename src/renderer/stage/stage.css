@@ -59,3 +59,13 @@ body,
 .text {
   pointer-events: none;
 }
+
+.text-fade {
+  animation: text-in 200ms ease-out both;
+}
+
+@keyframes text-in {
+  from {
+    opacity: 0;
+  }
+}

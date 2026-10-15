@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } fr
 import { SAMPLE_LINE } from '@shared/textStyle';
 import type { StagePayload } from '@shared/types';
 import TextElement from '../shared/TextElement';
+import SpeechText from './SpeechText';
 
 /** A press that travels less than this is a click, not a drag. */
 const DRAG_THRESHOLD_PX = 4;
@@ -18,9 +19,16 @@ export default function Stage(): JSX.Element | null {
       if (!cancelled && payload) setStage(payload);
     });
     const off = api.onStageUpdate(setStage);
+    // A sound plays from here, where the character is: one element per sound, let go when it ends.
+    const offSound = api.onSound(({ url, volume }) => {
+      const audio = new Audio(url);
+      audio.volume = Math.min(1, Math.max(0, volume));
+      void audio.play().catch(() => undefined);
+    });
     return () => {
       cancelled = true;
       off();
+      offSound();
     };
   }, []);
 
@@ -31,7 +39,15 @@ export default function Stage(): JSX.Element | null {
       {stage.elements.map((element) => {
         const box = { left: element.x - stage.frame.x, top: element.y - stage.frame.y, width: element.width, height: element.height };
         if (element.type === 'character') return <CharacterElement key={element.id} stage={stage} {...box} />;
-        // Text shows only while it is being laid out — there are no real lines to show yet.
+        const { speech } = stage;
+        if (speech && element.type === 'speech') {
+          // Keyed by the line, so every line arrives from the start.
+          return <SpeechText key={speech.id} characterId={stage.id} text={speech.text} style={element.style} reveal={element.reveal} box={box} />;
+        }
+        if (speech && element.type === 'name') {
+          return <TextElement key={element.id} className="text text-fade" characterId={stage.id} text={stage.name} style={element.style} box={box} />;
+        }
+        // With nothing being said, text shows only while it is being laid out.
         if (!stage.preview) return null;
         return (
           <TextElement
@@ -111,10 +127,15 @@ function CharacterElement({ stage, left, top, width, height }: CharacterElementP
     []
   );
 
-  const finish = (): void => {
+  const finish = (clicked: boolean): void => {
     const current = press.current;
     press.current = null;
-    if (!current?.dragging) return;
+    if (!current) return;
+    if (!current.dragging) {
+      // Pressed and let go without going anywhere: a click.
+      if (clicked) window.shard?.click();
+      return;
+    }
     setDragging(false);
     window.shard?.dragEnd();
   };
@@ -160,9 +181,9 @@ function CharacterElement({ stage, left, top, width, height }: CharacterElementP
       data-dragging={dragging ? 'true' : 'false'}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
-      onPointerUp={finish}
-      onPointerCancel={finish}
-      onLostPointerCapture={finish}
+      onPointerUp={() => finish(true)}
+      onPointerCancel={() => finish(false)}
+      onLostPointerCapture={() => finish(false)}
       onContextMenu={(event) => {
         event.preventDefault();
         window.shard?.menu();

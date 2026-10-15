@@ -12,9 +12,10 @@ function seeded(values: number[]): () => number {
 }
 
 describe('exclusionWindow', () => {
-  it('does not exclude anything in tiny groups', () => {
+  it('lets a lone line repeat, and never says the same line twice running otherwise', () => {
     expect(exclusionWindow(1)).toBe(0);
-    expect(exclusionWindow(3)).toBe(0);
+    expect(exclusionWindow(2)).toBe(1);
+    expect(exclusionWindow(3)).toBe(1);
   });
 
   it('excludes a third of the group, rounded up', () => {

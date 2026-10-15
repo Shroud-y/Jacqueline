@@ -20,8 +20,8 @@ describe('character schema', () => {
           id: 'r1',
           name: 'Greets the game',
           enabled: true,
-          when: { type: 'app.started', app: 'dota2.exe' },
-          if: [{ type: 'chance', value: 0.5 }],
+          when: { type: 'programStarted', program: 'dota2.exe' },
+          if: [{ type: 'chance', percent: 50 }],
           then: [{ type: 'say', group: 'greet' }],
           cooldownSec: 600
         }
@@ -31,8 +31,7 @@ describe('character schema', () => {
     };
     const parsed = characterSchema.safeParse(full);
     expect(parsed.success).toBe(true);
-    // What a trigger carries beyond its type is the engine's business, and must survive a save.
-    expect(parsed.data?.rules[0]?.when).toEqual({ type: 'app.started', app: 'dota2.exe' });
+    expect(parsed.data?.rules[0]?.when).toEqual({ type: 'programStarted', program: 'dota2.exe' });
   });
 
   it('refuses an empty name', () => {
@@ -45,7 +44,7 @@ describe('character schema', () => {
 
   it('refuses a rule that does nothing', () => {
     const character = defaultCharacter('a1', 'Miku');
-    const rule = { id: 'r1', name: '', enabled: true, when: { type: 'app.started' }, if: [], then: [], cooldownSec: 0 };
+    const rule = { id: 'r1', name: '', enabled: true, when: { type: 'startup' }, if: [], then: [], cooldownSec: 0 };
     expect(characterSchema.safeParse({ ...character, rules: [rule] }).success).toBe(false);
   });
 

@@ -40,7 +40,14 @@ export class Visibility {
   }
 
   hide(id: string, choice: HideChoice): void {
-    this.until.set(id, this.now() + HIDE_MS[choice]);
+    this.hideFor(id, HIDE_MS[choice]);
+  }
+
+  /** Out of sight for this many milliseconds — longer if it was already hidden for longer. */
+  hideFor(id: string, ms: number): void {
+    const until = this.now() + ms;
+    if ((this.until.get(id) ?? 0) >= until) return;
+    this.until.set(id, until);
     this.changed();
   }
 

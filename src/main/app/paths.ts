@@ -14,6 +14,5 @@ export const paths = {
   settingsFile: (): string => join(app.getPath('userData'), 'settings.json'),
   characterDir: (id: string): string => join(app.getPath('userData'), 'characters', id),
   charactersRoot: (): string => join(app.getPath('userData'), 'characters'),
-  stateFile: (): string => join(app.getPath('userData'), 'state.json'),
   logDir: (): string => join(app.getPath('userData'), 'logs')
 };

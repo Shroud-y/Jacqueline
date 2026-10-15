@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { StagePayload } from '@shared/types';
+import type { StagePayload, StageSound } from '@shared/types';
 
 /**
  * A character window's entire surface. Nothing else is exposed: no node, no
@@ -18,7 +18,9 @@ const CHANNEL = {
   stagePainted: 'stage:painted',
   stageDragStart: 'stage:dragStart',
   stageDragEnd: 'stage:dragEnd',
-  stageMenu: 'stage:menu'
+  stageMenu: 'stage:menu',
+  stageClick: 'stage:click',
+  stageSound: 'stage:sound'
 } as const;
 
 const api = {
@@ -48,6 +50,17 @@ const api = {
   /** The character was right-clicked. */
   menu(): void {
     ipcRenderer.send(CHANNEL.stageMenu);
+  },
+
+  /** The character was clicked. */
+  click(): void {
+    ipcRenderer.send(CHANNEL.stageClick);
+  },
+
+  onSound(handler: (sound: StageSound) => void): () => void {
+    const listener = (_event: unknown, sound: StageSound): void => handler(sound);
+    ipcRenderer.on(CHANNEL.stageSound, listener);
+    return () => ipcRenderer.off(CHANNEL.stageSound, listener);
   }
 };
 

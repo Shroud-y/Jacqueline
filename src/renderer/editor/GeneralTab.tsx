@@ -28,12 +28,7 @@ export default function GeneralTab({ character, onChange }: { character: Charact
             { value: 'always', label: 'Always', hint: 'As long as it is switched on.' },
             { value: 'whileRunning', label: 'While a program is running', hint: 'Appears when one of the programs below starts, leaves when the last one closes.' },
             { value: 'whileFocused', label: 'While a program is in front', hint: 'Only while one of the programs below is the window you are working in.' },
-            {
-              value: 'onSpeech',
-              label: 'Only when it speaks',
-              hint: 'Needs a rule that makes it speak, and rules are not built yet.',
-              disabled: presence.mode !== 'onSpeech'
-            }
+            { value: 'onSpeech', label: 'Only when it speaks', hint: 'Comes out with each line and leaves when it is done. Its rules decide when that is.' }
           ]}
         />
 

@@ -7,6 +7,7 @@
  */
 
 import { z } from 'zod';
+import { ruleSchema, type Rule } from './rules';
 
 export const CHARACTER_SCHEMA_VERSION = 1;
 
@@ -124,24 +125,6 @@ const presenceSchema = z.object({
 /* Behaviour                                                           */
 /* ------------------------------------------------------------------ */
 
-/**
- * A trigger, a condition or an action: a `type` and whatever that type needs.
- * Deliberately loose for now — the engine that defines the types does not
- * exist yet, and it is the one that will say what each of them requires.
- */
-const typedSchema = z.looseObject({ type: z.string().min(1).max(64) });
-
-const ruleSchema = z.object({
-  id: z.string().min(1).max(64),
-  name: z.string().max(80),
-  enabled: z.boolean(),
-  when: typedSchema,
-  if: z.array(typedSchema).max(16),
-  then: z.array(typedSchema).min(1).max(16),
-  /** How long before this rule may fire again. 0 is no limit. */
-  cooldownSec: z.number().min(0).max(7 * 24 * 3600)
-});
-
 const lineSchema = z.object({
   id: z.string().min(1).max(64),
   text: z.string().min(1).max(2000),
@@ -178,7 +161,7 @@ export type Visual = z.infer<typeof visualSchema>;
 export type TextStyle = z.infer<typeof textStyleSchema>;
 export type LayoutElement = z.infer<typeof layoutElementSchema>;
 export type Presence = z.infer<typeof presenceSchema>;
-export type Rule = z.infer<typeof ruleSchema>;
+export type { Rule };
 export type Line = z.infer<typeof lineSchema>;
 
 /** A character as the list shows it: usable, or a folder whose file could not be read. */
@@ -272,6 +255,9 @@ export function referencedAssets(character: Character): Set<string> {
   for (const visual of Object.values(character.appearance.states)) used.add(visual.src);
   for (const lines of Object.values(character.lines)) {
     for (const line of lines) if (line.audio) used.add(line.audio);
+  }
+  for (const rule of character.rules) {
+    for (const action of rule.then) if (action.type === 'sound') used.add(action.file);
   }
   if (character.audio.appear) used.add(character.audio.appear);
   if (character.audio.disappear) used.add(character.audio.disappear);

@@ -12,6 +12,11 @@ import { AppTray } from './app/tray';
 import { handleAssetProtocol, registerAssetScheme } from './characters/assetProtocol';
 import { registerEditorIpc } from './characters/editorIpc';
 import { isPresent } from './characters/presence';
+import { isWithinClockWindow, minutesOfDay } from './engine/timeOfDay';
+import { runActions } from './engine/actions';
+import { SpeechDirector } from './engine/director';
+import { RuleRunner } from './engine/ruleRunner';
+import { RecentHistory } from './engine/selector';
 import { CharacterStore } from './characters/store';
 import { Visibility } from './characters/visibility';
 import { PresenceWatcher } from './sensors/presenceWatcher';
@@ -75,8 +80,44 @@ async function bootstrap(): Promise<void> {
     onMenu: (id) => {
       const character = characters.get(id);
       if (character) tray.popUp(characterMenu(character), screen.getCursorScreenPoint());
-    }
+    },
+    // A click while it is talking is "enough, thank you"; otherwise it is a click.
+    onClick: (id) => (director.isSpeaking(id) ? director.dismiss(id) : rules.event({ type: 'clicked', characterId: id })),
+    speechFor: (id) => director.current(id),
+    isOnStage: (id) => director.isOnStage(id)
   });
+
+  const director = new SpeechDirector();
+  director.onChange(() => windows.refresh());
+
+  // Behaviour. Lines are only written to the log for now; 3.2 puts them on screen.
+  const history = new RecentHistory();
+  const isSilenced = (): boolean => {
+    const { muted, quietHours } = settings.current;
+    return muted || (quietHours.enabled && isWithinClockWindow(minutesOfDay(Date.now()), quietHours.from, quietHours.to));
+  };
+  const rules = new RuleRunner({
+    loadSensors: loadDesktopSensors,
+    idleSeconds: () => powerMonitor.getSystemIdleTime(),
+    onFired: (fired) =>
+      runActions(fired, {
+        isSilenced,
+        say: (character, text) => {
+          log.info(`"${character.name}" says: ${text}`);
+          director.say(character.id, text);
+        },
+        playSound: (character, file) => windows.playSound(character.id, file, character.audio.volume),
+        show: (character, ms) => windows.showFor(character.id, ms),
+        hide: (character, ms) => visibility.hideFor(character.id, ms),
+        log: (message) => log.info(message),
+        history,
+        rng: Math.random
+      })
+  });
+  // Someone hidden for now does nothing either.
+  const acting = (): Character[] =>
+    characters.list().flatMap((entry) => (entry.ok && entry.character.enabled && !visibility.isHidden(entry.id) ? [entry.character] : []));
+  rules.setCharacters(acting());
   presence.onChange(() => windows.refresh());
   presence.setCharacters(watched());
   windows.start();
@@ -153,13 +194,21 @@ async function bootstrap(): Promise<void> {
 
   const resync = (): void => {
     presence.setCharacters(watched());
+    const active = acting();
+    rules.setCharacters(active);
+    // Whoever is off, gone or hidden stops mid-sentence.
+    const activeIds = new Set(active.map((character) => character.id));
+    for (const entry of characters.list()) if (!activeIds.has(entry.id)) director.forget(entry.id);
     windows.refresh();
     tray.refresh();
     editor.send(IPC.editorChanged, characters.list());
   };
   characters.onChange(resync);
   visibility.onChange(resync);
-  settings.onChange(() => tray.refresh());
+  settings.onChange((next) => {
+    if (next.muted) director.silenceAll();
+    tray.refresh();
+  });
 
   // Started again while already running: that is someone looking for the
   // app, and the editor is the only window it has to show them.
@@ -173,11 +222,16 @@ async function bootstrap(): Promise<void> {
 
   app.on('before-quit', () => {
     editor.destroy();
+    rules.stop();
+    director.silenceAll();
     windows.stop();
     presence.stop();
     visibility.stop();
     tray.destroy();
   });
+
+  // Once the windows have had a moment to come up, so a sound has somewhere to play.
+  setTimeout(() => rules.event({ type: 'startup' }), 3_000).unref?.();
 
   log.info('SHARD ready');
 }
