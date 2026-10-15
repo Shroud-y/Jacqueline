@@ -14,6 +14,7 @@ let askedFor: readonly AssetKind[][];
 let opened: string[];
 let previewed: (string | null)[];
 let said: { id: string; text: string; line: string }[];
+let ran: { id: string; rule: string; slots: Record<string, string | number> }[];
 
 const handlers = (): ReturnType<typeof editorHandlers> =>
   editorHandlers(store, {
@@ -27,6 +28,8 @@ const handlers = (): ReturnType<typeof editorHandlers> =>
     },
     setPreview: (id) => previewed.push(id),
     sayNow: (character, text, line) => said.push({ id: character.id, text, line: line.id }),
+    runNow: (fired) => ran.push({ id: fired.character.id, rule: fired.rule.id, slots: fired.slots }),
+    runningPrograms: async () => ['code.exe', 'dota2.exe'],
     now: () => new Date(2026, 0, 1, 9, 5).getTime()
   });
 
@@ -39,6 +42,7 @@ beforeEach(() => {
   opened = [];
   previewed = [];
   said = [];
+  ran = [];
 });
 
 afterEach(() => {
@@ -192,6 +196,25 @@ describe('editor requests', () => {
     expect((await handlers().testLine({ id: 'nobody', group: 'hi', line: 'a' })).ok).toBe(false);
     expect((await handlers().testLine({ id: created.id })).ok).toBe(false);
     expect(said).toHaveLength(1);
+  });
+
+  it('runs a rule now, whatever its trigger, for a character that is on', async () => {
+    const created = await make();
+    const rule = { id: 'r1', name: '', enabled: true, when: { type: 'startup' as const }, if: [], then: [{ type: 'show' as const, seconds: 5 }], cooldownSec: 60 };
+    await handlers().save({ ...created, rules: [rule] });
+    expect(await handlers().testRule({ id: created.id, rule: 'r1' })).toEqual({ ok: true });
+    expect(ran).toEqual([{ id: created.id, rule: 'r1', slots: { name: 'Miku', time: '09:05', program: 'notepad.exe', minutes: 15 } }]);
+    expect((await handlers().testRule({ id: created.id, rule: 'nope' })).ok).toBe(false);
+    expect((await handlers().testRule({ id: 'nobody', rule: 'r1' })).ok).toBe(false);
+    expect((await handlers().testRule({ id: created.id })).ok).toBe(false);
+
+    await handlers().save({ ...created, enabled: false, rules: [rule] });
+    expect((await handlers().testRule({ id: created.id, rule: 'r1' })).ok).toBe(false);
+    expect(ran).toHaveLength(1);
+  });
+
+  it('says what is running', async () => {
+    expect(await handlers().runningPrograms()).toEqual(['code.exe', 'dota2.exe']);
   });
 
   it('does not say anything for a character that is off', async () => {

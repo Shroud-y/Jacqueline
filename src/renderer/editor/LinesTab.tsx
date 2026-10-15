@@ -16,6 +16,7 @@ import {
   unknownSlots,
   updateLine
 } from '@shared/lines';
+import { ruleTitle } from '@shared/ruleText';
 import { Notice, NumberInput, TextInput } from './fields';
 import type { Characters } from './useCharacters';
 
@@ -174,7 +175,7 @@ function GroupPane({ character, characters, group, onRenamed }: GroupPaneProps):
           {users.length > 0 ? (
             <Notice kind="warn">
               {users.length === 1 ? 'A rule says' : `${users.length} rules say`} something from this group:{' '}
-              {users.map((rule) => rule.name || 'unnamed rule').join(', ')}. Without it, {users.length === 1 ? 'it has' : 'they have'} nothing to say.
+              {users.map(ruleTitle).join('; ')}. Without it, {users.length === 1 ? 'it has' : 'they have'} nothing to say.
             </Notice>
           ) : null}
           <div className="confirm">
@@ -190,7 +191,7 @@ function GroupPane({ character, characters, group, onRenamed }: GroupPaneProps):
         <div className="group-users">
           {users.length === 0
             ? 'No rule says anything from this group yet.'
-            : `Said by ${users.map((rule) => rule.name || 'an unnamed rule').join(', ')}.`}
+            : `Said by: ${users.map(ruleTitle).join('; ')}.`}
         </div>
       )}
 

@@ -1395,3 +1395,173 @@ input {
 .line-help p {
   margin: 0 0 6px;
 }
+
+/* ---- behaviour tab --------------------------------------------------------- */
+
+.behaviour {
+  display: grid;
+  gap: 24px;
+  max-width: 960px;
+}
+
+.rules {
+  border-top: 1px solid var(--line);
+}
+
+.rule {
+  border-bottom: 1px solid var(--line);
+}
+
+.rule[data-open='true'] {
+  border-left: 2px solid var(--line-strong);
+  background: var(--surface);
+}
+
+.rule-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 12px;
+}
+
+.rule-row .checkbox {
+  padding-top: 15px;
+}
+
+.rule-summary {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+  padding: 13px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rule-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rule-name {
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.rule-sentence {
+  overflow-wrap: anywhere;
+}
+
+.rule-sentence b {
+  font-weight: 600;
+}
+
+.rule[data-enabled='false'] .rule-sentence {
+  color: var(--text-3);
+}
+
+.rule[data-enabled='false'] .rule-sentence b {
+  font-weight: 400;
+}
+
+.rule-problem {
+  color: var(--danger);
+  font-size: 12.5px;
+}
+
+.rule-detail {
+  flex: none;
+  max-width: 40%;
+  color: var(--text-2);
+  font-size: 13px;
+  text-align: right;
+}
+
+.rule-editor {
+  display: grid;
+  gap: 24px;
+  max-width: 720px;
+  padding: 8px 40px 20px;
+}
+
+.rule-block {
+  display: grid;
+  gap: 8px;
+}
+
+.rule-block-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rule-none {
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.rule-part {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rule-part-fields {
+  flex: 1;
+  min-width: 0;
+}
+
+.rule-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.rule-word {
+  color: var(--text-2);
+}
+
+.rule-program {
+  width: 220px;
+}
+
+.rule-clock {
+  width: 80px;
+}
+
+.rule-number .number {
+  width: 96px;
+}
+
+.rule-file {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rule-more {
+  justify-self: start;
+  margin-left: -8px;
+}
+
+.rule-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.rules-add {
+  justify-self: start;
+}
+
+.rule-name-input.input {
+  max-width: 360px;
+}

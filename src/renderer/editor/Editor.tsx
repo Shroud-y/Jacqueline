@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Character, CharacterEntry } from '@shared/character';
 import AppearanceTab from './AppearanceTab';
+import BehaviourTab from './BehaviourTab';
 import GeneralTab from './GeneralTab';
 import LayoutTab from './layout/LayoutTab';
 import LinesTab from './LinesTab';
@@ -166,6 +167,8 @@ function CharacterPane({ character, characters, onSelect }: CharacterPaneProps):
           <AppearanceTab character={character} characters={characters} />
         ) : tab === 'layout' ? (
           <LayoutTab character={character} characters={characters} />
+        ) : tab === 'behaviour' ? (
+          <BehaviourTab character={character} characters={characters} />
         ) : tab === 'lines' ? (
           <LinesTab character={character} characters={characters} />
         ) : (

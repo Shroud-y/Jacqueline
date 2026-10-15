@@ -35,6 +35,10 @@ interface TextInputProps {
   maxLength?: number;
   label: string;
   className?: string;
+  /** The id of a `<datalist>` to suggest from. */
+  list?: string;
+  /** Focused, with its text selected, as soon as it appears. */
+  autoFocus?: boolean;
 }
 
 /**
@@ -42,7 +46,7 @@ interface TextInputProps {
  * not stays in the box and is put back to the last good value when the box is
  * left — nothing invalid ever reaches the file.
  */
-export function TextInput({ value, onCommit, validate, onProblem, placeholder, maxLength, label, className }: TextInputProps): JSX.Element {
+export function TextInput({ value, onCommit, validate, onProblem, placeholder, maxLength, label, className, list, autoFocus }: TextInputProps): JSX.Element {
   // What is being typed, while it is being typed; otherwise the box simply
   // shows the saved value, so a change made elsewhere turns up in it.
   const [typed, setTyped] = useState<string | null>(null);
@@ -58,7 +62,12 @@ export function TextInput({ value, onCommit, validate, onProblem, placeholder, m
       value={text}
       placeholder={placeholder}
       maxLength={maxLength}
-      onFocus={() => setTyped(value)}
+      list={list}
+      autoFocus={autoFocus}
+      onFocus={(event) => {
+        setTyped(value);
+        if (autoFocus) event.currentTarget.select();
+      }}
       // Leaving the box drops whatever was not good enough to save.
       onBlur={() => {
         setTyped(null);

@@ -13,7 +13,7 @@ import { handleAssetProtocol, registerAssetScheme } from './characters/assetProt
 import { registerEditorIpc } from './characters/editorIpc';
 import { isPresent } from './characters/presence';
 import { isWithinClockWindow, minutesOfDay } from './engine/timeOfDay';
-import { runActions } from './engine/actions';
+import { runActions, type ActionDeps } from './engine/actions';
 import { SpeechDirector } from './engine/director';
 import { RuleRunner } from './engine/ruleRunner';
 import { RecentHistory } from './engine/selector';
@@ -96,23 +96,23 @@ async function bootstrap(): Promise<void> {
     const { muted, quietHours } = settings.current;
     return muted || (quietHours.enabled && isWithinClockWindow(minutesOfDay(Date.now()), quietHours.from, quietHours.to));
   };
+  const actionDeps: ActionDeps = {
+    isSilenced,
+    say: (character, text) => {
+      log.info(`"${character.name}" says: ${text}`);
+      director.say(character.id, text);
+    },
+    playSound: (character, file) => windows.playSound(character.id, file, character.audio.volume),
+    show: (character, ms) => windows.showFor(character.id, ms),
+    hide: (character, ms) => visibility.hideFor(character.id, ms),
+    log: (message) => log.info(message),
+    history,
+    rng: Math.random
+  };
   const rules = new RuleRunner({
     loadSensors: loadDesktopSensors,
     idleSeconds: () => powerMonitor.getSystemIdleTime(),
-    onFired: (fired) =>
-      runActions(fired, {
-        isSilenced,
-        say: (character, text) => {
-          log.info(`"${character.name}" says: ${text}`);
-          director.say(character.id, text);
-        },
-        playSound: (character, file) => windows.playSound(character.id, file, character.audio.volume),
-        show: (character, ms) => windows.showFor(character.id, ms),
-        hide: (character, ms) => visibility.hideFor(character.id, ms),
-        log: (message) => log.info(message),
-        history,
-        rng: Math.random
-      })
+    onFired: (fired) => runActions(fired, actionDeps)
   });
   // Someone hidden for now does nothing either.
   const acting = (): Character[] =>
@@ -146,6 +146,15 @@ async function bootstrap(): Promise<void> {
       director.dismiss(character.id);
       director.say(character.id, text);
       if (line.audio) windows.playSound(character.id, line.audio, character.audio.volume);
+    },
+    runNow: (fired) => {
+      director.dismiss(fired.character.id);
+      runActions(fired, { ...actionDeps, isSilenced: () => false });
+    },
+    runningPrograms: async () => {
+      const sensors = await loadDesktopSensors();
+      if (!sensors) return [];
+      return [...sensors.runningApps()].map((stem) => `${stem}.exe`).sort((a, b) => a.localeCompare(b));
     }
   });
   editor.onClosed = () => windows.setPreview(null);

@@ -106,6 +106,10 @@ export interface EditorApi {
    * mute or quiet hours say. Slots only an event fills get a likely value.
    */
   testLine(payload: { id: string; group: string; line: string }): Promise<EditorResult>;
+  /** Does what a rule does now — whatever its trigger, conditions and wait — with slots filled as for a line tried. */
+  testRule(payload: { id: string; rule: string }): Promise<EditorResult>;
+  /** File names of the programs running now, 'dota2.exe', sorted. Asked once, not watched. */
+  runningPrograms(): Promise<string[]>;
   /** Where on disk a file dropped on the window is. Not IPC — answered by the preload itself. */
   pathForFile(file: File): string;
   openFolder(payload: { id: string }): Promise<EditorResult>;

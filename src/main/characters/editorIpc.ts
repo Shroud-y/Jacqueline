@@ -4,7 +4,7 @@ import { ASSET_EXTENSIONS, assetKindOf, assetNameSchema, characterIdSchema, refe
 import { IPC } from '@shared/ipc';
 import { unknownSlots } from '@shared/lines';
 import type { EditorApi, EditorResult } from '@shared/types';
-import { sampleSlots } from '../engine/ruleEngine';
+import { sampleSlots, type Fired } from '../engine/ruleEngine';
 import { fillSlots } from '../engine/slots';
 import type { CharacterStore } from './store';
 
@@ -17,6 +17,9 @@ export interface EditorIpcDeps {
   setPreview: (id: string | null) => void;
   /** Puts a line on screen now, with its sound. */
   sayNow: (character: Character, text: string, line: Line) => void;
+  /** Carries out a rule's actions now, as if it had fired. */
+  runNow: (fired: Fired) => void;
+  runningPrograms: () => Promise<string[]>;
   now?: () => number;
 }
 
@@ -30,6 +33,7 @@ const importPayload = z.object({
 const assetPayload = z.object({ id: characterIdSchema, file: assetNameSchema });
 const previewPayload = z.object({ id: characterIdSchema.nullable() });
 const testLinePayload = z.object({ id: characterIdSchema, group: z.string().min(1).max(64), line: z.string().min(1).max(64) });
+const testRulePayload = z.object({ id: characterIdSchema, rule: z.string().min(1).max(64) });
 
 const refused = { ok: false as const, error: 'That request could not be read.' };
 
@@ -118,6 +122,20 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
       return { ok: true };
     },
 
+    testRule: (payload) => {
+      const parsed = testRulePayload.safeParse(payload);
+      if (!parsed.success) return refused;
+      const character = store.get(parsed.data.id);
+      if (!character) return { ok: false, error: 'Unknown character.' };
+      const rule = character.rules.find((entry) => entry.id === parsed.data.rule);
+      if (!rule) return { ok: false, error: 'That rule is not there any more.' };
+      if (!character.enabled) return { ok: false, error: 'The character is off. Switch it on to try its rules.' };
+      deps.runNow({ character, rule, slots: sampleSlots(character, (deps.now ?? Date.now)()) });
+      return { ok: true };
+    },
+
+    runningPrograms: () => deps.runningPrograms(),
+
     openFolder: async (payload) => {
       const parsed = idPayload.safeParse(payload);
       if (!parsed.success) return refused;
@@ -143,7 +161,9 @@ const CHANNELS: { [K in keyof EditorHandlers]: string } = {
   assets: IPC.editorAssets,
   releaseAsset: IPC.editorReleaseAsset,
   preview: IPC.editorPreview,
-  testLine: IPC.editorTestLine
+  testLine: IPC.editorTestLine,
+  testRule: IPC.editorTestRule,
+  runningPrograms: IPC.editorRunningPrograms
 };
 
 export function registerEditorIpc(store: CharacterStore, deps: EditorIpcDeps): void {

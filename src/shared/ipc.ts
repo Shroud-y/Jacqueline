@@ -32,5 +32,9 @@ export const IPC = {
   /** editor → main: which character is being laid out right now, or nobody. */
   editorPreview: 'editor:preview',
   /** editor → main: say this line now, to see and hear it where it will be. */
-  editorTestLine: 'editor:testLine'
+  editorTestLine: 'editor:testLine',
+  /** editor → main: do what a rule does, now. */
+  editorTestRule: 'editor:testRule',
+  /** editor → main, invoke: the programs running right now, for suggestions. */
+  editorRunningPrograms: 'editor:runningPrograms'
 } as const;
