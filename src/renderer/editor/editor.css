@@ -105,6 +105,30 @@ input {
   margin-top: 8px;
 }
 
+/* The app's own settings: a row like a character's, at the very bottom. */
+.sidebar-settings {
+  height: var(--field-h);
+  margin: 4px 0 0;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r);
+  background: none;
+  color: var(--text-2);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--ease);
+}
+
+.sidebar-settings:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.sidebar-settings[aria-current='true'] {
+  background: var(--raised);
+  color: var(--text);
+}
+
 .thumb {
   flex: none;
   width: 30px;
@@ -412,6 +436,12 @@ input {
   align-items: center;
   gap: 10px;
   cursor: pointer;
+}
+
+/* Same look as an unavailable option. */
+.checkbox[data-disabled='true'] label {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .checkbox-box {
@@ -1532,7 +1562,7 @@ input {
   width: 220px;
 }
 
-.rule-clock {
+.clock {
   width: 80px;
 }
 
@@ -1564,4 +1594,58 @@ input {
 
 .rule-name-input.input {
   max-width: 360px;
+}
+
+/* ---- settings and audio ---------------------------------------------------- */
+
+.pane-title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 36px;
+  font-weight: 600;
+}
+
+.quiet-hours {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0 26px;
+}
+
+.quiet-hours[data-enabled='false'] {
+  opacity: 0.45;
+}
+
+.quiet-prose {
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+/* ---- cost ------------------------------------------------------------------ */
+
+.cost {
+  display: grid;
+  gap: 8px;
+}
+
+.cost-level {
+  font-weight: 600;
+}
+
+.cost-items {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-2);
+}
+
+/* A character's zip is being carried over the list: it will be imported. */
+.sidebar[data-dropping='true'] {
+  outline: 1px dashed var(--line-strong);
+  outline-offset: -4px;
+}
+
+.sidebar-import {
+  margin-top: 0;
 }

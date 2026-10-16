@@ -1,12 +1,14 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { z } from 'zod';
 import { ASSET_EXTENSIONS, assetKindOf, assetNameSchema, characterIdSchema, referencedAssets, type AssetKind, type Character, type Line } from '@shared/character';
 import { IPC } from '@shared/ipc';
 import { unknownSlots } from '@shared/lines';
-import type { EditorApi, EditorResult } from '@shared/types';
+import type { EditorApi, EditorResult, Settings, SettingsResult, SettingsView } from '@shared/types';
 import { sampleSlots, type Fired } from '../engine/ruleEngine';
 import { fillSlots } from '../engine/slots';
 import type { CharacterStore } from './store';
+import { exportCharacter, importCharacter, ZIP_MAX_BYTES } from './transfer';
 
 /** What the handlers need from the outside world, so they can be tested without it. */
 export interface EditorIpcDeps {
@@ -20,6 +22,16 @@ export interface EditorIpcDeps {
   /** Carries out a rule's actions now, as if it had fired. */
   runNow: (fired: Fired) => void;
   runningPrograms: () => Promise<string[]>;
+  openRoot: () => Promise<EditorResult>;
+  /** A zip to import; null when the user backs out. */
+  pickZip: () => Promise<string | null>;
+  /** Where to save an export; null when the user backs out. */
+  pickSavePath: (suggestedName: string) => Promise<string | null>;
+  /** Shows a file in its folder. */
+  revealFile: (path: string) => void;
+  settings: () => SettingsView;
+  /** Validated by the settings store, which refuses what it cannot use. */
+  updateSettings: (patch: Partial<Settings>) => SettingsResult;
   now?: () => number;
 }
 
@@ -34,6 +46,17 @@ const assetPayload = z.object({ id: characterIdSchema, file: assetNameSchema });
 const previewPayload = z.object({ id: characterIdSchema.nullable() });
 const testLinePayload = z.object({ id: characterIdSchema, group: z.string().min(1).max(64), line: z.string().min(1).max(64) });
 const testRulePayload = z.object({ id: characterIdSchema, rule: z.string().min(1).max(64) });
+const zipPayload = z.object({ path: z.string().min(1).max(4096).optional() });
+
+/** 'Kasane Teto' → 'Kasane Teto.zip'; whatever a file name cannot hold is dropped. */
+function zipName(name: string): string {
+  const safe = [...name]
+    .filter((char) => char.charCodeAt(0) >= 32 && !'<>:"/\\|?*'.includes(char))
+    .join('')
+    .trim()
+    .replace(/[. ]+$/, '');
+  return `${safe || 'character'}.zip`;
+}
 
 const refused = { ok: false as const, error: 'That request could not be read.' };
 
@@ -136,6 +159,53 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
 
     runningPrograms: () => deps.runningPrograms(),
 
+    openRoot: () => deps.openRoot(),
+
+    exportCharacter: async (payload) => {
+      const parsed = idPayload.safeParse(payload);
+      if (!parsed.success) return refused;
+      const character = store.get(parsed.data.id);
+      if (!character) return { ok: false, error: 'Unknown character.' };
+      const packed = exportCharacter(store, character.id);
+      if (!packed.ok) return packed;
+      const path = await deps.pickSavePath(zipName(character.name));
+      if (path === null) return { ok: false, error: '' };
+      try {
+        writeFileSync(path, packed.zip);
+      } catch (err) {
+        return { ok: false, error: `Could not save the zip: ${(err as Error).message}` };
+      }
+      deps.revealFile(path);
+      return { ok: true };
+    },
+
+    importCharacter: async (payload) => {
+      const parsed = zipPayload.safeParse(payload ?? {});
+      if (!parsed.success) return refused;
+      const path = parsed.data.path ?? (await deps.pickZip());
+      if (path === null) return { ok: false, error: '' };
+      if (!path.toLowerCase().endsWith('.zip')) return { ok: false, error: 'A character comes as a .zip file.' };
+      let zip: Buffer;
+      try {
+        if (statSync(path).size > ZIP_MAX_BYTES) return { ok: false, error: 'That zip is too big to be a character.' };
+        zip = readFileSync(path);
+      } catch (err) {
+        return { ok: false, error: `Could not read the zip: ${(err as Error).message}` };
+      }
+      return importCharacter(store, zip);
+    },
+
+    settings: () => deps.settings(),
+
+    updateSettings: (payload) => {
+      if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
+        return { ok: false, settings: deps.settings().settings, error: 'That request could not be read.' };
+      }
+      // The version is the store's to say.
+      const { version: _version, ...patch } = payload as Partial<Settings>;
+      return deps.updateSettings(patch);
+    },
+
     openFolder: async (payload) => {
       const parsed = idPayload.safeParse(payload);
       if (!parsed.success) return refused;
@@ -147,7 +217,7 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
 
 /** The handlers take what came over the wire, not what the editor's types promise it sent. */
 type EditorHandlers = {
-  [K in Exclude<keyof EditorApi, 'onChanged' | 'pathForFile'>]: (payload?: unknown) => ReturnType<EditorApi[K]> | Awaited<ReturnType<EditorApi[K]>>;
+  [K in Exclude<keyof EditorApi, 'onChanged' | 'onSettings' | 'pathForFile'>]: (payload?: unknown) => ReturnType<EditorApi[K]> | Awaited<ReturnType<EditorApi[K]>>;
 };
 
 const CHANNELS: { [K in keyof EditorHandlers]: string } = {
@@ -163,7 +233,12 @@ const CHANNELS: { [K in keyof EditorHandlers]: string } = {
   preview: IPC.editorPreview,
   testLine: IPC.editorTestLine,
   testRule: IPC.editorTestRule,
-  runningPrograms: IPC.editorRunningPrograms
+  runningPrograms: IPC.editorRunningPrograms,
+  openRoot: IPC.editorOpenRoot,
+  exportCharacter: IPC.editorExport,
+  importCharacter: IPC.editorImport,
+  settings: IPC.editorSettingsGet,
+  updateSettings: IPC.editorSettingsUpdate
 };
 
 export function registerEditorIpc(store: CharacterStore, deps: EditorIpcDeps): void {

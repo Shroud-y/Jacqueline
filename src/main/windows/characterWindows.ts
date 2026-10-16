@@ -26,6 +26,8 @@ import { createLogger } from '../app/logger';
 import { assetUrl } from '../characters/assetProtocol';
 import type { CharacterStore } from '../characters/store';
 import { ClickThroughController } from './clickThrough';
+import { EntrySounds, type EntryKind } from './entrySounds';
+import { distanceToRect, nextPollMs } from './hotPoll';
 import { loadPage } from './rendererUrl';
 
 const log = createLogger('windows');
@@ -33,22 +35,18 @@ const log = createLogger('windows');
 /** `window.open` target names look like this, so the handler can tell whose window is being asked for. */
 const FRAME_PREFIX = 'character:';
 
-/**
- * How often the cursor is checked against each character's rectangle.
+/*
+ * The cursor is checked against each character's rectangle on a timer.
  *
  * The windows ignore the mouse, so they cannot be told when the cursor
  * arrives over them. Electron's answer is `forward: true`, a global
  * `WH_MOUSE_LL` hook that routes every mouse move on the machine through
  * this process — not something to hold for as long as a character is on
  * screen, which is all day. A `GetCursorPos` is as near free as a system call
- * gets, so it is asked often.
- *
- * Often, because this interval is how long a character cannot be grabbed
- * after the cursor reaches it. At an eighth of a second a natural "move
- * there and press" landed inside the gap about as often as not. Thirty
- * milliseconds is under the time a hand takes to stop moving and press.
+ * gets; how often it is asked depends on how near the cursor is (`hotPoll.ts`).
+ * Near a character it is every 30 ms: at an eighth of a second a natural
+ * "move there and press" landed inside the gap about as often as not.
  */
-const HOT_POLL_MS = 30;
 
 /**
  * A window takes the mouse this far outside the character's own rectangle. A
@@ -65,6 +63,9 @@ const DRAG_LIMIT_MS = 30_000;
 /** A page that never says it has painted still gets its window, eventually. */
 const REVEAL_FALLBACK_MS = 2_000;
 
+/** A disappear sound keeps the host page alive at most this long after the last character has gone. */
+const FAREWELL_LIMIT_MS = 5_000;
+
 interface Geometry {
   frame: Rect;
   anchor: Rect;
@@ -80,6 +81,8 @@ interface Live {
   geometry: Geometry;
   shown: boolean;
   revealTimer: NodeJS.Timeout | null;
+  /** Out for a reason of its own when last looked at, not only to be laid out in the editor. */
+  onItsOwn: boolean;
 }
 
 /** Who decides whether a character is on screen and whether it should be moving. */
@@ -96,6 +99,8 @@ export interface PresenceSource {
   speechFor(id: string): { id: string; text: string; durationMs: number } | null;
   /** Speaking, or only just finished: on screen whatever its presence rules say. */
   isOnStage(id: string): boolean;
+  /** Muted, or inside quiet hours: no sound plays. */
+  isSilenced(): boolean;
 }
 
 interface Drag {
@@ -126,6 +131,10 @@ export class CharacterWindows {
   private readonly shownFor = new Map<string, { until: number; timer: NodeJS.Timeout }>();
   /** Sounds asked for before their character's window was up. */
   private readonly pendingSounds = new Map<string, StageSound[]>();
+  private readonly entrySounds = new EntrySounds();
+  /** Disappear sounds playing in the host page, which must outlive them. */
+  private farewells = 0;
+  private stopping = false;
 
   constructor(
     private readonly store: CharacterStore,
@@ -169,6 +178,8 @@ export class CharacterWindows {
   }
 
   stop(): void {
+    // Quitting is not every character leaving: nothing says goodbye.
+    this.stopping = true;
     screen.off('display-metrics-changed', this.onDisplaysChanged);
     screen.off('display-removed', this.onDisplaysChanged);
     ipcMain.removeHandler(IPC.stageGet);
@@ -219,6 +230,7 @@ export class CharacterWindows {
 
   /** Brings the windows in line with the characters: opens, updates and closes as needed. */
   private sync(): void {
+    if (this.stopping) return;
     const wanted = new Map<string, Character>();
     for (const entry of this.store.list()) {
       if (entry.ok && this.wants(entry.character)) wanted.set(entry.id, entry.character);
@@ -229,11 +241,12 @@ export class CharacterWindows {
     }
     for (const [id, character] of wanted) {
       const live = this.live.get(id);
+      if (live) live.onItsOwn = this.wantedOnItsOwn(character);
       if (live) this.update(live, character);
       else if (!this.opening.has(id)) void this.open(id);
     }
 
-    if (wanted.size === 0 && this.opening.size === 0) this.destroyHost();
+    if (wanted.size === 0 && this.opening.size === 0 && this.farewells === 0) this.destroyHost();
   }
 
   /**
@@ -275,8 +288,13 @@ export class CharacterWindows {
   }
 
   private wants(character: Character): boolean {
+    return character.id === this.previewId ? character.enabled : this.wantedOnItsOwn(character);
+  }
+
+  /** On screen for a reason of its own, and not only because it is being laid out. */
+  private wantedOnItsOwn(character: Character): boolean {
     if (!character.enabled) return false;
-    if (character.id === this.previewId || this.shownFor.has(character.id) || this.presence.isOnStage(character.id)) return true;
+    if (this.shownFor.has(character.id) || this.presence.isOnStage(character.id)) return true;
     const { anchor, position } = this.geometry(character);
     return this.presence.isPresent(character, { x: position.x, y: position.y, width: anchor.width, height: anchor.height });
   }
@@ -379,7 +397,8 @@ export class CharacterWindows {
       clickThrough: new ClickThroughController(win),
       geometry: this.geometry(character),
       shown: false,
-      revealTimer: null
+      revealTimer: null,
+      onItsOwn: this.wantedOnItsOwn(character)
     };
     this.live.set(id, live);
 
@@ -428,7 +447,10 @@ export class CharacterWindows {
     live.win.setAlwaysOnTop(true, 'screen-saver');
     live.win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     this.startHotPolling();
-    for (const sound of this.pendingSounds.get(live.id) ?? []) live.win.webContents.send(IPC.stageSound, sound);
+    this.kickHot();
+    const appear = live.onItsOwn ? this.entrySound(live.id, 'appear') : null;
+    const pending = [...(appear ? [appear] : []), ...(this.pendingSounds.get(live.id) ?? [])];
+    for (const sound of pending) live.win.webContents.send(IPC.stageSound, sound);
     this.pendingSounds.delete(live.id);
     const { x, y, width, height } = live.geometry.window;
     log.debug(`"${live.id}" shown at ${x},${y} ${width}x${height}`);
@@ -438,14 +460,60 @@ export class CharacterWindows {
     live.geometry = this.geometry(character);
     if (live.win.isDestroyed()) return;
     // Mid-drag the window is wherever the cursor has taken it.
-    if (this.drag?.id !== live.id) live.win.setBounds(live.geometry.window);
+    if (this.drag?.id !== live.id) {
+      live.win.setBounds(live.geometry.window);
+      this.kickHot();
+    }
     live.win.webContents.send(IPC.stageUpdate, this.payload(character, live.geometry));
   }
 
   private close(live: Live): void {
     log.debug(`"${live.id}" hidden`);
+    // Only a character that was out for real is heard leaving — not one
+    // that was only being laid out, and not everyone at once on quit.
+    if (live.shown && live.onItsOwn && !this.stopping) this.farewell(live.id);
     this.forget(live);
     if (!live.win.isDestroyed()) live.win.destroy();
+  }
+
+  /**
+   * The character's appear or disappear sound, if it has one and may play it
+   * now. A character just switched off still has its disappear sound.
+   */
+  private entrySound(id: string, kind: EntryKind): StageSound | null {
+    const character = this.store.get(id);
+    if (!character || this.presence.isSilenced()) return null;
+    const file = character.audio[kind];
+    if (!file || !this.store.assetPath(id, file)) return null;
+    if (!this.entrySounds.take(id, kind)) return null;
+    return { url: assetUrl(id, file), volume: character.audio.volume };
+  }
+
+  /**
+   * Its own window closes at once, so a disappear sound plays from the host
+   * page — kept open until the sound is over, or a few seconds at most.
+   */
+  private farewell(id: string): void {
+    const host = this.host;
+    if (!host || host.isDestroyed()) return;
+    const sound = this.entrySound(id, 'disappear');
+    if (!sound) return;
+    this.farewells += 1;
+    const script = `new Promise((done) => {
+      const audio = new Audio(${JSON.stringify(sound.url)});
+      audio.volume = ${Math.min(1, Math.max(0, sound.volume))};
+      audio.onended = audio.onerror = () => done();
+      audio.play().catch(() => done());
+      setTimeout(done, ${FAREWELL_LIMIT_MS});
+    })`;
+    void host.webContents
+      .executeJavaScript(script)
+      .catch((err: unknown) => log.warn(`disappear sound for "${id}" failed: ${String(err)}`))
+      .finally(() => {
+        this.farewells -= 1;
+        // Quitting: nothing may be opened again on the way out.
+        if (!this.stopping) this.sync();
+      });
   }
 
   private forget(live: Live): void {
@@ -523,21 +591,44 @@ export class CharacterWindows {
 
   private startHotPolling(): void {
     if (this.hotTimer) return;
-    this.hotTimer = setInterval(() => this.pollHot(), HOT_POLL_MS);
-    this.hotTimer.unref?.();
+    this.scheduleHot(0);
   }
 
   private stopHotPolling(): void {
     if (!this.hotTimer) return;
-    clearInterval(this.hotTimer);
+    clearTimeout(this.hotTimer);
     this.hotTimer = null;
   }
 
-  private pollHot(): void {
+  private scheduleHot(ms: number): void {
+    this.hotTimer = setTimeout(() => {
+      let next: number;
+      try {
+        next = this.pollHot();
+      } catch (err) {
+        // One bad look must not stop the looking: every character would stay click-through.
+        log.warn(`cursor check failed: ${String(err)}`);
+        next = nextPollMs(Infinity);
+      }
+      this.scheduleHot(next);
+    }, ms);
+    this.hotTimer.unref?.();
+  }
+
+  /** A window arrived or moved: look now, not when a far-away cursor's long wait is over. */
+  private kickHot(): void {
+    if (!this.hotTimer) return;
+    clearTimeout(this.hotTimer);
+    this.scheduleHot(0);
+  }
+
+  /** Grabs or lets go of the mouse for every window; answers how soon to look again. */
+  private pollHot(): number {
     // Mid-drag the window keeps the mouse whatever is under the cursor: the
     // window is what is moving.
-    if (this.drag) return;
+    if (this.drag) return nextPollMs(0);
     const cursor = screen.getCursorScreenPoint();
+    let nearest = Infinity;
     for (const live of this.live.values()) {
       if (!live.shown || live.win.isDestroyed()) continue;
       const inside = anchorInWindow(live.geometry.frame, live.geometry.anchor);
@@ -550,7 +641,9 @@ export class CharacterWindows {
       // Arriving is acted on at once; leaving can wait out the debounce.
       if (pointInRect(cursor, hot)) live.clickThrough.grab();
       else live.clickThrough.request(false);
+      nearest = Math.min(nearest, distanceToRect(cursor, hot));
     }
+    return nextPollMs(nearest);
   }
 
   /**

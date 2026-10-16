@@ -22,7 +22,9 @@ export const assetNameSchema = z
   .string()
   .max(120)
   .regex(/^[A-Za-z0-9_][A-Za-z0-9_ .-]*$/, 'not a valid asset file name')
-  .refine((name) => !name.includes('..'), 'not a valid asset file name');
+  .refine((name) => !name.includes('..'), 'not a valid asset file name')
+  // CON.png and the like are devices on Windows, not files.
+  .refine((name) => !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i.test(name), 'not a valid asset file name');
 
 const colorSchema = z.string().trim().min(1).max(64);
 

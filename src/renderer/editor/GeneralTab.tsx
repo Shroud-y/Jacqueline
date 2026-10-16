@@ -1,5 +1,8 @@
 import type { Character, Presence } from '@shared/character';
-import { Checkbox, Field, Group, OptionList, TagList } from './fields';
+import { estimateCost } from '@shared/cost';
+import { Checkbox, Field, Group, Notice, OptionList, TagList } from './fields';
+
+const LEVEL_LABEL = { light: 'Light', moderate: 'Moderate', heavy: 'Heavy' } as const;
 
 type Mode = Presence['mode'];
 
@@ -16,6 +19,7 @@ export default function GeneralTab({ character, onChange }: { character: Charact
   const { presence } = character;
   const setPresence = (patch: Partial<Presence>): void => onChange({ ...character, presence: { ...presence, ...patch } });
   const tied = TIED.includes(presence.mode);
+  const cost = estimateCost(character);
 
   return (
     <div className="form">
@@ -64,6 +68,20 @@ export default function GeneralTab({ character, onChange }: { character: Charact
             <button type="button" className="button quiet under-prose" onClick={() => setPresence({ position: null })}>
               Back to the corner
             </button>
+          ) : null}
+        </div>
+      </Group>
+
+      <Group title="What it costs">
+        <div className="cost">
+          <div className="cost-level">{LEVEL_LABEL[cost.level]}</div>
+          <ul className="cost-items">
+            {cost.items.map((item) => (
+              <li key={item.text}>{item.text}</li>
+            ))}
+          </ul>
+          {cost.level === 'heavy' ? (
+            <Notice kind="warn">A rest between plays (Appearance → Motion) brings a moving character down to a fraction of this.</Notice>
           ) : null}
         </div>
       </Group>

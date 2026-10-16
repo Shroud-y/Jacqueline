@@ -13,24 +13,13 @@ import {
   ruleSentence,
   TRIGGER_LABELS
 } from '@shared/ruleText';
-import { Field, Notice, NumberInput, Segmented, Select, TextInput } from './fields';
+import { ClockInput, Field, Notice, NumberInput, Segmented, Select, TextInput } from './fields';
 import type { Characters } from './useCharacters';
 
 const PROGRAMS_LIST = 'running-programs';
 const MAX_CONDITIONS = 16;
 const MAX_ACTIONS = 16;
 
-const CLOCK = /^(\d{1,2}):([0-5]\d)$/;
-
-/** '9:05' → '09:05'; null when it is not a time of day. */
-function readClock(text: string): string | null {
-  const match = CLOCK.exec(text.trim());
-  if (!match) return null;
-  const hours = Number(match[1]);
-  return hours > 23 ? null : `${String(hours).padStart(2, '0')}:${match[2]}`;
-}
-
-const clockProblem = (text: string): string | null => (readClock(text) === null ? 'A time like 09:00 or 23:30.' : null);
 const programProblem = (text: string): string | null => (text.trim() === '' ? "A program's file name, like dota2.exe." : null);
 
 /** What the character does, and when: a list of rules, one open at a time. */
@@ -346,14 +335,6 @@ function ProgramInput({ value, onChange, autoFocus }: { value: string; onChange:
         autoFocus={autoFocus}
         onCommit={(text) => onChange(text.trim())}
       />
-    </span>
-  );
-}
-
-function ClockInput({ value, label, onChange }: { value: string; label: string; onChange: (clock: string) => void }): JSX.Element {
-  return (
-    <span className="rule-clock">
-      <TextInput label={label} value={value} maxLength={5} placeholder="09:00" validate={clockProblem} onCommit={(text) => onChange(readClock(text) ?? value)} />
     </span>
   );
 }

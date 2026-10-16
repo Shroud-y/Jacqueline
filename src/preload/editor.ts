@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { CharacterEntry } from '@shared/character';
-import type { EditorApi } from '@shared/types';
+import type { EditorApi, SettingsView } from '@shared/types';
 
 /**
  * The editor window's entire surface. Channel names are written out
@@ -21,7 +21,13 @@ const CHANNEL = {
   editorPreview: 'editor:preview',
   editorTestLine: 'editor:testLine',
   editorTestRule: 'editor:testRule',
-  editorRunningPrograms: 'editor:runningPrograms'
+  editorRunningPrograms: 'editor:runningPrograms',
+  editorOpenRoot: 'editor:openRoot',
+  editorExport: 'editor:export',
+  editorImport: 'editor:import',
+  editorSettingsGet: 'settings:get',
+  editorSettingsUpdate: 'settings:update',
+  editorSettingsChanged: 'settings:changed'
 } as const;
 
 const api: EditorApi = {
@@ -45,6 +51,18 @@ const api: EditorApi = {
   testLine: (payload) => ipcRenderer.invoke(CHANNEL.editorTestLine, payload),
   testRule: (payload) => ipcRenderer.invoke(CHANNEL.editorTestRule, payload),
   runningPrograms: () => ipcRenderer.invoke(CHANNEL.editorRunningPrograms),
+  openRoot: () => ipcRenderer.invoke(CHANNEL.editorOpenRoot),
+  exportCharacter: (payload) => ipcRenderer.invoke(CHANNEL.editorExport, payload),
+  importCharacter: (payload) => ipcRenderer.invoke(CHANNEL.editorImport, payload),
+  settings: () => ipcRenderer.invoke(CHANNEL.editorSettingsGet),
+  updateSettings: (patch) => ipcRenderer.invoke(CHANNEL.editorSettingsUpdate, patch),
+
+  onSettings(handler) {
+    const listener = (_event: unknown, view: SettingsView): void => handler(view);
+    ipcRenderer.on(CHANNEL.editorSettingsChanged, listener);
+    return () => ipcRenderer.off(CHANNEL.editorSettingsChanged, listener);
+  },
+
   pathForFile: (file) => webUtils.getPathForFile(file)
 };
 

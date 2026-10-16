@@ -97,12 +97,24 @@ export function Switch({ checked, onChange, label }: { checked: boolean; onChang
 }
 
 /** Every other yes or no. */
-export function Checkbox({ checked, onChange, label, hint }: { checked: boolean; onChange: (checked: boolean) => void; label: string; hint?: string }): JSX.Element {
+export function Checkbox({
+  checked,
+  onChange,
+  label,
+  hint,
+  disabled = false
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+  hint?: string;
+  disabled?: boolean;
+}): JSX.Element {
   const id = useId();
   return (
-    <div className="checkbox">
+    <div className="checkbox" data-disabled={disabled}>
       <label htmlFor={id}>
-        <input id={id} type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+        <input id={id} type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
         <span className="checkbox-box" aria-hidden="true" />
         <span>{label}</span>
       </label>
@@ -513,5 +525,26 @@ export function Fold({ title, children, defaultOpen = true }: { title: string; c
       </button>
       {open ? <div className="fold-body">{children}</div> : null}
     </section>
+  );
+}
+
+const CLOCK = /^(\d{1,2}):([0-5]\d)$/;
+
+/** '9:05' → '09:05'; null when it is not a time of day. */
+export function readClock(text: string): string | null {
+  const match = CLOCK.exec(text.trim());
+  if (!match) return null;
+  const hours = Number(match[1]);
+  return hours > 23 ? null : `${String(hours).padStart(2, '0')}:${match[2]}`;
+}
+
+const clockProblem = (text: string): string | null => (readClock(text) === null ? 'A time like 09:00 or 23:30.' : null);
+
+/** A time of day, 24-hour. Saved as 'HH:mm' however it was typed. */
+export function ClockInput({ value, label, onChange }: { value: string; label: string; onChange: (clock: string) => void }): JSX.Element {
+  return (
+    <span className="clock">
+      <TextInput label={label} value={value} maxLength={5} placeholder="09:00" validate={clockProblem} onCommit={(text) => onChange(readClock(text) ?? value)} />
+    </span>
   );
 }

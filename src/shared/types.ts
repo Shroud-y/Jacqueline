@@ -19,6 +19,13 @@ export interface Settings {
   quietHours: QuietHours;
 }
 
+/** The settings as the editor shows them, with what this build can do about them. */
+export interface SettingsView {
+  settings: Settings;
+  /** False in a development run: starting with Windows needs the installed app. */
+  autostartAvailable: boolean;
+}
+
 /** What a settings change answers with: the settings as they now stand, and why not if it was refused. */
 export type SettingsResult =
   | { ok: true; settings: Settings }
@@ -110,6 +117,15 @@ export interface EditorApi {
   testRule(payload: { id: string; rule: string }): Promise<EditorResult>;
   /** File names of the programs running now, 'dota2.exe', sorted. Asked once, not watched. */
   runningPrograms(): Promise<string[]>;
+  /** Opens the folder every character lives in. */
+  openRoot(): Promise<EditorResult>;
+  /** Saves the character and the files it uses as one zip, then shows it. An empty `error`: the save dialog was closed. */
+  exportCharacter(payload: { id: string }): Promise<EditorResult>;
+  /** A new character from a zip: `path` when one was dropped, otherwise one the user picks. */
+  importCharacter(payload: { path?: string }): Promise<EditorResult<{ character: Character }>>;
+  settings(): Promise<SettingsView>;
+  updateSettings(patch: Partial<Omit<Settings, 'version'>>): Promise<SettingsResult>;
+  onSettings(handler: (view: SettingsView) => void): () => void;
   /** Where on disk a file dropped on the window is. Not IPC — answered by the preload itself. */
   pathForFile(file: File): string;
   openFolder(payload: { id: string }): Promise<EditorResult>;

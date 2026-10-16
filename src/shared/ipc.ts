@@ -36,5 +36,17 @@ export const IPC = {
   /** editor → main: do what a rule does, now. */
   editorTestRule: 'editor:testRule',
   /** editor → main, invoke: the programs running right now, for suggestions. */
-  editorRunningPrograms: 'editor:runningPrograms'
+  editorRunningPrograms: 'editor:runningPrograms',
+  /** Opens the folder every character lives in. */
+  editorOpenRoot: 'editor:openRoot',
+  /** Saves a character as a zip, where the user picks. */
+  editorExport: 'editor:export',
+  /** Makes a new character from a zip: dropped, or picked. */
+  editorImport: 'editor:import',
+
+  /** editor → main, invoke: the app's settings, and what this build can do with them. */
+  editorSettingsGet: 'settings:get',
+  editorSettingsUpdate: 'settings:update',
+  /** main → editor: the settings changed — from the editor, or from the tray. */
+  editorSettingsChanged: 'settings:changed'
 } as const;

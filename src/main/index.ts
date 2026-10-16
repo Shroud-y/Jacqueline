@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { ASSET_EXTENSIONS, type Character } from '@shared/character';
 import { IPC } from '@shared/ipc';
+import type { Settings, SettingsView } from '@shared/types';
 
 import { configureLogger, createLogger } from './app/logger';
 import { characterMenu, trayMenu, trayTooltip, type MenuAction, type MenuState } from './app/menus';
@@ -42,6 +43,7 @@ async function bootstrap(): Promise<void> {
   app.setAppUserModelId('dev.codex.companion');
 
   const settings = new SettingsStore(paths.settingsFile());
+  const settingsView = (): SettingsView => settingsViewOf(settings.current);
   const characters = new CharacterStore(paths.charactersRoot());
   handleAssetProtocol(characters);
 
@@ -73,6 +75,12 @@ async function bootstrap(): Promise<void> {
   const watched = (): Character[] =>
     characters.list().flatMap((entry) => (entry.ok && !visibility.isHidden(entry.id) ? [entry.character] : []));
 
+  // Muted, or inside quiet hours: nothing is said or played by anyone.
+  const isSilenced = (): boolean => {
+    const { muted, quietHours } = settings.current;
+    return muted || (quietHours.enabled && isWithinClockWindow(minutesOfDay(Date.now()), quietHours.from, quietHours.to));
+  };
+
   const windows = new CharacterWindows(characters, join(__dirname, '../preload/stage.js'), {
     isPresent: (character, anchor) =>
       !visibility.isHidden(character.id) && isPresent(character, presence.facts, anchor),
@@ -84,7 +92,8 @@ async function bootstrap(): Promise<void> {
     // A click while it is talking is "enough, thank you"; otherwise it is a click.
     onClick: (id) => (director.isSpeaking(id) ? director.dismiss(id) : rules.event({ type: 'clicked', characterId: id })),
     speechFor: (id) => director.current(id),
-    isOnStage: (id) => director.isOnStage(id)
+    isOnStage: (id) => director.isOnStage(id),
+    isSilenced
   });
 
   const director = new SpeechDirector();
@@ -92,10 +101,6 @@ async function bootstrap(): Promise<void> {
 
   // Behaviour: rules fire, their actions run, lines go to the director.
   const history = new RecentHistory();
-  const isSilenced = (): boolean => {
-    const { muted, quietHours } = settings.current;
-    return muted || (quietHours.enabled && isWithinClockWindow(minutesOfDay(Date.now()), quietHours.from, quietHours.to));
-  };
   const actionDeps: ActionDeps = {
     isSilenced,
     say: (character, text) => {
@@ -151,6 +156,25 @@ async function bootstrap(): Promise<void> {
       director.dismiss(fired.character.id);
       runActions(fired, { ...actionDeps, isSilenced: () => false });
     },
+    pickZip: async () => {
+      const options = { properties: ['openFile' as const], filters: [{ name: 'SHARD character', extensions: ['zip'] }] };
+      const parent = editor.browserWindow;
+      const picked = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options);
+      return picked.canceled ? null : (picked.filePaths[0] ?? null);
+    },
+    pickSavePath: async (suggestedName) => {
+      const options = { defaultPath: join(app.getPath('documents'), suggestedName), filters: [{ name: 'SHARD character', extensions: ['zip'] }] };
+      const parent = editor.browserWindow;
+      const picked = parent ? await dialog.showSaveDialog(parent, options) : await dialog.showSaveDialog(options);
+      return picked.canceled || !picked.filePath ? null : picked.filePath;
+    },
+    revealFile: (path) => shell.showItemInFolder(path),
+    openRoot: async () => {
+      const failure = await shell.openPath(paths.charactersRoot());
+      return failure ? { ok: false, error: failure } : { ok: true };
+    },
+    settings: settingsView,
+    updateSettings: (patch) => settings.update(patch),
     runningPrograms: async () => {
       const sensors = await loadDesktopSensors();
       if (!sensors) return [];
@@ -223,6 +247,7 @@ async function bootstrap(): Promise<void> {
   settings.onChange((next) => {
     if (next.muted) director.silenceAll();
     tray.refresh();
+    editor.send(IPC.editorSettingsChanged, settingsView());
   });
 
   // Started again while already running: that is someone looking for the
@@ -249,6 +274,11 @@ async function bootstrap(): Promise<void> {
   setTimeout(() => rules.event({ type: 'startup' }), 3_000).unref?.();
 
   log.info('SHARD ready');
+}
+
+/** Settings as the editor shows them. */
+function settingsViewOf(settings: Settings): SettingsView {
+  return { settings, autostartAvailable: app.isPackaged };
 }
 
 /** Reads the real value and reconciles, rather than assuming. */

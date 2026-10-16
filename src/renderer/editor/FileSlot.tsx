@@ -1,4 +1,4 @@
-import { useState, type DragEvent } from 'react';
+import { useState, type DragEvent, type ReactNode } from 'react';
 import type { AssetKind } from '@shared/character';
 import { formatBytes } from './media';
 
@@ -22,12 +22,14 @@ interface FileSlotProps {
   /** The file's own size in pixels, once it is known. */
   onMeasured?: (size: { width: number; height: number }) => void;
   busy?: boolean;
+  /** More buttons beside Replace and Remove, for a filled slot. */
+  actions?: ReactNode;
 }
 
 const KIND_LABEL: Record<AssetKind, string> = { image: 'Picture', video: 'Video', audio: 'Sound', font: 'Font' };
 
 /** A place for one file: empty with a way to fill it, or the file with ways to change it. */
-export default function FileSlot({ label, hint, file, kinds, onChoose, onRemove, onMeasured, busy = false }: FileSlotProps): JSX.Element {
+export default function FileSlot({ label, hint, file, kinds, onChoose, onRemove, onMeasured, busy = false, actions }: FileSlotProps): JSX.Element {
   const [over, setOver] = useState(false);
   const [size, setSize] = useState<{ url: string; width: number; height: number } | null>(null);
 
@@ -62,10 +64,13 @@ export default function FileSlot({ label, hint, file, kinds, onChoose, onRemove,
       {file ? (
         <>
           <div className="slot" data-over={over} {...drop}>
-            <span className="slot-thumb" aria-hidden="true">
-              {file.kind === 'image' ? (
+            {/* A sound has nothing to show. */}
+            {file.kind === 'image' ? (
+              <span className="slot-thumb" aria-hidden="true">
                 <img src={file.url} alt="" draggable={false} onLoad={(event) => measured(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight)} />
-              ) : file.kind === 'video' ? (
+              </span>
+            ) : file.kind === 'video' ? (
+              <span className="slot-thumb" aria-hidden="true">
                 <video
                   src={file.url}
                   muted
@@ -73,14 +78,15 @@ export default function FileSlot({ label, hint, file, kinds, onChoose, onRemove,
                   disablePictureInPicture
                   onLoadedMetadata={(event) => measured(event.currentTarget.videoWidth, event.currentTarget.videoHeight)}
                 />
-              ) : null}
-            </span>
+              </span>
+            ) : null}
             <span className="slot-meta">
               <span className="slot-name">{file.name}</span>
               <span className="slot-detail">{meta}</span>
             </span>
           </div>
           <div className="slot-actions">
+            {actions}
             <button type="button" className="button quiet" disabled={busy} onClick={() => onChoose()}>
               Replace
             </button>

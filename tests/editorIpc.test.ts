@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AssetKind } from '@shared/character';
 import { editorHandlers } from '@main/characters/editorIpc';
 import { CharacterStore } from '@main/characters/store';
+import { DEFAULT_SETTINGS, SettingsStore } from '@main/app/settings';
 
 let root: string;
 let outside: string;
@@ -15,6 +16,11 @@ let opened: string[];
 let previewed: (string | null)[];
 let said: { id: string; text: string; line: string }[];
 let ran: { id: string; rule: string; slots: Record<string, string | number> }[];
+let settings: SettingsStore;
+let savePath: string | null;
+let suggested: string[];
+let revealed: string[];
+let zipPath: string | null;
 
 const handlers = (): ReturnType<typeof editorHandlers> =>
   editorHandlers(store, {
@@ -30,6 +36,15 @@ const handlers = (): ReturnType<typeof editorHandlers> =>
     sayNow: (character, text, line) => said.push({ id: character.id, text, line: line.id }),
     runNow: (fired) => ran.push({ id: fired.character.id, rule: fired.rule.id, slots: fired.slots }),
     runningPrograms: async () => ['code.exe', 'dota2.exe'],
+    openRoot: async () => ({ ok: true }),
+    pickZip: async () => zipPath,
+    pickSavePath: async (name) => {
+      suggested.push(name);
+      return savePath;
+    },
+    revealFile: (path) => revealed.push(path),
+    settings: () => ({ settings: settings.current, autostartAvailable: false }),
+    updateSettings: (patch) => settings.update(patch),
     now: () => new Date(2026, 0, 1, 9, 5).getTime()
   });
 
@@ -43,6 +58,11 @@ beforeEach(() => {
   previewed = [];
   said = [];
   ran = [];
+  settings = new SettingsStore(join(root, 'settings.json'));
+  savePath = null;
+  suggested = [];
+  revealed = [];
+  zipPath = null;
 });
 
 afterEach(() => {
@@ -211,6 +231,52 @@ describe('editor requests', () => {
     await handlers().save({ ...created, enabled: false, rules: [rule] });
     expect((await handlers().testRule({ id: created.id, rule: 'r1' })).ok).toBe(false);
     expect(ran).toHaveLength(1);
+  });
+
+  it('changes settings through the store, which refuses what it cannot use', async () => {
+    const h = handlers();
+    expect(await h.settings()).toEqual({ settings: DEFAULT_SETTINGS, autostartAvailable: false });
+
+    const muted = await h.updateSettings({ muted: true, quietHours: { enabled: true, from: '22:00', to: '07:00' } });
+    expect(muted).toMatchObject({ ok: true, settings: { muted: true, quietHours: { enabled: true, from: '22:00', to: '07:00' } } });
+
+    const bad = await h.updateSettings({ quietHours: { enabled: true, from: '25:00', to: '07:00' } });
+    expect(bad.ok).toBe(false);
+    expect(bad.settings.quietHours.from).toBe('22:00');
+
+    // The version is not the editor's to change; anything else that is not a patch is refused.
+    expect((await h.updateSettings({ version: 2, muted: false })).settings).toMatchObject({ version: 1, muted: false });
+    expect((await h.updateSettings('mute')).ok).toBe(false);
+    expect((await h.updateSettings(null)).ok).toBe(false);
+  });
+
+  it('exports to where the user says, and imports it back as a new character', async () => {
+    const created = await make('Kasane: Teto?');
+    const h = handlers();
+
+    // The save dialog closed: nothing happened, and nothing needs saying.
+    expect(await h.exportCharacter({ id: created.id })).toEqual({ ok: false, error: '' });
+    expect(suggested).toEqual(['Kasane Teto.zip']);
+
+    savePath = join(outside, 'teto.zip');
+    expect(await h.exportCharacter({ id: created.id })).toEqual({ ok: true });
+    expect(existsSync(savePath)).toBe(true);
+    expect(revealed).toEqual([savePath]);
+
+    const dropped = await h.importCharacter({ path: savePath });
+    expect(dropped).toMatchObject({ ok: true, character: { name: 'Kasane: Teto?' } });
+    zipPath = savePath;
+    expect((await h.importCharacter({})).ok).toBe(true);
+    zipPath = null;
+    expect(await h.importCharacter({})).toEqual({ ok: false, error: '' });
+    expect(await h.list()).toHaveLength(3);
+
+    // Only a .zip, and only a file that is there.
+    writeFileSync(join(outside, 'teto.png'), 'x');
+    expect((await h.importCharacter({ path: join(outside, 'teto.png') })).ok).toBe(false);
+    expect((await h.importCharacter({ path: join(outside, 'gone.zip') })).ok).toBe(false);
+    expect((await h.exportCharacter({ id: 'nobody' })).ok).toBe(false);
+    expect((await h.importCharacter({ path: 42 })).ok).toBe(false);
   });
 
   it('says what is running', async () => {

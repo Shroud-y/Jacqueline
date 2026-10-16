@@ -7,6 +7,8 @@ export interface Characters {
   entries: CharacterEntry[] | null;
   /** The last thing main refused, in its own words; null once something has gone through since. */
   error: string | null;
+  /** What did not happen, to lead the error with: "Not saved.", "Not imported." */
+  errorLead: string;
   dismissError(): void;
   /** Saves the whole character as it should now be. */
   update(character: Character): void;
@@ -18,6 +20,9 @@ export interface Characters {
   duplicate(id: string): Promise<Character | null>;
   remove(id: string): Promise<boolean>;
   openFolder(id: string): void;
+  exportCharacter(id: string): void;
+  /** From a dropped zip's path, or one the user picks. */
+  importCharacter(path?: string): Promise<Character | null>;
 }
 
 /**
@@ -30,6 +35,7 @@ export interface Characters {
 export function useCharacters(): Characters {
   const [entries, setEntries] = useState<CharacterEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorLead, setErrorLead] = useState('Not saved.');
 
   useEffect(() => {
     const api = window.shardEditor;
@@ -45,9 +51,10 @@ export function useCharacters(): Characters {
     };
   }, []);
 
-  const settle = useCallback(<T extends object>(result: EditorResult<T>): result is { ok: true } & T => {
+  const settle = useCallback(<T extends object>(result: EditorResult<T>, lead = 'Not saved.'): result is { ok: true } & T => {
     // An empty error is a cancelled dialog: nothing happened and nothing needs saying.
     setError(result.ok || result.error === '' ? null : result.error);
+    setErrorLead(lead);
     return result.ok;
   }, []);
 
@@ -106,5 +113,39 @@ export function useCharacters(): Characters {
     [settle]
   );
 
-  return { entries, error, dismissError: () => setError(null), update, save, report: setError, create, duplicate, remove, openFolder };
+  const exportCharacter = useCallback(
+    (id: string): void => {
+      void window.shardEditor?.exportCharacter({ id }).then((result) => settle(result, 'Not exported.'));
+    },
+    [settle]
+  );
+
+  const importCharacter = useCallback(
+    async (path?: string): Promise<Character | null> => {
+      const result = await window.shardEditor?.importCharacter(path ? { path } : {});
+      return result && settle(result, 'Not imported.') ? result.character : null;
+    },
+    [settle]
+  );
+
+  const report = useCallback((message: string): void => {
+    setError(message);
+    setErrorLead('Not saved.');
+  }, []);
+
+  return {
+    entries,
+    error,
+    errorLead,
+    dismissError: () => setError(null),
+    update,
+    save,
+    report,
+    create,
+    duplicate,
+    remove,
+    openFolder,
+    exportCharacter,
+    importCharacter
+  };
 }

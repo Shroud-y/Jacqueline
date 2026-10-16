@@ -111,3 +111,10 @@ describe('characterElement', () => {
     expect(characterElement({ ...base, layout: { elements: [] } })).toBeNull();
   });
 });
+
+describe('asset names', () => {
+  it('refuses names Windows keeps for devices', () => {
+    for (const name of ['CON.png', 'nul.ogg', 'Com1.webm', 'lpt9', 'aux']) expect(assetNameSchema.safeParse(name).success, name).toBe(false);
+    for (const name of ['console.png', 'con-1.png', 'icon.png', 'com10.png']) expect(assetNameSchema.safeParse(name).success, name).toBe(true);
+  });
+});

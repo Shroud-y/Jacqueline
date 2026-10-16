@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, unlinkSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import {
   ASSET_MAX_BYTES,
@@ -102,6 +102,30 @@ export class CharacterStore {
       return { ok: false, error: `Could not copy its files: ${(err as Error).message}` };
     }
     return this.write({ ...source, id, name: `${source.name} copy`.slice(0, 60) });
+  }
+
+  /**
+   * A character from somewhere else — an imported zip — with its files, as a
+   * new character of its own. Its id is always a fresh one: importing the same
+   * zip twice gives two characters, never one overwritten.
+   */
+  adopt(character: Character, files: ReadonlyMap<string, Buffer>): StoreResult<{ character: Character }> {
+    const id = randomUUID();
+    try {
+      const dir = this.assetsDir(id);
+      mkdirSync(dir, { recursive: true });
+      for (const [name, data] of files) {
+        // Checked again here: nothing from outside picks a path on its own.
+        if (!assetNameSchema.safeParse(name).success || assetKindOf(name) === null) throw new Error(`${name} is not a usable file name`);
+        writeFileSync(join(dir, name), data);
+      }
+    } catch (err) {
+      rmSync(this.dir(id), { recursive: true, force: true });
+      return { ok: false, error: `Could not write its files: ${(err as Error).message}` };
+    }
+    const result = this.write({ ...character, id });
+    if (!result.ok) rmSync(this.dir(id), { recursive: true, force: true });
+    return result;
   }
 
   remove(id: string): StoreResult {

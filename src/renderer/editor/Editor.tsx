@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, type DragEvent } from 'react';
 import type { Character, CharacterEntry } from '@shared/character';
 import AppearanceTab from './AppearanceTab';
+import AudioTab from './AudioTab';
 import BehaviourTab from './BehaviourTab';
 import GeneralTab from './GeneralTab';
 import LayoutTab from './layout/LayoutTab';
 import LinesTab from './LinesTab';
+import SettingsPane from './SettingsPane';
 import Thumbnail from './Thumbnail';
 import { MoreMenu, Notice, Switch, TextInput } from './fields';
 import { useCharacters, type Characters } from './useCharacters';
@@ -27,41 +29,81 @@ export default function Editor(): JSX.Element {
   const characters = useCharacters();
   const { entries } = characters;
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // The app's own settings take the place of a character while they are open.
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const select = (id: string): void => {
+    setSelectedId(id);
+    setSettingsOpen(false);
+  };
 
   // Something is always selected while there is anything to select.
   const selected = entries?.find((entry) => entry.id === selectedId) ?? entries?.[0] ?? null;
 
   const create = async (): Promise<void> => {
     const created = await characters.create(NEW_NAME);
-    if (created) setSelectedId(created.id);
+    if (created) select(created.id);
+  };
+
+  const importZip = async (path?: string): Promise<void> => {
+    const imported = await characters.importCharacter(path);
+    if (imported) select(imported.id);
+  };
+
+  // A zip dropped anywhere on the list of characters is imported.
+  const [dropping, setDropping] = useState(false);
+  const onDragOver = (event: DragEvent): void => {
+    if (!event.dataTransfer.types.includes('Files')) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    setDropping(true);
+  };
+  const onDrop = (event: DragEvent): void => {
+    event.preventDefault();
+    setDropping(false);
+    const file = event.dataTransfer.files[0];
+    const path = file ? window.shardEditor?.pathForFile(file) : '';
+    if (path) void importZip(path);
   };
 
   return (
     <div className="editor">
-      <aside className="sidebar">
+      <aside className="sidebar" data-dropping={dropping} onDragOver={onDragOver} onDragLeave={() => setDropping(false)} onDrop={onDrop}>
         <div className="sidebar-head">Characters</div>
         <nav className="sidebar-list" aria-label="Characters">
           {entries?.map((entry) => (
-            <SidebarItem key={entry.id} entry={entry} selected={entry.id === selected?.id} onSelect={() => setSelectedId(entry.id)} />
+            <SidebarItem key={entry.id} entry={entry} selected={!settingsOpen && entry.id === selected?.id} onSelect={() => select(entry.id)} />
           ))}
         </nav>
         <button type="button" className="button quiet sidebar-new" onClick={() => void create()}>
           + New character
         </button>
+        <button type="button" className="button quiet sidebar-new sidebar-import" title="Or drop a character's .zip here" onClick={() => void importZip()}>
+          Import…
+        </button>
+        <button type="button" className="sidebar-settings" aria-current={settingsOpen} onClick={() => setSettingsOpen(true)}>
+          Settings
+        </button>
       </aside>
 
       <main className="pane">
-        {entries === null ? null : selected === null ? (
+        {settingsOpen ? (
+          <SettingsPane />
+        ) : entries === null ? null : selected === null ? (
           <div className="blank">
             <h1>No characters yet</h1>
             <p>A character lives on your desktop: a picture or a video, where it sits, and when it shows up.</p>
+            {characters.error ? (
+              <Notice kind="bad" lead={characters.errorLead} onDismiss={characters.dismissError}>
+                {characters.error}
+              </Notice>
+            ) : null}
             <button type="button" className="button primary" onClick={() => void create()}>
               Make the first one
             </button>
           </div>
         ) : selected.ok ? (
           // Keyed: switching character must not carry one's half-typed name over to the next.
-          <CharacterPane key={selected.id} character={selected.character} characters={characters} onSelect={setSelectedId} />
+          <CharacterPane key={selected.id} character={selected.character} characters={characters} onSelect={select} />
         ) : (
           <BrokenPane id={selected.id} error={selected.error} characters={characters} />
         )}
@@ -138,6 +180,7 @@ function CharacterPane({ character, characters, onSelect }: CharacterPaneProps):
               items={[
                 { label: 'Open folder', onSelect: () => characters.openFolder(character.id) },
                 { label: 'Duplicate', onSelect: () => void duplicate() },
+                { label: 'Export…', onSelect: () => characters.exportCharacter(character.id) },
                 { label: 'Delete…', onSelect: () => setConfirming(true), danger: true, divided: true }
               ]}
             />
@@ -156,7 +199,7 @@ function CharacterPane({ character, characters, onSelect }: CharacterPaneProps):
       <div className="pane-body" role="tabpanel">
         {characters.error ? (
           <div className="pane-notice">
-            <Notice kind="bad" lead="Not saved." onDismiss={characters.dismissError}>
+            <Notice kind="bad" lead={characters.errorLead} onDismiss={characters.dismissError}>
               {characters.error}
             </Notice>
           </div>
@@ -172,10 +215,7 @@ function CharacterPane({ character, characters, onSelect }: CharacterPaneProps):
         ) : tab === 'lines' ? (
           <LinesTab character={character} characters={characters} />
         ) : (
-          <div className="blank">
-            <h1>{TABS.find((entry) => entry.id === tab)?.label}</h1>
-            <p>Not built yet.</p>
-          </div>
+          <AudioTab character={character} characters={characters} />
         )}
       </div>
     </>

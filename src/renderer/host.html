@@ -2,10 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; media-src shard-asset:" />
     <title>SHARD</title>
   </head>
-  <!-- Never shown and never scripted. Every character window is opened from
-       here, which is what puts them all in one renderer process. -->
+  <!-- Never shown. Every character window is opened from here, which is what
+       puts them all in one renderer process. Main uses it for one more thing:
+       a disappear sound, which cannot play from a window that is closing. -->
   <body></body>
 </html>
