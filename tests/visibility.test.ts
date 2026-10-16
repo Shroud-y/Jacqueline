@@ -134,7 +134,7 @@ describe('trayMenu', () => {
     const menu = trayMenu([], state({ everyoneHidden: true, muted: true }));
     expect(find(menu, 'Hide everyone')).toMatchObject({ checked: true, action: { type: 'setEveryoneHidden', hidden: false } });
     expect(find(menu, 'Mute')).toMatchObject({ checked: true, action: { type: 'setMuted', muted: false } });
-    expect(trayTooltip({ everyoneHidden: true })).toBe('SHARD — everyone hidden');
+    expect(trayTooltip({ everyoneHidden: true })).toBe('Jacqueline — everyone hidden');
   });
 
   it('always ends with a way out', () => {

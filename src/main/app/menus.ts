@@ -30,7 +30,7 @@ export interface MenuState {
 }
 
 export function trayMenu(entries: readonly CharacterEntry[], state: MenuState): MenuEntry[] {
-  const menu: MenuEntry[] = [{ kind: 'label', label: 'SHARD' }, { kind: 'separator' }];
+  const menu: MenuEntry[] = [{ kind: 'label', label: 'Jacqueline' }, { kind: 'separator' }];
 
   if (entries.length === 0) menu.push({ kind: 'label', label: 'No characters yet' });
   for (const entry of entries) {
@@ -83,5 +83,5 @@ export function characterMenu(character: Character): MenuEntry[] {
 }
 
 export function trayTooltip(state: Pick<MenuState, 'everyoneHidden'>): string {
-  return state.everyoneHidden ? 'SHARD — everyone hidden' : 'SHARD';
+  return state.everyoneHidden ? 'Jacqueline — everyone hidden' : 'Jacqueline';
 }

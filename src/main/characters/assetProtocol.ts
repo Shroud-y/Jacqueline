@@ -7,7 +7,7 @@ import type { CharacterStore } from './store';
 const log = createLogger('assets');
 
 /**
- * `shard-asset://<characterId>/<file>` — how a character's window reaches its
+ * `jacqueline-asset://<characterId>/<file>` — how a character's window reaches its
  * own pictures, video and sound. A scheme of our own rather than `file://`,
  * so a renderer can be handed exactly the assets folders and nothing else on
  * the disk.

@@ -8,7 +8,7 @@ let dir: string;
 let file: string;
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'shard-settings-'));
+  dir = mkdtempSync(join(tmpdir(), 'jacqueline-settings-'));
   file = join(dir, 'settings.json');
 });
 

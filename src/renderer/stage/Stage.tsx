@@ -12,7 +12,7 @@ export default function Stage(): JSX.Element | null {
   const [stage, setStage] = useState<StagePayload | null>(null);
 
   useEffect(() => {
-    const api = window.shard;
+    const api = window.jacqueline;
     if (!api) return;
     let cancelled = false;
     void api.getStage().then((payload) => {
@@ -84,7 +84,7 @@ function CharacterElement({ stage, left, top, width, height }: CharacterElementP
   // The placeholder is on screen as soon as it is mounted; a picture or a
   // video says so itself, once it has a frame to show.
   useEffect(() => {
-    if (!visual) window.shard?.painted();
+    if (!visual) window.jacqueline?.painted();
   }, [visual]);
 
   // A video moves only while someone is there to see it, and — if the
@@ -122,7 +122,7 @@ function CharacterElement({ stage, left, top, width, height }: CharacterElementP
   useEffect(
     () => () => {
       // Unmounted mid-drag: main must not be left following the cursor.
-      if (press.current?.dragging) window.shard?.dragEnd();
+      if (press.current?.dragging) window.jacqueline?.dragEnd();
     },
     []
   );
@@ -133,11 +133,11 @@ function CharacterElement({ stage, left, top, width, height }: CharacterElementP
     if (!current) return;
     if (!current.dragging) {
       // Pressed and let go without going anywhere: a click.
-      if (clicked) window.shard?.click();
+      if (clicked) window.jacqueline?.click();
       return;
     }
     setDragging(false);
-    window.shard?.dragEnd();
+    window.jacqueline?.dragEnd();
   };
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>): void => {
@@ -154,7 +154,7 @@ function CharacterElement({ stage, left, top, width, height }: CharacterElementP
     if (Math.hypot(event.screenX - current.x, event.screenY - current.y) < DRAG_THRESHOLD_PX) return;
     current.dragging = true;
     setDragging(true);
-    window.shard?.dragStart();
+    window.jacqueline?.dragStart();
   };
 
   // The element is made exactly the shape of what it shows. Left to fill the
@@ -169,7 +169,7 @@ function CharacterElement({ stage, left, top, width, height }: CharacterElementP
     opacity: stage.opacity,
     transform: stage.flip ? 'scaleX(-1)' : undefined
   };
-  const painted = (): void => window.shard?.painted();
+  const painted = (): void => window.jacqueline?.painted();
   const measured = (width: number, height: number): void => {
     if (visual) setNatural({ url: visual.url, width, height });
   };
@@ -186,7 +186,7 @@ function CharacterElement({ stage, left, top, width, height }: CharacterElementP
       onLostPointerCapture={() => finish(false)}
       onContextMenu={(event) => {
         event.preventDefault();
-        window.shard?.menu();
+        window.jacqueline?.menu();
       }}
     >
       {visual?.type === 'image' ? (

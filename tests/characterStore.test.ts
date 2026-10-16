@@ -9,8 +9,8 @@ let root: string;
 let outside: string;
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'shard-characters-'));
-  outside = mkdtempSync(join(tmpdir(), 'shard-source-'));
+  root = mkdtempSync(join(tmpdir(), 'jacqueline-characters-'));
+  outside = mkdtempSync(join(tmpdir(), 'jacqueline-source-'));
 });
 
 afterEach(() => {
@@ -182,7 +182,7 @@ describe('asset requests', () => {
     const store = new CharacterStore(root);
     const { id } = make(store);
     store.importAsset(id, sourceFile('my idle.png'));
-    expect(resolveAssetRequest(`shard-asset://${id}/my%20idle.png?v=12`, store)).toBe(join(root, id, 'assets', 'my idle.png'));
+    expect(resolveAssetRequest(`jacqueline-asset://${id}/my%20idle.png?v=12`, store)).toBe(join(root, id, 'assets', 'my idle.png'));
   });
 
   it('refuses anything that is not a bare file of a known character', () => {
@@ -190,13 +190,13 @@ describe('asset requests', () => {
     const { id } = make(store);
     writeFileSync(join(root, 'secret.txt'), 'x');
     for (const url of [
-      `shard-asset://${id}/..%2F..%2Fsecret.txt`,
-      `shard-asset://${id}/..%5C..%5Csecret.txt`,
-      `shard-asset://${id}/sub/idle.png`,
-      `shard-asset://${id}/`,
-      `shard-asset://${id}/%E0%A4%A`,
-      'shard-asset://nobody/idle.png',
-      'shard-asset://../idle.png',
+      `jacqueline-asset://${id}/..%2F..%2Fsecret.txt`,
+      `jacqueline-asset://${id}/..%5C..%5Csecret.txt`,
+      `jacqueline-asset://${id}/sub/idle.png`,
+      `jacqueline-asset://${id}/`,
+      `jacqueline-asset://${id}/%E0%A4%A`,
+      'jacqueline-asset://nobody/idle.png',
+      'jacqueline-asset://../idle.png',
       `file:///${id}/idle.png`,
       'not a url'
     ]) {
@@ -209,6 +209,6 @@ describe('asset requests', () => {
     const { id } = make(store);
     // The URL parser collapses the `..` before we see it; what is left is a
     // bare name, looked for inside the folder like any other.
-    expect(resolveAssetRequest(`shard-asset://${id}/%2E%2E/secret.txt`, store)).toBe(join(root, id, 'assets', 'secret.txt'));
+    expect(resolveAssetRequest(`jacqueline-asset://${id}/%2E%2E/secret.txt`, store)).toBe(join(root, id, 'assets', 'secret.txt'));
   });
 });

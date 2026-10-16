@@ -55,7 +55,7 @@ export class RuleRunner {
     void this.reconfigure();
   }
 
-  /** Something that happened outside: SHARD started, a character was clicked. */
+  /** Something that happened outside: Jacqueline started, a character was clicked. */
   event(event: RuleEvent): void {
     if (this.stopped) return;
     const fired = this.engine.handle(event, { now: this.now(), isRunning: (program) => this.running.get(program) ?? null });
@@ -197,7 +197,7 @@ function describe(event: RuleEvent): string {
     case 'returned':
       return `back after ${Math.round(event.awayMinutes)} min`;
     case 'startup':
-      return 'SHARD started';
+      return 'Jacqueline started';
     case 'clicked':
       return 'clicked';
     case 'every':

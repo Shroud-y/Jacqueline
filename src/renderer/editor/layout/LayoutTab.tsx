@@ -56,12 +56,12 @@ export default function LayoutTab({ character, characters }: { character: Charac
 
   // On the desktop, this character shows its layout with sample text for as long as this tab is open.
   useEffect(() => {
-    void window.shardEditor?.preview({ id });
-    return () => void window.shardEditor?.preview({ id: null });
+    void window.jacquelineEditor?.preview({ id });
+    return () => void window.jacquelineEditor?.preview({ id: null });
   }, [id]);
 
   const loadFonts = useCallback((): void => {
-    void window.shardEditor?.assets({ id }).then((assets: AssetInfo[]) => setFontFiles(assets.filter((asset) => asset.kind === 'font').map((asset) => asset.file)));
+    void window.jacquelineEditor?.assets({ id }).then((assets: AssetInfo[]) => setFontFiles(assets.filter((asset) => asset.kind === 'font').map((asset) => asset.file)));
   }, [id]);
   useEffect(loadFonts, [loadFonts]);
 
@@ -164,7 +164,7 @@ export default function LayoutTab({ character, characters }: { character: Charac
     setSelectedId(null);
     const font = element.style.font;
     // Its own font file, now perhaps used by nothing.
-    if (isFontFile(font)) void window.shardEditor?.releaseAsset({ id, file: font }).then(loadFonts);
+    if (isFontFile(font)) void window.jacquelineEditor?.releaseAsset({ id, file: font }).then(loadFonts);
   };
 
   const onKeyDown = (event: KeyboardEvent): void => {
@@ -198,7 +198,7 @@ export default function LayoutTab({ character, characters }: { character: Charac
   };
 
   const chooseFont = async (element: Extract<LayoutElement, { type: 'speech' | 'name' }>): Promise<void> => {
-    const api = window.shardEditor;
+    const api = window.jacquelineEditor;
     if (!api) return;
     const imported = await api.importAsset({ id, kinds: ['font'] });
     if (!imported.ok) {

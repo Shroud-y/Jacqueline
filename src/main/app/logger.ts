@@ -21,7 +21,7 @@ export function configureLogger(options: { level?: LogLevel; directory?: string 
   if (options.directory) {
     try {
       mkdirSync(options.directory, { recursive: true });
-      logFile = join(options.directory, 'shard.log');
+      logFile = join(options.directory, 'jacqueline.log');
     } catch {
       logFile = null;
     }

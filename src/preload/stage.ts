@@ -66,4 +66,4 @@ const api = {
 
 export type StageApi = typeof api;
 
-contextBridge.exposeInMainWorld('shard', api);
+contextBridge.exposeInMainWorld('jacqueline', api);

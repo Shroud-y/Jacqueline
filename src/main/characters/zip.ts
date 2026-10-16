@@ -136,7 +136,7 @@ export function readZip(zip: Buffer, limits: ReadLimits): ZipEntry[] {
     const max = limits.maxBytes(name);
     if (max === null) continue;
     if (flags & ENCRYPTED_FLAG) throw new ZipError(`${name} is encrypted.`);
-    if (method !== STORED && method !== DEFLATED) throw new ZipError(`${name} is packed in a way SHARD cannot read.`);
+    if (method !== STORED && method !== DEFLATED) throw new ZipError(`${name} is packed in a way Jacqueline cannot read.`);
     if (unpacked > max) throw new ZipError(`${name} is too big.`);
     total += unpacked;
     if (total > limits.maxTotal) throw new ZipError('Everything in that zip together is too big.');

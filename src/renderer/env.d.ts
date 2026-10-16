@@ -20,8 +20,8 @@ interface StageApi {
 declare global {
   interface Window {
     /** Absent when the page is opened outside Electron. */
-    shard?: StageApi;
+    jacqueline?: StageApi;
     /** The editor window's bridge; absent everywhere else. */
-    shardEditor?: EditorApi;
+    jacquelineEditor?: EditorApi;
   }
 }

@@ -8,7 +8,7 @@ export default function SettingsPane(): JSX.Element | null {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const api = window.shardEditor;
+    const api = window.jacquelineEditor;
     if (!api) return;
     let cancelled = false;
     void api.settings().then((next) => {
@@ -28,7 +28,7 @@ export default function SettingsPane(): JSX.Element | null {
   const update = (patch: Partial<Omit<Settings, 'version'>>): void => {
     // Shown at once, so a second change made before main answers builds on this one.
     setView((current) => (current ? { ...current, settings: { ...current.settings, ...patch } } : current));
-    void window.shardEditor?.updateSettings(patch).then((result) => {
+    void window.jacquelineEditor?.updateSettings(patch).then((result) => {
       setView((current) => (current ? { ...current, settings: result.settings } : current));
       setError(result.ok ? null : result.error);
     });
@@ -53,7 +53,7 @@ export default function SettingsPane(): JSX.Element | null {
           <Group title="Start">
             <Checkbox
               label="Start with Windows"
-              hint={autostartAvailable ? 'SHARD starts in the tray when you sign in.' : 'Works in the installed app only, not in a development run.'}
+              hint={autostartAvailable ? 'Jacqueline starts in the tray when you sign in.' : 'Works in the installed app only, not in a development run.'}
               checked={settings.startWithSystem}
               disabled={!autostartAvailable}
               onChange={(startWithSystem) => update({ startWithSystem })}
@@ -85,7 +85,7 @@ export default function SettingsPane(): JSX.Element | null {
           <Group title="Files">
             <div>
               <div className="prose">Every character is a folder of its own: character.json and its files.</div>
-              <button type="button" className="button quiet under-prose" onClick={() => void window.shardEditor?.openRoot()}>
+              <button type="button" className="button quiet under-prose" onClick={() => void window.jacquelineEditor?.openRoot()}>
                 Open characters folder
               </button>
             </div>

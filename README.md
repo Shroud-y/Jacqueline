@@ -1,8 +1,8 @@
-<img src="resources/icons/app.png" width="96" height="96" alt="SHARD app icon">
+<img src="resources/icons/app.png" width="96" height="96" alt="Jacqueline app icon">
 
-# SHARD
+# Jacqueline
 
-This is my hobby project. It started as Ordis from Warframe living on my PC —
+This is my hobby project, formerly called SHARD. It started as Ordis from Warframe living on my PC —
 a little companion in the tray that noticed what I was doing and said
 something about it. Now it is the thing underneath him: a way to build your
 own characters for your desktop.
@@ -11,7 +11,7 @@ A character is a picture or a video that sits on your screen, says lines now
 and then, and comes and goes when you tell it to. An anime clip in the corner
 that is there only while Dota 2 is running. A mascot that greets you in the
 morning and tells you to go to bed at midnight. Ordis again, if you write his
-lines. SHARD ships no characters of its own — you make them.
+lines. Jacqueline ships no characters of its own — you make them.
 
 It is built to be cheap to keep running: a still character costs about half a
 percent of one CPU core, and nothing at all while it is off screen.
@@ -38,7 +38,7 @@ away; there is no Save button.
   starts → say a line from **greet***. Open one to change it:
   - **When**: a program starts, closes or comes to the front; every day at a
     time; every so often (somewhere between N and M minutes); you come back
-    after being away; SHARD starts; the character is clicked.
+    after being away; Jacqueline starts; the character is clicked.
   - **Only if**: by chance (a percentage), between two times of day, a
     program is or is not running.
   - **Then**: say a line from a group, play a sound, come out for a while
@@ -71,7 +71,7 @@ characters.
 <details>
 <summary>What is in a character</summary>
 
-A character is a folder under `%APPDATA%\shard\characters\` (tray →
+A character is a folder under `%APPDATA%\jacqueline\characters\` (tray →
 **Open characters folder** takes you there):
 
 ```
@@ -81,7 +81,7 @@ A character is a folder under `%APPDATA%\shard\characters\` (tray →
 ```
 
 You can copy a folder there by hand — its name has to be lowercase letters,
-digits and dashes — and SHARD picks it up the next time it starts. A `character.json` that cannot be read shows in the editor with the
+digits and dashes — and Jacqueline picks it up the next time it starts. A `character.json` that cannot be read shows in the editor with the
 reason, and its files are left alone.
 
 Files it takes: pictures `.png .webp .jpg`, video `.webm .mp4`, sound
@@ -105,7 +105,7 @@ need it:
   moving while nobody is watching and "you come back" rules know when you did.
 
 No window titles, no screenshots, no page content, no keystrokes. Nothing is
-written to disk except your characters and settings, and SHARD makes no
+written to disk except your characters and settings, and Jacqueline makes no
 network requests at all.
 
 </details>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Jacqueline: a J holding an I. Palette A — graphite and amber (docs/DESIGN.md). -->
+  <rect x="8" y="8" width="240" height="240" rx="58" fill="#1b1a18" stroke="#3a3632" stroke-width="4"/>
+  <path d="M164 56 V146 A50 50 0 0 1 64 146" fill="none" stroke="#e8a33d" stroke-width="38" stroke-linecap="round"/>
+  <path d="M112 76 V132" fill="none" stroke="#e8a33d" stroke-width="20" stroke-linecap="round"/>
+</svg>

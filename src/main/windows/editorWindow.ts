@@ -38,7 +38,7 @@ export class EditorWindow {
       height: 700,
       minWidth: 820,
       minHeight: 520,
-      title: 'SHARD — Characters',
+      title: 'Jacqueline — Characters',
       icon: this.iconPath,
       backgroundColor: '#14161b',
       autoHideMenuBar: true,

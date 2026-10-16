@@ -23,7 +23,7 @@ export default function AppearanceTab({ character, characters }: { character: Ch
   const [natural, setNatural] = useState<{ src: string; width: number; height: number } | null>(null);
 
   const loadAssets = useCallback((): void => {
-    void window.shardEditor?.assets({ id }).then(setAssets);
+    void window.jacquelineEditor?.assets({ id }).then(setAssets);
   }, [id]);
   useEffect(loadAssets, [loadAssets]);
 
@@ -47,7 +47,7 @@ export default function AppearanceTab({ character, characters }: { character: Ch
 
   /** Puts a file into a state, and lets the old one go once nothing points at it any more. */
   const choose = async (state: StateName, path?: string): Promise<void> => {
-    const api = window.shardEditor;
+    const api = window.jacquelineEditor;
     if (!api) return;
     setBusy(state);
     try {
@@ -84,7 +84,7 @@ export default function AppearanceTab({ character, characters }: { character: Ch
     const states = { ...appearance.states };
     delete states[state];
     if (!(await characters.save({ ...character, appearance: { ...appearance, states } }))) return;
-    if (old) await window.shardEditor?.releaseAsset({ id, file: old });
+    if (old) await window.jacquelineEditor?.releaseAsset({ id, file: old });
     loadAssets();
   };
 

@@ -27,7 +27,7 @@ export const TRIGGER_LABELS: Record<Trigger['type'], string> = {
   time: 'Every day at a time',
   every: 'Every so often',
   returned: 'You come back to the computer',
-  startup: 'SHARD starts',
+  startup: 'Jacqueline starts',
   clicked: 'The character is clicked'
 };
 
@@ -73,7 +73,7 @@ function triggerParts(trigger: Trigger): Part[] {
     case 'returned':
       return [plain('When you are back after '), strong(`${trigger.afterMinutes} min`), plain(' away')];
     case 'startup':
-      return [plain('When SHARD starts')];
+      return [plain('When Jacqueline starts')];
     case 'clicked':
       return [plain('When it is clicked')];
   }

@@ -36,7 +36,7 @@ export const triggerSchema = z.discriminatedUnion('type', [
     .refine((every) => every.maxMinutes >= every.minMinutes, 'the longest wait cannot be shorter than the shortest'),
   /** The user is back at the computer after at least this long away from it. */
   z.object({ type: z.literal('returned'), afterMinutes: z.number().min(1).max(1440) }),
-  /** SHARD has just started. */
+  /** Jacqueline has just started. */
   z.object({ type: z.literal('startup') }),
   /** The character itself was clicked. */
   z.object({ type: z.literal('clicked') })

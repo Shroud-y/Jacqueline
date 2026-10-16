@@ -12,8 +12,8 @@ let src: string;
 let store: CharacterStore;
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'shard-transfer-'));
-  src = mkdtempSync(join(tmpdir(), 'shard-transfer-src-'));
+  root = mkdtempSync(join(tmpdir(), 'jacqueline-transfer-'));
+  src = mkdtempSync(join(tmpdir(), 'jacqueline-transfer-src-'));
   store = new CharacterStore(root);
 });
 
@@ -104,7 +104,7 @@ describe('passing a character on', () => {
       ],
       [writeZip([{ name: 'character.json', data: Buffer.from('{oops') }]), 'not valid JSON'],
       [writeZip([{ name: 'character.json', data: json({ ...character, name: '' }) }]), 'not valid'],
-      [writeZip([{ name: 'character.json', data: json({ ...character, schema: 99 }) }]), 'newer SHARD'],
+      [writeZip([{ name: 'character.json', data: json({ ...character, schema: 99 }) }]), 'newer version'],
       [Buffer.from('nope'), 'not a zip']
     ];
     for (const [zip, words] of cases) {

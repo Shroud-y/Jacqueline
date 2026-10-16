@@ -66,4 +66,4 @@ const api: EditorApi = {
   pathForFile: (file) => webUtils.getPathForFile(file)
 };
 
-contextBridge.exposeInMainWorld('shardEditor', api);
+contextBridge.exposeInMainWorld('jacquelineEditor', api);

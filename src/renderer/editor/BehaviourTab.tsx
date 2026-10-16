@@ -30,14 +30,14 @@ export default function BehaviourTab({ character, characters }: { character: Cha
   const [programs, setPrograms] = useState<string[] | null>(null);
 
   const loadAssets = useCallback((): void => {
-    void window.shardEditor?.assets({ id }).then((list) => setAssets(new Set(list.map((entry) => entry.file))));
+    void window.jacquelineEditor?.assets({ id }).then((list) => setAssets(new Set(list.map((entry) => entry.file))));
   }, [id]);
   useEffect(loadAssets, [loadAssets]);
 
   // What is running is asked once, when a rule is first opened — never watched.
   useEffect(() => {
     if (openId === null || programs !== null) return;
-    void window.shardEditor?.runningPrograms().then(setPrograms);
+    void window.jacquelineEditor?.runningPrograms().then(setPrograms);
   }, [openId, programs]);
 
   const add = (): void => {
@@ -152,13 +152,13 @@ function RuleEditor({ character, characters, rule, setRule, onAssetsChanged }: R
     const ok = await characters.save({ ...character, rules: character.rules.map((entry) => (entry.id === rule.id ? next : entry)) });
     if (!ok) return;
     const kept = new Set(next.then.flatMap((action) => (action.type === 'sound' ? [action.file] : [])));
-    for (const file of new Set(released)) if (file && !kept.has(file)) await window.shardEditor?.releaseAsset({ id, file });
+    for (const file of new Set(released)) if (file && !kept.has(file)) await window.jacquelineEditor?.releaseAsset({ id, file });
     onAssetsChanged();
   };
 
   /** A sound picked for action `index` — a new action when `index` is the end of the list. */
   const chooseSound = async (index: number): Promise<void> => {
-    const api = window.shardEditor;
+    const api = window.jacquelineEditor;
     if (!api) return;
     setBusy(true);
     try {
@@ -185,12 +185,12 @@ function RuleEditor({ character, characters, rule, setRule, onAssetsChanged }: R
   const remove = async (): Promise<void> => {
     const ok = await characters.save({ ...character, rules: character.rules.filter((entry) => entry.id !== rule.id) });
     if (!ok) return;
-    for (const action of rule.then) if (action.type === 'sound') await window.shardEditor?.releaseAsset({ id, file: action.file });
+    for (const action of rule.then) if (action.type === 'sound') await window.jacquelineEditor?.releaseAsset({ id, file: action.file });
     onAssetsChanged();
   };
 
   const test = async (): Promise<void> => {
-    const result = await window.shardEditor?.testRule({ id, rule: rule.id });
+    const result = await window.jacquelineEditor?.testRule({ id, rule: rule.id });
     setTestProblem(result && !result.ok ? result.error : null);
   };
 

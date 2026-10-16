@@ -1,5 +1,5 @@
-appId: dev.codex.companion
-productName: SHARD
+appId: dev.jacqueline.app
+productName: Jacqueline
 directories:
   buildResources: resources
   output: release
@@ -21,4 +21,4 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: SHARD
+  shortcutName: Jacqueline

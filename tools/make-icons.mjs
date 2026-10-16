@@ -1,105 +1,68 @@
 /**
- * Generates resources/icons/tray.ico and app.ico.
+ * Generates resources/icons/app.ico, tray.ico and app.png from icon.svg.
  *
- * Placeholder art, same as the portrait in the renderer: a dark rounded square
- * with a cyan diamond "eye". Written by hand as raw ICO/BMP so the repo needs
- * no image dependency and no binary assets in source control.
- *
- *   node tools/make-icons.mjs
+ * Runs under Electron (`pnpm icons`), which is what draws the SVG: each size
+ * is rasterised from the vector itself, not scaled down from a big bitmap, so
+ * 16 px stays as crisp as 16 px can be. The ICO is packed here by hand — PNG
+ * entries, which Windows has read since Vista — so the repo needs no image
+ * dependency.
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { app, BrowserWindow } from 'electron';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const outDir = join(here, '..', 'resources', 'icons');
+const dir = join(here, '..', 'resources', 'icons');
+const svg = readFileSync(join(dir, 'icon.svg'), 'utf8');
 
-/** @returns {{r:number,g:number,b:number,a:number}} */
-function pixel(x, y, size) {
-  const u = (x + 0.5) / size;
-  const v = (y + 0.5) / size;
-
-  // Rounded-square mask.
-  const cx = Math.abs(u - 0.5) * 2;
-  const cy = Math.abs(v - 0.5) * 2;
-  const edge = Math.pow(cx, 5) + Math.pow(cy, 5);
-  if (edge > 1) return { r: 0, g: 0, b: 0, a: 0 };
-
-  // Diamond eye.
-  const diamond = Math.abs(u - 0.5) + Math.abs(v - 0.5);
-  if (diamond < 0.13) return { r: 8, g: 14, b: 20, a: 255 };
-  if (diamond < 0.34) {
-    const t = (0.34 - diamond) / 0.21;
-    return { r: Math.round(90 * t), g: Math.round(200 + 30 * t), b: 255, a: 255 };
-  }
-
-  // Body gradient.
-  const t = v;
-  return {
-    r: Math.round(22 - 12 * t),
-    g: Math.round(32 - 16 * t),
-    b: Math.round(42 - 20 * t),
-    a: 255
-  };
+/** One PNG per size, drawn by the page from the SVG. */
+async function rasterise(win, sizes) {
+  const url = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+  const pngs = await win.webContents.executeJavaScript(`(async () => {
+    const image = new Image();
+    image.src = ${JSON.stringify(url)};
+    await image.decode();
+    return ${JSON.stringify(sizes)}.map((size) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = size;
+      canvas.getContext('2d').drawImage(image, 0, 0, size, size);
+      return canvas.toDataURL('image/png').split(',')[1];
+    });
+  })()`);
+  return new Map(sizes.map((size, i) => [size, Buffer.from(pngs[i], 'base64')]));
 }
 
-function bmpFor(size) {
-  const header = Buffer.alloc(40);
-  header.writeUInt32LE(40, 0); // biSize
-  header.writeInt32LE(size, 4); // biWidth
-  header.writeInt32LE(size * 2, 8); // biHeight — XOR + AND masks
-  header.writeUInt16LE(1, 12); // biPlanes
-  header.writeUInt16LE(32, 14); // biBitCount
-  header.writeUInt32LE(0, 16); // BI_RGB
-
-  const xor = Buffer.alloc(size * size * 4);
-  // BMP rows run bottom-up.
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const { r, g, b, a } = pixel(x, size - 1 - y, size);
-      const offset = (y * size + x) * 4;
-      xor[offset] = b;
-      xor[offset + 1] = g;
-      xor[offset + 2] = r;
-      xor[offset + 3] = a;
-    }
-  }
-
-  // AND mask: one bit per pixel, rows padded to 4 bytes. Fully zero, since
-  // transparency is carried by the alpha channel.
-  const maskRowBytes = Math.ceil(size / 32) * 4;
-  const and = Buffer.alloc(maskRowBytes * size);
-
-  return Buffer.concat([header, xor, and]);
-}
-
-function ico(sizes) {
-  const images = sizes.map((size) => ({ size, data: bmpFor(size) }));
-  const header = Buffer.alloc(6);
+/** An ICO of PNG entries: a 6-byte header, a 16-byte entry per image, then the images. */
+function ico(images) {
+  const sizes = [...images.keys()];
+  const header = Buffer.alloc(6 + sizes.length * 16);
   header.writeUInt16LE(0, 0);
-  header.writeUInt16LE(1, 2); // type: icon
-  header.writeUInt16LE(images.length, 4);
-
-  const entries = [];
-  let offset = 6 + images.length * 16;
-  for (const image of images) {
-    const entry = Buffer.alloc(16);
-    entry.writeUInt8(image.size === 256 ? 0 : image.size, 0);
-    entry.writeUInt8(image.size === 256 ? 0 : image.size, 1);
-    entry.writeUInt8(0, 2); // palette
-    entry.writeUInt8(0, 3); // reserved
-    entry.writeUInt16LE(1, 4); // planes
-    entry.writeUInt16LE(32, 6); // bpp
-    entry.writeUInt32LE(image.data.length, 8);
-    entry.writeUInt32LE(offset, 12);
-    offset += image.data.length;
-    entries.push(entry);
-  }
-
-  return Buffer.concat([header, ...entries, ...images.map((image) => image.data)]);
+  header.writeUInt16LE(1, 2);
+  header.writeUInt16LE(sizes.length, 4);
+  let offset = header.length;
+  sizes.forEach((size, i) => {
+    const at = 6 + i * 16;
+    const png = images.get(size);
+    header.writeUInt8(size >= 256 ? 0 : size, at);
+    header.writeUInt8(size >= 256 ? 0 : size, at + 1);
+    header.writeUInt16LE(1, at + 4);
+    header.writeUInt16LE(32, at + 6);
+    header.writeUInt32LE(png.length, at + 8);
+    header.writeUInt32LE(offset, at + 12);
+    offset += png.length;
+  });
+  return Buffer.concat([header, ...sizes.map((size) => images.get(size))]);
 }
 
-mkdirSync(outDir, { recursive: true });
-writeFileSync(join(outDir, 'tray.ico'), ico([16, 24, 32]));
-writeFileSync(join(outDir, 'app.ico'), ico([16, 32, 48, 64, 128, 256]));
-console.log(`icons written to ${outDir}`);
+app.whenReady().then(async () => {
+  const win = new BrowserWindow({ show: false, webPreferences: { offscreen: true } });
+  await win.loadURL('about:blank');
+  const images = await rasterise(win, [16, 20, 24, 32, 40, 48, 64, 128, 256]);
+  const pick = (sizes) => new Map(sizes.map((size) => [size, images.get(size)]));
+  writeFileSync(join(dir, 'tray.ico'), ico(pick([16, 20, 24, 32, 40])));
+  writeFileSync(join(dir, 'app.ico'), ico(pick([16, 24, 32, 48, 64, 128, 256])));
+  writeFileSync(join(dir, 'app.png'), images.get(256));
+  console.log('wrote tray.ico, app.ico, app.png');
+  app.exit(0);
+});

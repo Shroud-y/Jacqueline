@@ -50,7 +50,7 @@ export default function FileSlot({ label, hint, file, kinds, onChoose, onRemove,
     event.preventDefault();
     setOver(false);
     const dropped = event.dataTransfer.files[0];
-    const path = dropped ? window.shardEditor?.pathForFile(dropped) : '';
+    const path = dropped ? window.jacquelineEditor?.pathForFile(dropped) : '';
     if (path) onChoose(path);
   };
 

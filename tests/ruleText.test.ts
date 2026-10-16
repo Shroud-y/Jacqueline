@@ -35,7 +35,7 @@ describe('rule sentences', () => {
     expect(when({ type: 'every', minMinutes: 10, maxMinutes: 30 })).toBe('Every **10–30** minutes');
     expect(when({ type: 'every', minMinutes: 15, maxMinutes: 15 })).toBe('Every **15** minutes');
     expect(when({ type: 'returned', afterMinutes: 20 })).toBe('When you are back after **20 min** away');
-    expect(when({ type: 'startup' })).toBe('When SHARD starts');
+    expect(when({ type: 'startup' })).toBe('When Jacqueline starts');
     expect(when({ type: 'clicked' })).toBe('When it is clicked');
   });
 

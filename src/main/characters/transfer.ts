@@ -93,7 +93,7 @@ export function importCharacter(store: CharacterStore, zip: Buffer): StoreResult
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, error: 'Its character.json is not a character.' };
   const version = (raw as { schema?: unknown }).schema;
   if (typeof version === 'number' && version > CHARACTER_SCHEMA_VERSION) {
-    return { ok: false, error: 'It was made by a newer SHARD. Update SHARD to import it.' };
+    return { ok: false, error: 'It was made by a newer version of Jacqueline. Update Jacqueline to import it.' };
   }
   // Its id is replaced on the way in; where it stood is someone else's screen.
   const parsed = characterSchema.safeParse({ ...raw, id: 'imported' });

@@ -18,7 +18,7 @@ export default function AudioTab({ character, characters }: { character: Charact
   const playing = useRef<HTMLAudioElement | null>(null);
 
   const loadAssets = useCallback((): void => {
-    void window.shardEditor?.assets({ id }).then(setAssets);
+    void window.jacquelineEditor?.assets({ id }).then(setAssets);
   }, [id]);
   useEffect(loadAssets, [loadAssets]);
 
@@ -41,7 +41,7 @@ export default function AudioTab({ character, characters }: { character: Charact
   };
 
   const choose = async (entry: Entry, path?: string): Promise<void> => {
-    const api = window.shardEditor;
+    const api = window.jacquelineEditor;
     if (!api) return;
     setBusy(entry);
     try {
@@ -65,7 +65,7 @@ export default function AudioTab({ character, characters }: { character: Charact
   const remove = async (entry: Entry): Promise<void> => {
     const old = audio[entry];
     if (!(await characters.save({ ...character, audio: { ...audio, [entry]: null } }))) return;
-    if (old) await window.shardEditor?.releaseAsset({ id, file: old });
+    if (old) await window.jacquelineEditor?.releaseAsset({ id, file: old });
     loadAssets();
   };
 

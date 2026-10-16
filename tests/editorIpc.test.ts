@@ -49,8 +49,8 @@ const handlers = (): ReturnType<typeof editorHandlers> =>
   });
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'shard-editor-'));
-  outside = mkdtempSync(join(tmpdir(), 'shard-editor-src-'));
+  root = mkdtempSync(join(tmpdir(), 'jacqueline-editor-'));
+  outside = mkdtempSync(join(tmpdir(), 'jacqueline-editor-src-'));
   store = new CharacterStore(root);
   picked = null;
   askedFor = [];

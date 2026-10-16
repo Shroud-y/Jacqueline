@@ -7,6 +7,7 @@ import type { Settings, SettingsView } from '@shared/types';
 
 import { configureLogger, createLogger } from './app/logger';
 import { characterMenu, trayMenu, trayTooltip, type MenuAction, type MenuState } from './app/menus';
+import { LEGACY_LOGIN_ITEM, migrateFromShard } from './app/migrate';
 import { paths } from './app/paths';
 import { SettingsStore } from './app/settings';
 import { AppTray } from './app/tray';
@@ -39,8 +40,19 @@ if (!app.requestSingleInstanceLock()) {
 async function bootstrap(): Promise<void> {
   await app.whenReady();
 
+  // Before anything reads from the folder: SHARD's characters become Jacqueline's.
+  let migrated: string[] = [];
+  let migrateError: string | null = null;
+  try {
+    migrated = migrateFromShard(app.getPath('appData'), app.getPath('userData'));
+  } catch (err) {
+    migrateError = String(err);
+  }
   configureLogger({ directory: paths.logDir(), level: app.isPackaged ? 'info' : 'debug' });
-  app.setAppUserModelId('dev.codex.companion');
+  if (migrated.length > 0) log.info(`carried over from SHARD: ${migrated.join(', ')}`);
+  if (migrateError) log.error(`cannot carry over SHARD's characters: ${migrateError}`);
+  // Also the name the start-with-Windows entry is written under.
+  app.setAppUserModelId('dev.jacqueline.app');
 
   const settings = new SettingsStore(paths.settingsFile());
   const settingsView = (): SettingsView => settingsViewOf(settings.current);
@@ -157,13 +169,13 @@ async function bootstrap(): Promise<void> {
       runActions(fired, { ...actionDeps, isSilenced: () => false });
     },
     pickZip: async () => {
-      const options = { properties: ['openFile' as const], filters: [{ name: 'SHARD character', extensions: ['zip'] }] };
+      const options = { properties: ['openFile' as const], filters: [{ name: 'Jacqueline character', extensions: ['zip'] }] };
       const parent = editor.browserWindow;
       const picked = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options);
       return picked.canceled ? null : (picked.filePaths[0] ?? null);
     },
     pickSavePath: async (suggestedName) => {
-      const options = { defaultPath: join(app.getPath('documents'), suggestedName), filters: [{ name: 'SHARD character', extensions: ['zip'] }] };
+      const options = { defaultPath: join(app.getPath('documents'), suggestedName), filters: [{ name: 'Jacqueline character', extensions: ['zip'] }] };
       const parent = editor.browserWindow;
       const picked = parent ? await dialog.showSaveDialog(parent, options) : await dialog.showSaveDialog(options);
       return picked.canceled || !picked.filePath ? null : picked.filePath;
@@ -273,7 +285,7 @@ async function bootstrap(): Promise<void> {
   // Once the windows have had a moment to come up, so a sound has somewhere to play.
   setTimeout(() => rules.event({ type: 'startup' }), 3_000).unref?.();
 
-  log.info('SHARD ready');
+  log.info('Jacqueline ready');
 }
 
 /** Settings as the editor shows them. */
@@ -288,6 +300,12 @@ function reconcileAutostart(wanted: boolean): void {
   // welcome window at every login — under the same name as the installed
   // app's entry, which it would overwrite.
   if (!app.isPackaged) return;
+  try {
+    // SHARD's own entry, under its old name, would start an exe that is no longer there.
+    app.setLoginItemSettings({ openAtLogin: false, name: LEGACY_LOGIN_ITEM });
+  } catch (err) {
+    log.warn(`cannot remove SHARD's old autostart entry: ${String(err)}`);
+  }
   try {
     const current = app.getLoginItemSettings({ args: ['--hidden'] });
     if (current.openAtLogin === wanted) return;

@@ -5,7 +5,7 @@
 
 import { assetKindOf, type TextStyle } from './character';
 
-/** Fonts a Windows machine has without anything installed, plus the one SHARD ships. */
+/** Fonts a Windows machine has without anything installed, plus the one Jacqueline ships. */
 export const SYSTEM_FONTS: readonly string[] = [
   'Saira',
   'Segoe UI',

@@ -61,7 +61,7 @@ export default function Editor(): JSX.Element {
     event.preventDefault();
     setDropping(false);
     const file = event.dataTransfer.files[0];
-    const path = file ? window.shardEditor?.pathForFile(file) : '';
+    const path = file ? window.jacquelineEditor?.pathForFile(file) : '';
     if (path) void importZip(path);
   };
 

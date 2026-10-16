@@ -100,7 +100,7 @@ function GroupPane({ character, characters, group, onRenamed }: GroupPaneProps):
   const remove = async (): Promise<void> => {
     const sounds = lines.flatMap((line) => (line.audio ? [line.audio] : []));
     if (!(await characters.save(removeGroup(character, group)))) return;
-    for (const file of new Set(sounds)) await window.shardEditor?.releaseAsset({ id, file });
+    for (const file of new Set(sounds)) await window.jacquelineEditor?.releaseAsset({ id, file });
   };
 
   const add = (): void => {
@@ -112,7 +112,7 @@ function GroupPane({ character, characters, group, onRenamed }: GroupPaneProps):
 
   /** A sound for a line; the one it had goes once nothing else plays it. */
   const chooseSound = async (line: Line, path?: string): Promise<void> => {
-    const api = window.shardEditor;
+    const api = window.jacquelineEditor;
     if (!api) return;
     setBusySound(line.id);
     try {
@@ -134,17 +134,17 @@ function GroupPane({ character, characters, group, onRenamed }: GroupPaneProps):
   const removeSound = async (line: Line): Promise<void> => {
     if (!line.audio) return;
     if (await characters.save(updateLine(character, group, line.id, { audio: undefined }))) {
-      await window.shardEditor?.releaseAsset({ id, file: line.audio });
+      await window.jacquelineEditor?.releaseAsset({ id, file: line.audio });
     }
   };
 
   const deleteLine = async (line: Line): Promise<void> => {
     if (!(await characters.save(removeLine(character, group, line.id)))) return;
-    if (line.audio) await window.shardEditor?.releaseAsset({ id, file: line.audio });
+    if (line.audio) await window.jacquelineEditor?.releaseAsset({ id, file: line.audio });
   };
 
   const test = async (line: Line): Promise<void> => {
-    const result = await window.shardEditor?.testLine({ id, group, line: line.id });
+    const result = await window.jacquelineEditor?.testLine({ id, group, line: line.id });
     setTestProblem(result && !result.ok ? result.error : null);
   };
 
@@ -384,7 +384,7 @@ function SoundCell({ file, busy, onChoose, onRemove }: { file: string | null; bu
       event.preventDefault();
       setOver(false);
       const dropped = event.dataTransfer.files[0];
-      const path = dropped ? window.shardEditor?.pathForFile(dropped) : '';
+      const path = dropped ? window.jacquelineEditor?.pathForFile(dropped) : '';
       if (path) onChoose(path);
     }
   };

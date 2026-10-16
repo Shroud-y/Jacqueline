@@ -88,7 +88,7 @@ export class SettingsStore {
     for (const listener of this.listeners) listener(this.value);
     return written
       ? { ok: true, settings: this.value }
-      : { ok: false, settings: this.value, error: 'Changed, but it could not be saved to disk — it will be lost when SHARD closes.' };
+      : { ok: false, settings: this.value, error: 'Changed, but it could not be saved to disk — it will be lost when Jacqueline closes.' };
   }
 
   private read(): Settings {

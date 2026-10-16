@@ -38,7 +38,7 @@ export function useCharacters(): Characters {
   const [errorLead, setErrorLead] = useState('Not saved.');
 
   useEffect(() => {
-    const api = window.shardEditor;
+    const api = window.jacquelineEditor;
     if (!api) return;
     let cancelled = false;
     void api.list().then((list) => {
@@ -64,10 +64,10 @@ export function useCharacters(): Characters {
       setEntries((current) =>
         current ? current.map((entry) => (entry.id === character.id ? { id: character.id, ok: true, character } : entry)) : current
       );
-      void window.shardEditor?.save(character).then(async (result) => {
+      void window.jacquelineEditor?.save(character).then(async (result) => {
         if (settle(result)) return;
         // Refused: put back what main actually has.
-        const list = await window.shardEditor?.list();
+        const list = await window.jacquelineEditor?.list();
         if (list) setEntries(list);
       });
     },
@@ -76,7 +76,7 @@ export function useCharacters(): Characters {
 
   const save = useCallback(
     async (character: Character): Promise<boolean> => {
-      const result = await window.shardEditor?.save(character);
+      const result = await window.jacquelineEditor?.save(character);
       return result ? settle(result) : false;
     },
     [settle]
@@ -84,7 +84,7 @@ export function useCharacters(): Characters {
 
   const create = useCallback(
     async (name: string): Promise<Character | null> => {
-      const result = await window.shardEditor?.create({ name });
+      const result = await window.jacquelineEditor?.create({ name });
       return result && settle(result) ? result.character : null;
     },
     [settle]
@@ -92,7 +92,7 @@ export function useCharacters(): Characters {
 
   const duplicate = useCallback(
     async (id: string): Promise<Character | null> => {
-      const result = await window.shardEditor?.duplicate({ id });
+      const result = await window.jacquelineEditor?.duplicate({ id });
       return result && settle(result) ? result.character : null;
     },
     [settle]
@@ -100,7 +100,7 @@ export function useCharacters(): Characters {
 
   const remove = useCallback(
     async (id: string): Promise<boolean> => {
-      const result = await window.shardEditor?.remove({ id });
+      const result = await window.jacquelineEditor?.remove({ id });
       return result ? settle(result) : false;
     },
     [settle]
@@ -108,21 +108,21 @@ export function useCharacters(): Characters {
 
   const openFolder = useCallback(
     (id: string): void => {
-      void window.shardEditor?.openFolder({ id }).then(settle);
+      void window.jacquelineEditor?.openFolder({ id }).then(settle);
     },
     [settle]
   );
 
   const exportCharacter = useCallback(
     (id: string): void => {
-      void window.shardEditor?.exportCharacter({ id }).then((result) => settle(result, 'Not exported.'));
+      void window.jacquelineEditor?.exportCharacter({ id }).then((result) => settle(result, 'Not exported.'));
     },
     [settle]
   );
 
   const importCharacter = useCallback(
     async (path?: string): Promise<Character | null> => {
-      const result = await window.shardEditor?.importCharacter(path ? { path } : {});
+      const result = await window.jacquelineEditor?.importCharacter(path ? { path } : {});
       return result && settle(result, 'Not imported.') ? result.character : null;
     },
     [settle]
