@@ -66,6 +66,15 @@ const REVEAL_FALLBACK_MS = 2_000;
 /** A disappear sound keeps the host page alive at most this long after the last character has gone. */
 const FAREWELL_LIMIT_MS = 5_000;
 
+/**
+ * A character that leaves is put away, not closed, for this long: one that
+ * goes with the window in front comes back at the next alt-tab, and a page
+ * kept hidden comes back at once where a new one takes a few hundred
+ * milliseconds and a reload of everything. Hidden, it draws nothing and its
+ * video holds still; after this it is closed and its memory let go.
+ */
+const PARK_MS = 60_000;
+
 interface Geometry {
   frame: Rect;
   anchor: Rect;
@@ -83,6 +92,9 @@ interface Live {
   revealTimer: NodeJS.Timeout | null;
   /** Out for a reason of its own when last looked at, not only to be laid out in the editor. */
   onItsOwn: boolean;
+  /** Hidden and waiting to be wanted again, until `parkTimer` closes it. */
+  parked: boolean;
+  parkTimer: NodeJS.Timeout | null;
 }
 
 /** Who decides whether a character is on screen and whether it should be moving. */
@@ -151,7 +163,7 @@ export class CharacterWindows {
     ipcMain.handle(IPC.stageGet, (event) => {
       const live = this.bySender(event.sender);
       const character = live ? this.store.get(live.id) : null;
-      return live && character ? this.payload(character, live.geometry) : null;
+      return live && character ? this.payload(character, live.geometry, live) : null;
     });
     ipcMain.on(IPC.stagePainted, (event) => {
       const live = this.bySender(event.sender);
@@ -217,9 +229,9 @@ export class CharacterWindows {
     }
   }
 
-  /** How many characters have a window right now. */
+  /** How many characters are on screen right now. */
   get count(): number {
-    return this.live.size;
+    return [...this.live.values()].filter((live) => !live.parked).length;
   }
 
   private readonly onDisplaysChanged = (): void => this.sync();
@@ -237,16 +249,22 @@ export class CharacterWindows {
     }
 
     for (const live of [...this.live.values()]) {
-      if (!wanted.has(live.id)) this.close(live);
+      if (wanted.has(live.id)) continue;
+      // Gone, or switched off: nothing to come back for.
+      if (this.store.get(live.id)?.enabled) this.park(live);
+      else this.close(live);
     }
     for (const [id, character] of wanted) {
       const live = this.live.get(id);
-      if (live) live.onItsOwn = this.wantedOnItsOwn(character);
-      if (live) this.update(live, character);
-      else if (!this.opening.has(id)) void this.open(id);
+      if (live) {
+        live.onItsOwn = this.wantedOnItsOwn(character);
+        if (live.parked) this.unpark(live, character);
+        else this.update(live, character);
+      } else if (!this.opening.has(id)) void this.open(id);
     }
 
-    if (wanted.size === 0 && this.opening.size === 0 && this.farewells === 0) this.destroyHost();
+    // Put-away windows live in the host's renderer: it goes only once they have.
+    if (wanted.size === 0 && this.opening.size === 0 && this.farewells === 0 && this.live.size === 0) this.destroyHost();
   }
 
   /**
@@ -276,6 +294,8 @@ export class CharacterWindows {
     if (!this.store.assetPath(id, file)) return false;
     const sound: StageSound = { url: assetUrl(id, file), volume };
     const live = this.live.get(id);
+    // Put away is off screen: a sound there would come from nowhere.
+    if (live?.parked) return false;
     if (live?.shown && !live.win.isDestroyed()) {
       live.win.webContents.send(IPC.stageSound, sound);
       return true;
@@ -398,7 +418,9 @@ export class CharacterWindows {
       geometry: this.geometry(character),
       shown: false,
       revealTimer: null,
-      onItsOwn: this.wantedOnItsOwn(character)
+      onItsOwn: this.wantedOnItsOwn(character),
+      parked: false,
+      parkTimer: null
     };
     this.live.set(id, live);
 
@@ -439,7 +461,13 @@ export class CharacterWindows {
       clearTimeout(live.revealTimer);
       live.revealTimer = null;
     }
-    if (live.shown || live.win.isDestroyed()) return;
+    // Put away before its first frame: it is shown when it is wanted again.
+    if (live.shown || live.parked || live.win.isDestroyed()) return;
+    this.present(live);
+  }
+
+  /** On screen, without taking focus, and heard arriving. */
+  private present(live: Live): void {
     live.shown = true;
     live.win.setBounds(live.geometry.window);
     // Never `show()` — that would take focus.
@@ -464,14 +492,51 @@ export class CharacterWindows {
       live.win.setBounds(live.geometry.window);
       this.kickHot();
     }
-    live.win.webContents.send(IPC.stageUpdate, this.payload(character, live.geometry));
+    live.win.webContents.send(IPC.stageUpdate, this.payload(character, live.geometry, live));
+  }
+
+  /** No longer wanted: hidden at once, closed if it is still not wanted in a while. */
+  private park(live: Live): void {
+    if (live.parked) return;
+    log.debug(`"${live.id}" put away`);
+    // Only a character that was out for real is heard leaving — not one
+    // that was only being laid out.
+    if (live.shown && live.onItsOwn) this.farewell(live.id);
+    live.parked = true;
+    if (this.drag?.id === live.id) this.cancelDrag();
+    live.clickThrough.reset();
+    if (!live.win.isDestroyed()) {
+      live.win.hide();
+      // Its video stops where it is.
+      const character = this.store.get(live.id);
+      if (character) live.win.webContents.send(IPC.stageUpdate, this.payload(character, live.geometry, live));
+    }
+    live.parkTimer = setTimeout(() => {
+      live.parkTimer = null;
+      this.close(live);
+      this.sync();
+    }, PARK_MS);
+    live.parkTimer.unref?.();
+  }
+
+  /** Wanted again while put away: back on screen as it was. */
+  private unpark(live: Live, character: Character): void {
+    if (live.parkTimer) clearTimeout(live.parkTimer);
+    live.parkTimer = null;
+    live.parked = false;
+    log.debug(`"${live.id}" back`);
+    this.update(live, character);
+    if (live.win.isDestroyed()) return;
+    // Still waiting for its first frame: that shows it, as for any new window.
+    if (live.shown || !live.revealTimer) this.present(live);
   }
 
   private close(live: Live): void {
     log.debug(`"${live.id}" hidden`);
     // Only a character that was out for real is heard leaving — not one
-    // that was only being laid out, and not everyone at once on quit.
-    if (live.shown && live.onItsOwn && !this.stopping) this.farewell(live.id);
+    // that was only being laid out, not one already heard when it was put
+    // away, and not everyone at once on quit.
+    if (live.shown && live.onItsOwn && !live.parked && !this.stopping) this.farewell(live.id);
     this.forget(live);
     if (!live.win.isDestroyed()) live.win.destroy();
   }
@@ -519,6 +584,8 @@ export class CharacterWindows {
   private forget(live: Live): void {
     if (live.revealTimer) clearTimeout(live.revealTimer);
     live.revealTimer = null;
+    if (live.parkTimer) clearTimeout(live.parkTimer);
+    live.parkTimer = null;
     if (this.drag?.id === live.id) this.cancelDrag();
     this.pendingSounds.delete(live.id);
     this.live.delete(live.id);
@@ -552,7 +619,7 @@ export class CharacterWindows {
     return { frame, anchor, position, window: placeWindow(frame, anchor, position) };
   }
 
-  private payload(character: Character, geometry: Geometry): StagePayload {
+  private payload(character: Character, geometry: Geometry, live?: Live): StagePayload {
     const states = character.appearance.states;
     const speech = this.presence.speechFor(character.id);
     // While a line is up it wears its speaking look, if it has one.
@@ -565,7 +632,8 @@ export class CharacterWindows {
       opacity: character.appearance.opacity,
       flip: character.appearance.flip,
       visual: idle ? this.visual(character.id, idle.type, idle.src) : null,
-      playing: this.presence.isWatching(),
+      // Put away: nobody can see it move.
+      playing: this.presence.isWatching() && !live?.parked,
       restSec: character.appearance.restSec,
       preview: character.id === this.previewId,
       speech
@@ -630,7 +698,7 @@ export class CharacterWindows {
     const cursor = screen.getCursorScreenPoint();
     let nearest = Infinity;
     for (const live of this.live.values()) {
-      if (!live.shown || live.win.isDestroyed()) continue;
+      if (!live.shown || live.parked || live.win.isDestroyed()) continue;
       const inside = anchorInWindow(live.geometry.frame, live.geometry.anchor);
       const hot: Rect = {
         x: live.geometry.window.x + inside.x - HOT_MARGIN_PX,
