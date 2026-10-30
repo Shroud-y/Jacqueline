@@ -13,6 +13,8 @@ import { SettingsStore } from './app/settings';
 import { AppTray } from './app/tray';
 import { handleAssetProtocol, registerAssetScheme } from './characters/assetProtocol';
 import { registerEditorIpc } from './characters/editorIpc';
+import { handleScriptHost } from './characters/scriptHost';
+import { ScriptTrust } from './characters/scriptTrust';
 import { isPresent } from './characters/presence';
 import { isWithinClockWindow, minutesOfDay } from './engine/timeOfDay';
 import { runActions, type ActionDeps } from './engine/actions';
@@ -58,6 +60,8 @@ async function bootstrap(): Promise<void> {
   const settingsView = (): SettingsView => settingsViewOf(settings.current);
   const characters = new CharacterStore(paths.charactersRoot());
   handleAssetProtocol(characters);
+  const scriptTrust = new ScriptTrust(paths.scriptTrustFile());
+  handleScriptHost({ store: characters, isAllowed: (id) => scriptTrust.isAllowed(id) });
 
   const entries = characters.list();
   const broken = entries.filter((entry) => !entry.ok).length;
@@ -105,7 +109,8 @@ async function bootstrap(): Promise<void> {
     onClick: (id) => (director.isSpeaking(id) ? director.dismiss(id) : rules.event({ type: 'clicked', characterId: id })),
     speechFor: (id) => director.current(id),
     isOnStage: (id) => director.isOnStage(id),
-    isSilenced
+    isSilenced,
+    scriptAllowed: (id) => scriptTrust.isAllowed(id)
   });
 
   const director = new SpeechDirector();
@@ -181,6 +186,13 @@ async function bootstrap(): Promise<void> {
       return picked.canceled || !picked.filePath ? null : picked.filePath;
     },
     revealFile: (path) => shell.showItemInFolder(path),
+    scriptAllowed: (id) => scriptTrust.isAllowed(id),
+    blockScript: (id) => scriptTrust.block(id),
+    allowScript: (id) => scriptTrust.allow(id),
+    openPath: async (path) => {
+      const failure = await shell.openPath(path);
+      return failure ? { ok: false, error: failure } : { ok: true };
+    },
     openRoot: async () => {
       const failure = await shell.openPath(paths.charactersRoot());
       return failure ? { ok: false, error: failure } : { ok: true };
@@ -255,6 +267,7 @@ async function bootstrap(): Promise<void> {
     editor.send(IPC.editorChanged, characters.list());
   };
   characters.onChange(resync);
+  scriptTrust.onChange(resync);
   visibility.onChange(resync);
   settings.onChange((next) => {
     if (next.muted) director.silenceAll();

@@ -45,6 +45,17 @@ export function estimateCost(character: Character): CostEstimate {
     items.push({ text: `It is ${element?.width} × ${element?.height}: a video this size costs more than the figure above.`, level: 'moderate' });
   }
 
+  if (appearance.stylesheet) {
+    items.push({ text: 'Its own stylesheet: an animation in it costs about as much as a video, for as long as it runs.', level: 'light' });
+  }
+
+  if (appearance.script) {
+    items.push({
+      text: 'Its own script runs in a process of its own: about 30 MB, and CPU only while it animates something.',
+      level: 'moderate'
+    });
+  }
+
   // What has to be watched on its behalf. Listing running programs takes about 8 ms; the rest is close to free.
   const active = rules.filter((rule) => rule.enabled);
   const programs =

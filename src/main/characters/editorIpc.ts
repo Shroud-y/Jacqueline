@@ -1,9 +1,11 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
-import { readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { z } from 'zod';
 import { ASSET_EXTENSIONS, assetKindOf, assetNameSchema, characterIdSchema, referencedAssets, type AssetKind, type Character, type Line } from '@shared/character';
 import { IPC } from '@shared/ipc';
 import { unknownSlots } from '@shared/lines';
+import { SCRIPT_NAME, SCRIPT_STARTER } from '@shared/scriptTemplate';
+import { STYLE_STARTER, STYLESHEET_NAME } from '@shared/stylesheet';
 import type { EditorApi, EditorResult, Settings, SettingsResult, SettingsView } from '@shared/types';
 import { sampleSlots, type Fired } from '../engine/ruleEngine';
 import { fillSlots } from '../engine/slots';
@@ -29,6 +31,12 @@ export interface EditorIpcDeps {
   pickSavePath: (suggestedName: string) => Promise<string | null>;
   /** Shows a file in its folder. */
   revealFile: (path: string) => void;
+  /** Opens a file in the program the system opens it with. */
+  openPath: (path: string) => Promise<EditorResult>;
+  scriptAllowed: (id: string) => boolean;
+  /** A script that came from somewhere else waits for the user's yes. */
+  blockScript: (id: string) => void;
+  allowScript: (id: string) => void;
   settings: () => SettingsView;
   /** Validated by the settings store, which refuses what it cannot use. */
   updateSettings: (patch: Partial<Settings>) => SettingsResult;
@@ -161,6 +169,39 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
 
     openRoot: () => deps.openRoot(),
 
+    newStylesheet: (payload) => {
+      const parsed = idPayload.safeParse(payload);
+      if (!parsed.success) return refused;
+      return store.writeAsset(parsed.data.id, STYLESHEET_NAME, STYLE_STARTER);
+    },
+
+    newScript: (payload) => {
+      const parsed = idPayload.safeParse(payload);
+      if (!parsed.success) return refused;
+      return store.writeAsset(parsed.data.id, SCRIPT_NAME, SCRIPT_STARTER);
+    },
+
+    scriptAllowed: (payload) => {
+      const parsed = idPayload.safeParse(payload);
+      return parsed.success ? deps.scriptAllowed(parsed.data.id) : false;
+    },
+
+    allowScript: (payload) => {
+      const parsed = idPayload.safeParse(payload);
+      if (!parsed.success) return refused;
+      if (!store.has(parsed.data.id)) return { ok: false, error: 'Unknown character.' };
+      deps.allowScript(parsed.data.id);
+      return { ok: true };
+    },
+
+    openAsset: async (payload) => {
+      const parsed = assetPayload.safeParse(payload);
+      if (!parsed.success) return refused;
+      const path = store.assetPath(parsed.data.id, parsed.data.file);
+      if (!path || !existsSync(path)) return { ok: false, error: 'That file is not there.' };
+      return deps.openPath(path);
+    },
+
     exportCharacter: async (payload) => {
       const parsed = idPayload.safeParse(payload);
       if (!parsed.success) return refused;
@@ -192,7 +233,10 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
       } catch (err) {
         return { ok: false, error: `Could not read the zip: ${(err as Error).message}` };
       }
-      return importCharacter(store, zip);
+      const imported = importCharacter(store, zip);
+      // Someone else's code: it runs only once the user has looked and said yes.
+      if (imported.ok && imported.character.appearance.script) deps.blockScript(imported.character.id);
+      return imported;
     },
 
     settings: () => deps.settings(),
@@ -235,6 +279,11 @@ const CHANNELS: { [K in keyof EditorHandlers]: string } = {
   testRule: IPC.editorTestRule,
   runningPrograms: IPC.editorRunningPrograms,
   openRoot: IPC.editorOpenRoot,
+  newStylesheet: IPC.editorNewStylesheet,
+  newScript: IPC.editorNewScript,
+  scriptAllowed: IPC.editorScriptAllowed,
+  allowScript: IPC.editorAllowScript,
+  openAsset: IPC.editorOpenAsset,
   exportCharacter: IPC.editorExport,
   importCharacter: IPC.editorImport,
   settings: IPC.editorSettingsGet,

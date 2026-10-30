@@ -170,6 +170,21 @@ export class CharacterStore {
     }
   }
 
+  /** A new file among the character's assets, by a name of its own, with this text in it. */
+  writeAsset(id: string, name: string, text: string): StoreResult<{ file: string }> {
+    if (!this.entries.has(id)) return { ok: false, error: 'Unknown character.' };
+    if (!assetNameSchema.safeParse(name).success || assetKindOf(name) === null) return { ok: false, error: 'That kind of file cannot be used.' };
+    try {
+      const dir = this.assetsDir(id);
+      mkdirSync(dir, { recursive: true });
+      const file = freeName(dir, name);
+      writeFileSync(join(dir, file), text, 'utf8');
+      return { ok: true, file };
+    } catch (err) {
+      return { ok: false, error: `Could not write the file: ${(err as Error).message}` };
+    }
+  }
+
   removeAsset(id: string, file: string): StoreResult {
     const path = this.assetPath(id, file);
     if (!path) return { ok: false, error: 'Unknown file.' };

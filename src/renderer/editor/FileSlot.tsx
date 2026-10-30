@@ -26,7 +26,7 @@ interface FileSlotProps {
   actions?: ReactNode;
 }
 
-const KIND_LABEL: Record<AssetKind, string> = { image: 'Picture', video: 'Video', audio: 'Sound', font: 'Font' };
+const KIND_LABEL: Record<AssetKind, string> = { image: 'Picture', video: 'Video', audio: 'Sound', font: 'Font', style: 'Stylesheet', script: 'Script' };
 
 /** A place for one file: empty with a way to fill it, or the file with ways to change it. */
 export default function FileSlot({ label, hint, file, kinds, onChoose, onRemove, onMeasured, busy = false, actions }: FileSlotProps): JSX.Element {

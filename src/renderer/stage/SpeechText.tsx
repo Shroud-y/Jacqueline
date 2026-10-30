@@ -36,7 +36,7 @@ export default function SpeechText({ characterId, text, style, reveal, box }: Sp
 
   return (
     <TextElement
-      className={reveal === 'fade' ? 'text text-fade' : 'text'}
+      className={reveal === 'fade' ? 'text text-speech text-fade' : 'text text-speech'}
       characterId={characterId}
       text={text.slice(0, shown)}
       style={style}

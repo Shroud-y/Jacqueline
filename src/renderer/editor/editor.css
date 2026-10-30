@@ -1649,3 +1649,10 @@ input {
 .sidebar-import {
   margin-top: 0;
 }
+
+/* A script waiting for the user's yes: the warning, and the one way to give it. */
+.script-blocked {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+}

@@ -79,6 +79,119 @@ export default function AppearanceTab({ character, characters }: { character: Ch
     }
   };
 
+  const stylesheet = appearance.stylesheet;
+  const [styleBusy, setStyleBusy] = useState(false);
+
+  /** A stylesheet put to use; the one it had goes once nothing points at it. */
+  const applyStylesheet = async (file: string | null): Promise<boolean> => {
+    const old = appearance.stylesheet;
+    if (!(await characters.save({ ...character, appearance: { ...appearance, stylesheet: file } }))) return false;
+    if (old && old !== file) await window.jacquelineEditor?.releaseAsset({ id, file: old });
+    loadAssets();
+    return true;
+  };
+
+  const chooseStylesheet = async (path?: string): Promise<void> => {
+    const api = window.jacquelineEditor;
+    if (!api) return;
+    setStyleBusy(true);
+    try {
+      const imported = await api.importAsset({ id, kinds: ['style'], ...(path ? { path } : {}) });
+      if (!imported.ok) {
+        if (imported.error) characters.report(imported.error);
+        return;
+      }
+      if (!(await applyStylesheet(imported.file))) await api.releaseAsset({ id, file: imported.file });
+    } finally {
+      setStyleBusy(false);
+    }
+  };
+
+  /** A stylesheet from the template, put to use and opened for editing. */
+  const startStylesheet = async (): Promise<void> => {
+    const api = window.jacquelineEditor;
+    if (!api) return;
+    setStyleBusy(true);
+    try {
+      const made = await api.newStylesheet({ id });
+      if (!made.ok) {
+        characters.report(made.error);
+        return;
+      }
+      if (await applyStylesheet(made.file)) await api.openAsset({ id, file: made.file });
+      else await api.releaseAsset({ id, file: made.file });
+    } finally {
+      setStyleBusy(false);
+    }
+  };
+
+  const script = appearance.script;
+  const [scriptBusy, setScriptBusy] = useState(false);
+  // Null while not known yet; false for a script that came with an imported character.
+  const [scriptAllowed, setScriptAllowed] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void window.jacquelineEditor?.scriptAllowed({ id }).then((allowed) => {
+      if (!cancelled) setScriptAllowed(allowed);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, script]);
+
+  /** A script put to use; the one it had goes once nothing points at it. */
+  const applyScript = async (file: string | null): Promise<boolean> => {
+    const old = appearance.script;
+    if (!(await characters.save({ ...character, appearance: { ...appearance, script: file } }))) return false;
+    if (old && old !== file) await window.jacquelineEditor?.releaseAsset({ id, file: old });
+    loadAssets();
+    return true;
+  };
+
+  /** Chosen or written here: the user's own, so it may run. */
+  const allowScript = async (): Promise<void> => {
+    const result = await window.jacquelineEditor?.allowScript({ id });
+    if (result?.ok) setScriptAllowed(true);
+  };
+
+  const chooseScript = async (path?: string): Promise<void> => {
+    const api = window.jacquelineEditor;
+    if (!api) return;
+    setScriptBusy(true);
+    try {
+      const imported = await api.importAsset({ id, kinds: ['script'], ...(path ? { path } : {}) });
+      if (!imported.ok) {
+        if (imported.error) characters.report(imported.error);
+        return;
+      }
+      if (await applyScript(imported.file)) await allowScript();
+      else await api.releaseAsset({ id, file: imported.file });
+    } finally {
+      setScriptBusy(false);
+    }
+  };
+
+  const startScript = async (): Promise<void> => {
+    const api = window.jacquelineEditor;
+    if (!api) return;
+    setScriptBusy(true);
+    try {
+      const made = await api.newScript({ id });
+      if (!made.ok) {
+        characters.report(made.error);
+        return;
+      }
+      if (await applyScript(made.file)) {
+        await allowScript();
+        await api.openAsset({ id, file: made.file });
+      } else {
+        await api.releaseAsset({ id, file: made.file });
+      }
+    } finally {
+      setScriptBusy(false);
+    }
+  };
+
   const remove = async (state: StateName): Promise<void> => {
     const old = appearance.states[state]?.src;
     const states = { ...appearance.states };
@@ -163,6 +276,73 @@ export default function AppearanceTab({ character, characters }: { character: Ch
           <Notice kind="warn">A moving character costs about ten times a still one. A rest between plays is the cheapest way to have both.</Notice>
         </Group>
       ) : null}
+
+      <Group title="Style">
+        <FileSlot
+          label="Stylesheet"
+          file={
+            stylesheet
+              ? { name: stylesheet, url: assetUrl(id, stylesheet), kind: 'style', bytes: assets?.find((entry) => entry.file === stylesheet)?.bytes ?? null }
+              : null
+          }
+          kinds={['style']}
+          busy={styleBusy}
+          onChoose={(path) => void chooseStylesheet(path)}
+          onRemove={() => void applyStylesheet(null)}
+          actions={
+            stylesheet ? (
+              <button type="button" className="button quiet" onClick={() => void window.jacquelineEditor?.openAsset({ id, file: stylesheet })}>
+                Edit
+              </button>
+            ) : null
+          }
+          hint="A .css file for the character's window: shadows, filters, animations, how text looks. Saved changes show on the desktop at once."
+        />
+        {stylesheet ? null : (
+          <div>
+            <button type="button" className="button quiet under-prose" disabled={styleBusy} onClick={() => void startStylesheet()}>
+              Start one from a template
+            </button>
+          </div>
+        )}
+      </Group>
+
+      <Group title="Script">
+        {script && scriptAllowed === false ? (
+          <div className="script-blocked">
+            <Notice kind="warn">
+              This script came with an imported character and does not run until you allow it. It cannot reach the internet, your files or other
+              characters — but read it first: Edit opens it.
+            </Notice>
+            <button type="button" className="button" onClick={() => void allowScript()}>
+              Allow it to run
+            </button>
+          </div>
+        ) : null}
+        <FileSlot
+          label="Script"
+          file={script ? { name: script, url: assetUrl(id, script), kind: 'script', bytes: assets?.find((entry) => entry.file === script)?.bytes ?? null } : null}
+          kinds={['script']}
+          busy={scriptBusy}
+          onChoose={(path) => void chooseScript(path)}
+          onRemove={() => void applyScript(null)}
+          actions={
+            script ? (
+              <button type="button" className="button quiet" onClick={() => void window.jacquelineEditor?.openAsset({ id, file: script })}>
+                Edit
+              </button>
+            ) : null
+          }
+          hint="A .js file that draws over the character — sparks, rings, anything on a canvas — and hears when it speaks or is clicked. Sealed off: no internet, no files, no other characters. Saved changes show at once."
+        />
+        {script ? null : (
+          <div>
+            <button type="button" className="button quiet under-prose" disabled={scriptBusy} onClick={() => void startScript()}>
+              Start one from a template
+            </button>
+          </div>
+        )}
+      </Group>
     </div>
   );
 }

@@ -75,6 +75,10 @@ export interface StagePayload {
   preview: boolean;
   /** The line it is saying now, or null. */
   speech: { id: string; text: string; durationMs: number } | null;
+  /** The character's own stylesheet, as something the page can load; null without one. */
+  stylesheet: string | null;
+  /** The sealed page its script runs in; null without a script, or one not allowed to run. */
+  script: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -119,6 +123,15 @@ export interface EditorApi {
   runningPrograms(): Promise<string[]>;
   /** Opens the folder every character lives in. */
   openRoot(): Promise<EditorResult>;
+  /** Writes a starter stylesheet among the character's assets and answers with its file name. Not yet used by the character. */
+  newStylesheet(payload: { id: string }): Promise<EditorResult<{ file: string }>>;
+  /** Writes a starter script among the character's assets and answers with its file name. Not yet used by the character. */
+  newScript(payload: { id: string }): Promise<EditorResult<{ file: string }>>;
+  /** False while a script that came with an imported character waits for the user's yes. */
+  scriptAllowed(payload: { id: string }): Promise<boolean>;
+  allowScript(payload: { id: string }): Promise<EditorResult>;
+  /** Opens one of the character's files in the program the system opens it with. */
+  openAsset(payload: { id: string; file: string }): Promise<EditorResult>;
   /** Saves the character and the files it uses as one zip, then shows it. An empty `error`: the save dialog was closed. */
   exportCharacter(payload: { id: string }): Promise<EditorResult>;
   /** A new character from a zip: `path` when one was dropped, otherwise one the user picks. */

@@ -51,7 +51,11 @@ const appearanceSchema = z.object({
    * again. 0 plays it on a loop. A moving character costs ten times a still
    * one for as long as it moves, so this is the cheapest way to have both.
    */
-  restSec: z.number().min(0).max(3600).default(0)
+  restSec: z.number().min(0).max(3600).default(0),
+  /** A `.css` among the assets, applied to the character's window. */
+  stylesheet: assetNameSchema.nullable().default(null),
+  /** A `.js` among the assets, run in a sealed layer over the character (scriptHost.ts). */
+  script: assetNameSchema.nullable().default(null)
 });
 
 /* ------------------------------------------------------------------ */
@@ -190,7 +194,7 @@ export function defaultCharacter(id: string, name: string): Character {
     id,
     name,
     enabled: true,
-    appearance: { states: {}, opacity: 1, flip: false, restSec: 0 },
+    appearance: { states: {}, opacity: 1, flip: false, restSec: 0, stylesheet: null, script: null },
     layout: {
       elements: [
         { id: 'character', type: 'character', x: 260, y: 0, width: 240, height: 240 },
@@ -217,13 +221,15 @@ export function describeIssue(error: z.ZodError): string {
 /* Assets                                                              */
 /* ------------------------------------------------------------------ */
 
-export type AssetKind = 'image' | 'video' | 'audio' | 'font';
+export type AssetKind = 'image' | 'video' | 'audio' | 'font' | 'style' | 'script';
 
 export const ASSET_EXTENSIONS: Record<AssetKind, readonly string[]> = {
   image: ['.png', '.webp', '.jpg', '.jpeg'],
   video: ['.webm', '.mp4'],
   audio: ['.ogg', '.wav', '.mp3'],
-  font: ['.ttf', '.otf', '.woff', '.woff2']
+  font: ['.ttf', '.otf', '.woff', '.woff2'],
+  style: ['.css'],
+  script: ['.js']
 };
 
 const MB = 1024 * 1024;
@@ -232,7 +238,9 @@ export const ASSET_MAX_BYTES: Record<AssetKind, number> = {
   image: 16 * MB,
   video: 64 * MB,
   audio: 16 * MB,
-  font: 8 * MB
+  font: 8 * MB,
+  style: MB / 2,
+  script: MB / 4
 };
 
 /** What a file is, from its extension; null when it is nothing a character can use. */
@@ -255,6 +263,8 @@ export function assetKindOf(fileName: string): AssetKind | null {
 export function referencedAssets(character: Character): Set<string> {
   const used = new Set<string>();
   for (const visual of Object.values(character.appearance.states)) used.add(visual.src);
+  if (character.appearance.stylesheet) used.add(character.appearance.stylesheet);
+  if (character.appearance.script) used.add(character.appearance.script);
   for (const lines of Object.values(character.lines)) {
     for (const line of lines) if (line.audio) used.add(line.audio);
   }

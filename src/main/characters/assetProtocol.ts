@@ -1,6 +1,6 @@
 import { net, protocol } from 'electron';
 import { pathToFileURL } from 'node:url';
-import { ASSET_SCHEME } from '@shared/assetUrl';
+import { ASSET_SCHEME, SCRIPT_SCHEME } from '@shared/assetUrl';
 import { createLogger } from '../app/logger';
 import type { CharacterStore } from './store';
 
@@ -20,7 +20,9 @@ export function registerAssetScheme(): void {
     // `corsEnabled`: a font is always fetched in CORS mode, unlike a picture or a
     // video, and the pages asking (`http://localhost` in development, `file://`
     // when packaged) are never the same origin as this scheme.
-    { scheme: ASSET_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } }
+    { scheme: ASSET_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
+    // A character's script runs on its own origin (scriptHost.ts): standard, so it is one.
+    { scheme: SCRIPT_SCHEME, privileges: { standard: true, secure: true } }
   ]);
 }
 

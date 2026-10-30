@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -21,6 +21,8 @@ let savePath: string | null;
 let suggested: string[];
 let revealed: string[];
 let zipPath: string | null;
+let opened2: string[];
+let blocked: Set<string>;
 
 const handlers = (): ReturnType<typeof editorHandlers> =>
   editorHandlers(store, {
@@ -43,6 +45,13 @@ const handlers = (): ReturnType<typeof editorHandlers> =>
       return savePath;
     },
     revealFile: (path) => revealed.push(path),
+    openPath: async (path) => {
+      opened2.push(path);
+      return { ok: true };
+    },
+    scriptAllowed: (id) => !blocked.has(id),
+    blockScript: (id) => blocked.add(id),
+    allowScript: (id) => blocked.delete(id),
     settings: () => ({ settings: settings.current, autostartAvailable: false }),
     updateSettings: (patch) => settings.update(patch),
     now: () => new Date(2026, 0, 1, 9, 5).getTime()
@@ -63,6 +72,8 @@ beforeEach(() => {
   suggested = [];
   revealed = [];
   zipPath = null;
+  opened2 = [];
+  blocked = new Set();
 });
 
 afterEach(() => {
@@ -277,6 +288,47 @@ describe('editor requests', () => {
     expect((await h.importCharacter({ path: join(outside, 'gone.zip') })).ok).toBe(false);
     expect((await h.exportCharacter({ id: 'nobody' })).ok).toBe(false);
     expect((await h.importCharacter({ path: 42 })).ok).toBe(false);
+  });
+
+  it('writes a starter stylesheet under a free name, and opens only files of that character', async () => {
+    const created = await make();
+    const h = handlers();
+    const first = await h.newStylesheet({ id: created.id });
+    const second = await h.newStylesheet({ id: created.id });
+    expect(first).toEqual({ ok: true, file: 'style.css' });
+    expect(second).toEqual({ ok: true, file: 'style-2.css' });
+    expect(readFileSync(join(root, created.id, 'assets', 'style.css'), 'utf8')).toContain('.text-speech');
+    expect((await h.newStylesheet({ id: 'nobody' })).ok).toBe(false);
+
+    expect(await h.openAsset({ id: created.id, file: 'style.css' })).toEqual({ ok: true });
+    expect(opened2).toEqual([join(root, created.id, 'assets', 'style.css')]);
+    expect((await h.openAsset({ id: created.id, file: 'gone.css' })).ok).toBe(false);
+    expect((await h.openAsset({ id: created.id, file: '../character.json' })).ok).toBe(false);
+    expect(opened2).toHaveLength(1);
+  });
+
+  it('writes a starter script, and holds back the script of an imported character until it is allowed', async () => {
+    const created = await make();
+    const h = handlers();
+    const made = await h.newScript({ id: created.id });
+    expect(made).toEqual({ ok: true, file: 'script.js' });
+    expect(readFileSync(join(root, created.id, 'assets', 'script.js'), 'utf8')).toContain('jacqueline.on');
+    await h.save({ ...created, appearance: { ...created.appearance, script: 'script.js' } });
+    expect(await h.scriptAllowed({ id: created.id })).toBe(true);
+
+    savePath = join(outside, 'scripted.zip');
+    expect((await h.exportCharacter({ id: created.id })).ok).toBe(true);
+    const imported = await h.importCharacter({ path: savePath });
+    if (!imported.ok) throw new Error(imported.error);
+    expect(imported.character.appearance.script).toBe('script.js');
+    expect(await h.scriptAllowed({ id: imported.character.id })).toBe(false);
+    // Its own maker's copy is untouched.
+    expect(await h.scriptAllowed({ id: created.id })).toBe(true);
+
+    expect(await h.allowScript({ id: imported.character.id })).toEqual({ ok: true });
+    expect(await h.scriptAllowed({ id: imported.character.id })).toBe(true);
+    expect((await h.allowScript({ id: 'nobody' })).ok).toBe(false);
+    expect(await h.scriptAllowed({ id: '../x' })).toBe(false);
   });
 
   it('says what is running', async () => {

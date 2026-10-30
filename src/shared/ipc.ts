@@ -39,6 +39,15 @@ export const IPC = {
   editorRunningPrograms: 'editor:runningPrograms',
   /** Opens the folder every character lives in. */
   editorOpenRoot: 'editor:openRoot',
+  /** Writes a starter stylesheet into a character's assets. */
+  editorNewStylesheet: 'editor:newStylesheet',
+  /** Writes a starter script into a character's assets. */
+  editorNewScript: 'editor:newScript',
+  /** Whether a character's script may run; and the user saying it may. */
+  editorScriptAllowed: 'editor:scriptAllowed',
+  editorAllowScript: 'editor:allowScript',
+  /** Opens one of a character's files in whatever the system opens it with. */
+  editorOpenAsset: 'editor:openAsset',
   /** Saves a character as a zip, where the user picks. */
   editorExport: 'editor:export',
   /** Makes a new character from a zip: dropped, or picked. */

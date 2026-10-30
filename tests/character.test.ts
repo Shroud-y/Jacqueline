@@ -118,3 +118,24 @@ describe('asset names', () => {
     for (const name of ['console.png', 'con-1.png', 'icon.png', 'com10.png']) expect(assetNameSchema.safeParse(name).success, name).toBe(true);
   });
 });
+
+describe('stylesheet', () => {
+  it('is none by default, and counts as a file the character uses', () => {
+    const character = defaultCharacter('miku', 'Miku');
+    expect(character.appearance.stylesheet).toBeNull();
+    // Saved before there were stylesheets: still valid, with none.
+    const { stylesheet: _gone, ...older } = character.appearance;
+    expect(characterSchema.parse({ ...character, appearance: older }).appearance.stylesheet).toBeNull();
+    expect(assetKindOf('style.css')).toBe('style');
+    const styled = { ...character, appearance: { ...character.appearance, stylesheet: 'style.css' } };
+    expect(referencedAssets(styled).has('style.css')).toBe(true);
+  });
+
+  it('counts a script as a file the character uses, and knows a .js when it sees one', () => {
+    const character = defaultCharacter('miku', 'Miku');
+    expect(character.appearance.script).toBeNull();
+    expect(assetKindOf('glow.js')).toBe('script');
+    const scripted = { ...character, appearance: { ...character.appearance, script: 'glow.js' } };
+    expect(referencedAssets(scripted).has('glow.js')).toBe(true);
+  });
+});

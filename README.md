@@ -29,6 +29,16 @@ away; there is no Save button.
 - **Appearance** — a picture or a video for when it is idle, and optionally
   another while it is speaking. Size, opacity, mirroring. A video can **rest**
   between plays, which is the cheapest way to have a character that moves.
+- **Appearance → Style** — a stylesheet of the character's own: shadows,
+  filters, animations, how its text looks. **Start one from a template** gives
+  you a commented `style.css` listing what can be styled; save it in any
+  editor and the character on your desktop changes at once.
+- **Appearance → Script** — a `.js` of the character's own that draws over it
+  (sparks, rings, anything on a canvas) and hears when it speaks or is
+  clicked; `jacqueline.setMood('…')` hands a mood to its stylesheet as
+  `[data-mood]`. It runs sealed off — no internet, no files, no other
+  characters — and a script that came with an imported character waits for
+  you to allow it.
 - **Layout** — a canvas with the character and its text on it: where the text
   sits, how big, in what font (yours too: drop in a `.ttf`), colour, outline,
   shadow, background, and how it appears (typed out, faded in, or at once).

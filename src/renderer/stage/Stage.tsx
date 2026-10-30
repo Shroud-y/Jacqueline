@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } fr
 import { SAMPLE_LINE } from '@shared/textStyle';
 import type { StagePayload } from '@shared/types';
 import TextElement from '../shared/TextElement';
+import ScriptLayer from './ScriptLayer';
 import SpeechText from './SpeechText';
 
 /** A press that travels less than this is a click, not a drag. */
@@ -10,6 +11,8 @@ const DRAG_THRESHOLD_PX = 4;
 /** A character's window: draws its layout. */
 export default function Stage(): JSX.Element | null {
   const [stage, setStage] = useState<StagePayload | null>(null);
+  // Set by the character's script, for its stylesheet.
+  const [mood, setMood] = useState<string | null>(null);
 
   useEffect(() => {
     const api = window.jacqueline;
@@ -34,8 +37,17 @@ export default function Stage(): JSX.Element | null {
 
   if (!stage) return null;
 
+  // Hooks a character's own stylesheet can rely on: see `STYLE_STARTER` in shared/stylesheet.ts.
   return (
-    <div className="stage">
+    <div
+      className="stage"
+      data-character={stage.id}
+      data-speaking={stage.speech ? 'true' : 'false'}
+      data-state={stage.speech ? 'speaking' : 'idle'}
+      data-preview={stage.preview ? 'true' : 'false'}
+      data-mood={stage.script && mood ? mood : undefined}
+    >
+      {stage.stylesheet ? <link rel="stylesheet" href={stage.stylesheet} /> : null}
       {stage.elements.map((element) => {
         const box = { left: element.x - stage.frame.x, top: element.y - stage.frame.y, width: element.width, height: element.height };
         if (element.type === 'character') return <CharacterElement key={element.id} stage={stage} {...box} />;
@@ -45,14 +57,14 @@ export default function Stage(): JSX.Element | null {
           return <SpeechText key={speech.id} characterId={stage.id} text={speech.text} style={element.style} reveal={element.reveal} box={box} />;
         }
         if (speech && element.type === 'name') {
-          return <TextElement key={element.id} className="text text-fade" characterId={stage.id} text={stage.name} style={element.style} box={box} />;
+          return <TextElement key={element.id} className="text text-name text-fade" characterId={stage.id} text={stage.name} style={element.style} box={box} />;
         }
         // With nothing being said, text shows only while it is being laid out.
         if (!stage.preview) return null;
         return (
           <TextElement
             key={element.id}
-            className="text"
+            className={element.type === 'name' ? 'text text-name' : 'text text-speech'}
             characterId={stage.id}
             text={element.type === 'name' ? stage.name : SAMPLE_LINE}
             style={element.style}
@@ -60,6 +72,7 @@ export default function Stage(): JSX.Element | null {
           />
         );
       })}
+      {stage.script ? <ScriptLayer url={stage.script} speech={stage.speech} preview={stage.preview} playing={stage.playing} onMood={setMood} /> : null}
     </div>
   );
 }
@@ -132,8 +145,11 @@ function CharacterElement({ stage, left, top, width, height }: CharacterElementP
     press.current = null;
     if (!current) return;
     if (!current.dragging) {
-      // Pressed and let go without going anywhere: a click.
-      if (clicked) window.jacqueline?.click();
+      // Pressed and let go without going anywhere: a click — for the rules, and for its script.
+      if (clicked) {
+        window.jacqueline?.click();
+        dispatchEvent(new Event('jacqueline-click'));
+      }
       return;
     }
     setDragging(false);

@@ -4,11 +4,11 @@ import { estimateCost } from '@shared/cost';
 
 const still = (): Character => ({
   ...defaultCharacter('miku', 'Miku'),
-  appearance: { states: { idle: { type: 'image', src: 'a.png' } }, opacity: 1, flip: false, restSec: 0 }
+  appearance: { states: { idle: { type: 'image', src: 'a.png' } }, opacity: 1, flip: false, restSec: 0, stylesheet: null, script: null }
 });
 const video = (restSec: number): Character => ({
   ...still(),
-  appearance: { states: { idle: { type: 'video', src: 'a.mp4' } }, opacity: 1, flip: false, restSec }
+  appearance: { states: { idle: { type: 'video', src: 'a.mp4' } }, opacity: 1, flip: false, restSec, stylesheet: null, script: null }
 });
 
 describe('what a character costs', () => {

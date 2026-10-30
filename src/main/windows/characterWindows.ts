@@ -6,7 +6,7 @@ import {
   type WebContents,
   type WebPreferences
 } from 'electron';
-import { statSync } from 'node:fs';
+import { statSync, watch, type FSWatcher } from 'node:fs';
 import type { Character } from '@shared/character';
 import { IPC } from '@shared/ipc';
 import {
@@ -24,6 +24,7 @@ import {
 import type { StagePayload, StageSound, StageVisual } from '@shared/types';
 import { createLogger } from '../app/logger';
 import { assetUrl } from '../characters/assetProtocol';
+import { scriptHostUrl } from '@shared/assetUrl';
 import type { CharacterStore } from '../characters/store';
 import { ClickThroughController } from './clickThrough';
 import { EntrySounds, type EntryKind } from './entrySounds';
@@ -95,6 +96,8 @@ interface Live {
   /** Hidden and waiting to be wanted again, until `parkTimer` closes it. */
   parked: boolean;
   parkTimer: NodeJS.Timeout | null;
+  /** Its stylesheet and script, watched so a saved change shows at once. */
+  styleWatch: { key: string; watchers: FSWatcher[]; timer: NodeJS.Timeout | null } | null;
 }
 
 /** Who decides whether a character is on screen and whether it should be moving. */
@@ -113,6 +116,8 @@ export interface PresenceSource {
   isOnStage(id: string): boolean;
   /** Muted, or inside quiet hours: no sound plays. */
   isSilenced(): boolean;
+  /** False for a character whose script the user has not allowed to run. */
+  scriptAllowed(id: string): boolean;
 }
 
 interface Drag {
@@ -420,7 +425,8 @@ export class CharacterWindows {
       revealTimer: null,
       onItsOwn: this.wantedOnItsOwn(character),
       parked: false,
-      parkTimer: null
+      parkTimer: null,
+      styleWatch: null
     };
     this.live.set(id, live);
 
@@ -487,6 +493,7 @@ export class CharacterWindows {
   private update(live: Live, character: Character): void {
     live.geometry = this.geometry(character);
     if (live.win.isDestroyed()) return;
+    this.watchFiles(live, [character.appearance.stylesheet, character.appearance.script]);
     // Mid-drag the window is wherever the cursor has taken it.
     if (this.drag?.id !== live.id) {
       live.win.setBounds(live.geometry.window);
@@ -581,7 +588,51 @@ export class CharacterWindows {
       });
   }
 
+  /**
+   * Follows the character's stylesheet and script on disk while the window
+   * is up: an editor saving one is all it takes to see the change. Only for
+   * a character that has either.
+   */
+  private watchFiles(live: Live, files: (string | null)[]): void {
+    const wanted = files.filter((file): file is string => file !== null);
+    const key = wanted.join('|');
+    if ((live.styleWatch?.key ?? '') === key) return;
+    this.unwatchStyle(live);
+    if (wanted.length === 0) return;
+    const current: NonNullable<Live['styleWatch']> = { key, watchers: [], timer: null };
+    const changed = (): void => {
+      // Editors save in bursts (truncate, write, rename): one refresh for the lot.
+      if (current.timer) clearTimeout(current.timer);
+      current.timer = setTimeout(() => {
+        current.timer = null;
+        const character = this.store.get(live.id);
+        if (character && !live.win.isDestroyed()) live.win.webContents.send(IPC.stageUpdate, this.payload(character, live.geometry, live));
+      }, 120);
+    };
+    for (const file of wanted) {
+      const path = this.store.assetPath(live.id, file);
+      if (!path) continue;
+      try {
+        const watcher = watch(path, changed);
+        watcher.on('error', () => watcher.close());
+        current.watchers.push(watcher);
+      } catch {
+        // Not there (yet): it simply is not followed.
+      }
+    }
+    live.styleWatch = current;
+  }
+
+  private unwatchStyle(live: Live): void {
+    const current = live.styleWatch;
+    if (!current) return;
+    if (current.timer) clearTimeout(current.timer);
+    for (const watcher of current.watchers) watcher.close();
+    live.styleWatch = null;
+  }
+
   private forget(live: Live): void {
+    this.unwatchStyle(live);
     if (live.revealTimer) clearTimeout(live.revealTimer);
     live.revealTimer = null;
     if (live.parkTimer) clearTimeout(live.parkTimer);
@@ -636,18 +687,41 @@ export class CharacterWindows {
       playing: this.presence.isWatching() && !live?.parked,
       restSec: character.appearance.restSec,
       preview: character.id === this.previewId,
-      speech
+      speech,
+      stylesheet: character.appearance.stylesheet ? this.versioned(character.id, character.appearance.stylesheet) : null,
+      script: this.scriptPage(character)
     };
   }
 
   private visual(id: string, type: StageVisual['type'], file: string): StageVisual | null {
+    const url = this.versioned(id, file);
+    return url ? { type, url } : null;
+  }
+
+  /**
+   * An asset's address, changed whenever the file is. A replaced or edited
+   * file keeps its name, so the address alone cannot tell the page anything
+   * changed: its modification time rides along as a query, which the
+   * protocol handler ignores. Null when the file is not there.
+   */
+  /** The sealed page for the character's script, changed whenever the script is; null if it has none or may not run it. */
+  private scriptPage(character: Character): string | null {
+    const file = character.appearance.script;
+    if (!file || !this.presence.scriptAllowed(character.id)) return null;
+    const path = this.store.assetPath(character.id, file);
+    if (!path) return null;
+    try {
+      return scriptHostUrl(character.id, `${file}@${Math.round(statSync(path).mtimeMs)}`);
+    } catch {
+      return null;
+    }
+  }
+
+  private versioned(id: string, file: string): string | null {
     const path = this.store.assetPath(id, file);
     if (!path) return null;
-    // A replaced file keeps its name, so the address alone cannot tell the
-    // page anything changed. Its modification time rides along as a query,
-    // which the protocol handler ignores.
     try {
-      return { type, url: `${assetUrl(id, file)}?v=${Math.round(statSync(path).mtimeMs)}` };
+      return `${assetUrl(id, file)}?v=${Math.round(statSync(path).mtimeMs)}`;
     } catch {
       return null;
     }
