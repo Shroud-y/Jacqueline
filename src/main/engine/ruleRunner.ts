@@ -124,10 +124,12 @@ export class RuleRunner {
     }
     if (polling) this.pollPrograms();
 
-    if (this.needs.focus && this.sensors && !this.unhookFocus) {
+    // Programs too: one that opens and closes between two looks still comes to the front.
+    const hearingFocus = this.needs.focus || programs.size > 0;
+    if (hearingFocus && this.sensors && !this.unhookFocus) {
       this.focused = this.sensors.foregroundApp();
       this.unhookFocus = this.sensors.onForegroundChange(() => this.onFocus());
-    } else if (!this.needs.focus && this.unhookFocus) {
+    } else if (!hearingFocus && this.unhookFocus) {
       this.unhookFocus();
       this.unhookFocus = null;
     }
@@ -181,7 +183,13 @@ export class RuleRunner {
     const program = this.sensors?.foregroundApp() ?? null;
     if (program === this.focused) return;
     this.focused = program;
-    if (program) this.event({ type: 'programFocused', program });
+    if (!program) return;
+    // Up front, yet not running at the last look: it has started. The next look sees it stop.
+    if (this.running.get(program) === false) {
+      this.running.set(program, true);
+      if (this.needs.startStop.has(program)) this.event({ type: 'programStarted', program });
+    }
+    if (this.needs.focus) this.event({ type: 'programFocused', program });
   }
 
   /** On the minute, every minute, for as long as some rule is daily. */

@@ -96,6 +96,60 @@ describe('RuleRunner', () => {
     r.stop();
   });
 
+  it('catches a program that opens and closes between two looks, once it comes to the front', async () => {
+    const d = desk();
+    const r = runner(d);
+    r.setCharacters([character([rule({ type: 'programStarted', program: 'tool.exe' }), rule({ type: 'programStopped', program: 'tool.exe' })])]);
+    await settle();
+
+    // Never in any process list: only the window coming to the front shows it.
+    d.switchTo('tool');
+    expect(fired.map((f) => f.rule.when.type)).toEqual(['programStarted']);
+    d.switchTo('chrome');
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fired.map((f) => f.rule.when.type)).toEqual(['programStarted', 'programStopped']);
+    r.stop();
+  });
+
+  it('does not report a start twice when the next look finds the program still running', async () => {
+    const d = desk();
+    const r = runner(d);
+    r.setCharacters([character([rule({ type: 'programStarted', program: 'tool.exe' })])]);
+    await settle();
+
+    d.running = new Set(['tool']);
+    d.switchTo('tool');
+    d.switchTo('chrome');
+    d.switchTo('tool');
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fired).toHaveLength(1);
+    r.stop();
+  });
+
+  it('takes a program already running at the first look for no start when it comes to the front', async () => {
+    const d = desk();
+    d.running = new Set(['tool']);
+    const r = runner(d);
+    r.setCharacters([character([rule({ type: 'programStarted', program: 'tool.exe' })])]);
+    await settle();
+    d.switchTo('tool');
+    expect(fired).toEqual([]);
+    r.stop();
+  });
+
+  it('stops listening to windows when no rule names a program any more', async () => {
+    const d = desk();
+    const r = runner(d);
+    r.setCharacters([character([rule({ type: 'programStarted', program: 'tool.exe' })])]);
+    await settle();
+    r.setCharacters([character([])]);
+    await settle();
+    d.switchTo('tool');
+    expect(fired).toEqual([]);
+    expect(vi.getTimerCount()).toBe(0);
+    r.stop();
+  });
+
   it('hears a window coming to the front as it happens, once per change', async () => {
     const d = desk();
     d.focused = 'chrome';
