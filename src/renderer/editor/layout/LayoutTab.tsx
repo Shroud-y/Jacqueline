@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type WheelEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type WheelEvent } from 'react';
 import { assetUrl } from '@shared/assetUrl';
 import { HANDLES, freeElementId, moveBox, placeBeside, resizeBox, snapBox, type Handle } from '@shared/canvas';
 import { DEFAULT_TEXT_STYLE, type Character, type LayoutElement } from '@shared/character';
+import { clampCropRect, cropFromRects, cropGeometry, fullRect, isCropped, mirrorCrop, moveCropRect, NO_CROP, visibleRect } from '@shared/crop';
 import { layoutAnchor, layoutFrame, type Rect } from '@shared/layout';
 import { SAMPLE_LINE, isFontFile } from '@shared/textStyle';
 import type { AssetInfo } from '@shared/types';
 import TextElement from '../../shared/TextElement';
+import { probeMedia } from '../media';
 import type { Characters } from '../useCharacters';
 import Inspector from './Inspector';
 
@@ -38,6 +40,13 @@ const capture = (element: HTMLElement | null, pointerId: number): void => {
   }
 };
 
+/** Cropping under way: the whole file on the canvas, and the part being kept. In what the screen shows, mirrored if the character is. */
+interface Cropping {
+  full: Rect;
+  visible: Rect;
+  gesture: { kind: 'move' | Handle; start: { x: number; y: number }; from: Rect } | null;
+}
+
 const boxOf = (element: LayoutElement): Rect => ({ x: element.x, y: element.y, width: element.width, height: element.height });
 
 /** Where things sit in the character's window: the canvas, and what is chosen on it. */
@@ -53,6 +62,8 @@ export default function LayoutTab({ character, characters }: { character: Charac
   const [draft, setDraft] = useState<{ id: string; box: Rect; guides: { x: number[]; y: number[] } } | null>(null);
   const [panning, setPanning] = useState<Pan | null>(null);
   const [fontFiles, setFontFiles] = useState<string[]>([]);
+  const [natural, setNatural] = useState<{ src: string; width: number; height: number } | null>(null);
+  const [cropping, setCropping] = useState<Cropping | null>(null);
 
   // On the desktop, this character shows its layout with sample text for as long as this tab is open.
   useEffect(() => {
@@ -101,6 +112,8 @@ export default function LayoutTab({ character, characters }: { character: Charac
 
   const onPointerDown = (event: PointerEvent): void => {
     if (event.button !== 0 && event.button !== 1) return;
+    // A press outside what is being kept: cropping is over, and it stands.
+    if (cropping && event.button === 0) finishCrop(cropping);
     // On the empty canvas: let go of the selection, and drag the view about.
     if (event.button === 0) setSelectedId(null);
     capture(canvas.current, event.pointerId);
@@ -108,6 +121,14 @@ export default function LayoutTab({ character, characters }: { character: Charac
   };
 
   const onPointerMove = (event: PointerEvent): void => {
+    if (cropping?.gesture) {
+      const { gesture: drag, full } = cropping;
+      const dx = (event.clientX - drag.start.x) / zoom;
+      const dy = (event.clientY - drag.start.y) / zoom;
+      const visible = drag.kind === 'move' ? moveCropRect(drag.from, dx, dy, full) : clampCropRect(resizeBox(drag.from, drag.kind, dx, dy), full);
+      setCropping({ ...cropping, visible });
+      return;
+    }
     if (panning) {
       setPan({ x: panning.from.x + event.clientX - panning.start.x, y: panning.from.y + event.clientY - panning.start.y });
       return;
@@ -131,6 +152,7 @@ export default function LayoutTab({ character, characters }: { character: Charac
   };
 
   const onPointerUp = (): void => {
+    if (cropping?.gesture) setCropping({ ...cropping, gesture: null });
     if (panning) setPanning(null);
     if (gesture && draft && draft.id === gesture.id) {
       const element = elements.find((entry) => entry.id === gesture.id);
@@ -168,6 +190,11 @@ export default function LayoutTab({ character, characters }: { character: Charac
   };
 
   const onKeyDown = (event: KeyboardEvent): void => {
+    if (cropping) {
+      if (event.key === 'Escape') setCropping(null);
+      else if (event.key === 'Enter') finishCrop(cropping);
+      return;
+    }
     if (!selected) return;
     const step = event.shiftKey ? 10 : 1;
     const nudge: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
@@ -213,9 +240,83 @@ export default function LayoutTab({ character, characters }: { character: Charac
     loadFonts();
   };
 
-  /* ---- drawing -------------------------------------------------------- */
+  /* ---- cropping ------------------------------------------------------- */
 
   const idle = character.appearance.states.idle ?? Object.values(character.appearance.states)[0] ?? null;
+  const idleSrc = idle?.src ?? null;
+  const idleType = idle?.type ?? null;
+  // The file's own proportions: a crop is a fraction of them.
+  useEffect(() => {
+    if (!idleSrc || !idleType) return;
+    let cancelled = false;
+    void probeMedia(assetUrl(id, idleSrc), idleType).then((size) => {
+      if (!cancelled && size) setNatural({ src: idleSrc, ...size });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, idleSrc, idleType]);
+  const fileSize = natural && natural.src === idleSrc ? natural : null;
+  const { flip } = character.appearance;
+  const characterBox = elements.find((element) => element.type === 'character');
+  const fileCrop = characterBox?.type === 'character' ? (characterBox.crop ?? NO_CROP) : NO_CROP;
+
+  const startCrop = (): void => {
+    if (!characterBox || !fileSize) return;
+    const onScreen = flip ? mirrorCrop(fileCrop) : fileCrop;
+    setCropping({ full: fullRect(boxOf(characterBox), fileSize, onScreen), visible: visibleRect(boxOf(characterBox), fileSize, onScreen), gesture: null });
+    setSelectedId(characterBox.id);
+    canvas.current?.focus();
+  };
+
+  /**
+   * The box becomes what is kept, so nothing cut off takes the mouse. Whatever
+   * stays stays exactly where it was, on the canvas and on the desktop: the
+   * character's place on screen is its box's corner, and that corner has moved.
+   */
+  const finishCrop = ({ full, visible }: Cropping): void => {
+    setCropping(null);
+    if (characterBox?.type !== 'character') return;
+    const onScreen = cropFromRects(full, visible);
+    const crop = flip ? mirrorCrop(onScreen) : onScreen;
+    const { crop: _before, ...rest } = characterBox;
+    const next: LayoutElement = isCropped(crop) ? { ...rest, ...visible, crop } : { ...rest, ...visible };
+    const { position } = character.presence;
+    characters.update({
+      ...character,
+      layout: { ...character.layout, elements: elements.map((entry) => (entry.id === next.id ? next : entry)) },
+      presence: {
+        ...character.presence,
+        position: position ? { x: position.x + visible.x - characterBox.x, y: position.y + visible.y - characterBox.y } : null
+      }
+    });
+  };
+
+  const resetCrop = (): void => {
+    if (!characterBox || !fileSize) return;
+    const full = fullRect(boxOf(characterBox), fileSize, flip ? mirrorCrop(fileCrop) : fileCrop);
+    finishCrop({ full, visible: full, gesture: null });
+  };
+
+  const beginCropDrag = (event: PointerEvent, kind: 'move' | Handle): void => {
+    if (event.button !== 0 || !cropping) return;
+    event.stopPropagation();
+    capture(canvas.current, event.pointerId);
+    setCropping({ ...cropping, gesture: { kind, start: { x: event.clientX, y: event.clientY }, from: cropping.visible } });
+  };
+
+  /** The character's file, muted and never played: a picture of it to arrange things around. */
+  const media = (style: CSSProperties): JSX.Element | null =>
+    idle ? (
+      idle.type === 'image' ? (
+        <img src={assetUrl(id, idle.src)} alt="" draggable={false} style={style} />
+      ) : (
+        <video src={assetUrl(id, idle.src)} muted preload="metadata" style={style} />
+      )
+    ) : null;
+
+  /* ---- drawing -------------------------------------------------------- */
+
   const has = (type: LayoutElement['type']): boolean => elements.some((element) => element.type === type);
   const selectedBox = selected ? shown(selected) : null;
 
@@ -266,11 +367,26 @@ export default function LayoutTab({ character, characters }: { character: Charac
                   onPointerDown={(event) => begin(event, element, 'move')}
                 >
                   {element.type === 'character' ? (
-                    idle ? (
-                      idle.type === 'image' ? (
-                        <img src={assetUrl(id, idle.src)} alt="" draggable={false} style={{ opacity: character.appearance.opacity, transform: character.appearance.flip ? 'scaleX(-1)' : undefined }} />
+                    idle && cropping ? null : idle ? (
+                      fileSize ? (
+                        (() => {
+                          const shownFile = cropGeometry(box, fileSize, element.crop);
+                          return (
+                            <div
+                              className="el-crop"
+                              style={{
+                                width: shownFile.width,
+                                height: shownFile.height,
+                                opacity: character.appearance.opacity,
+                                transform: flip ? 'scaleX(-1)' : undefined
+                              }}
+                            >
+                              {media({ position: 'absolute', maxWidth: 'none', maxHeight: 'none', ...shownFile.file })}
+                            </div>
+                          );
+                        })()
                       ) : (
-                        <video src={assetUrl(id, idle.src)} muted preload="metadata" style={{ opacity: character.appearance.opacity, transform: character.appearance.flip ? 'scaleX(-1)' : undefined }} />
+                        media({ opacity: character.appearance.opacity, transform: flip ? 'scaleX(-1)' : undefined })
                       )
                     ) : (
                       <div className="el-placeholder">{character.name}</div>
@@ -289,7 +405,46 @@ export default function LayoutTab({ character, characters }: { character: Charac
               );
             })}
 
-            {selected && selectedBox ? (
+            {cropping ? (
+              <>
+                {/* The whole file, dimmed, and the part being kept, clear, over it. */}
+                <div className="crop-full" style={{ left: cropping.full.x, top: cropping.full.y, width: cropping.full.width, height: cropping.full.height }}>
+                  {media({ width: '100%', height: '100%', maxWidth: 'none', maxHeight: 'none', transform: flip ? 'scaleX(-1)' : undefined })}
+                </div>
+                <div
+                  className="crop-kept"
+                  style={{ left: cropping.visible.x, top: cropping.visible.y, width: cropping.visible.width, height: cropping.visible.height }}
+                  onPointerDown={(event) => beginCropDrag(event, 'move')}
+                >
+                  {media({
+                    position: 'absolute',
+                    left: cropping.full.x - cropping.visible.x,
+                    top: cropping.full.y - cropping.visible.y,
+                    width: cropping.full.width,
+                    height: cropping.full.height,
+                    maxWidth: 'none',
+                    maxHeight: 'none',
+                    transform: flip ? 'scaleX(-1)' : undefined
+                  })}
+                </div>
+                <div className="selection" style={{ left: cropping.visible.x, top: cropping.visible.y, width: cropping.visible.width, height: cropping.visible.height }}>
+                  {HANDLES.map((handle) => (
+                    <span
+                      key={handle}
+                      className="grip"
+                      aria-hidden="true"
+                      style={{
+                        left: handle.includes('w') ? 0 : handle.includes('e') ? '100%' : '50%',
+                        top: handle.includes('n') ? 0 : handle.includes('s') ? '100%' : '50%',
+                        transform: `scale(${1 / zoom})`,
+                        cursor: `${handle}-resize`
+                      }}
+                      onPointerDown={(event) => beginCropDrag(event, handle)}
+                    />
+                  ))}
+                </div>
+              </>
+            ) : selected && selectedBox ? (
               <div className="selection" style={{ left: selectedBox.x, top: selectedBox.y, width: selectedBox.width, height: selectedBox.height }}>
                 {HANDLES.map((handle) => (
                   <span
@@ -313,10 +468,29 @@ export default function LayoutTab({ character, characters }: { character: Charac
           </div>
         ) : null}
 
-        <div className="canvas-hint">Drag to move · corners to resize · Shift changes proportions · Alt skips lining up · wheel zooms</div>
+        <div className="canvas-hint">
+          {cropping
+            ? 'Drag the edges to crop · drag inside to choose which part · Enter keeps it · Esc cancels'
+            : 'Drag to move · corners to resize · Shift changes proportions · Alt skips lining up · wheel zooms'}
+        </div>
       </div>
 
-      <Inspector element={selected} fontFiles={fontFiles} onChange={replace} onRemove={remove} onChooseFont={(element) => void chooseFont(element)} />
+      <Inspector
+        element={selected}
+        fontFiles={fontFiles}
+        onChange={replace}
+        onRemove={remove}
+        onChooseFont={(element) => void chooseFont(element)}
+        crop={{
+          available: fileSize !== null,
+          cropping: cropping !== null,
+          cropped: isCropped(fileCrop),
+          onStart: startCrop,
+          onDone: () => cropping && finishCrop(cropping),
+          onCancel: () => setCropping(null),
+          onReset: resetCrop
+        }}
+      />
     </div>
   );
 }

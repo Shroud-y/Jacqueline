@@ -88,8 +88,13 @@ const boxShape = {
   height: z.number().positive().max(4000)
 };
 
+/** How much is cut off each side of the picture or video, as a fraction of it. The file is left whole. */
+const cropSchema = z
+  .object({ top: z.number().min(0).max(1), right: z.number().min(0).max(1), bottom: z.number().min(0).max(1), left: z.number().min(0).max(1) })
+  .refine((crop) => crop.left + crop.right < 1 && crop.top + crop.bottom < 1, 'a crop has to leave something');
+
 const layoutElementSchema = z.discriminatedUnion('type', [
-  z.object({ ...boxShape, type: z.literal('character') }),
+  z.object({ ...boxShape, type: z.literal('character'), crop: cropSchema.optional() }),
   z.object({
     ...boxShape,
     type: z.literal('speech'),

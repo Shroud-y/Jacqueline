@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { characterElement, type AssetKind, type Character, type Visual } from '@shared/character';
+import { croppedSize } from '@shared/crop';
 import { assetUrl } from '@shared/assetUrl';
 import type { AssetInfo } from '@shared/types';
 import FileSlot, { type SlotFile } from './FileSlot';
@@ -45,6 +46,18 @@ export default function AppearanceTab({ character, characters }: { character: Ch
     }
   });
 
+  const uncropped = (base: Character): Character => ({
+    ...base,
+    layout: {
+      ...base.layout,
+      elements: base.layout.elements.map((entry) => {
+        if (entry.type !== 'character') return entry;
+        const { crop: _crop, ...rest } = entry;
+        return rest;
+      })
+    }
+  });
+
   /** Puts a file into a state, and lets the old one go once nothing points at it any more. */
   const choose = async (state: StateName, path?: string): Promise<void> => {
     const api = window.jacquelineEditor;
@@ -61,10 +74,11 @@ export default function AppearanceTab({ character, characters }: { character: Ch
         ...character,
         appearance: { ...appearance, states: { ...appearance.states, [state]: { type, src: imported.file } } }
       };
-      // A new look for the character fits its box: same width, the file's own proportions.
+      // A new look for the character fits its box: same width, the file's own proportions, and
+      // whole again: a crop was made for the file it replaces.
       if (state === 'idle' && element) {
         const size = await probeMedia(assetUrl(id, imported.file), type);
-        if (size) next = setElementSize(next, element.width, heightFor(element.width, size));
+        if (size) next = uncropped(setElementSize(next, element.width, heightFor(element.width, size)));
       }
       const old = appearance.states[state]?.src;
       if (await characters.save(next)) {
@@ -203,13 +217,13 @@ export default function AppearanceTab({ character, characters }: { character: Ch
 
   const setWidth = (width: number): void => {
     if (!element) return;
-    const ratio = naturalSize ?? { width: element.width, height: element.height };
+    const ratio = naturalSize ? croppedSize(naturalSize, element.crop) : { width: element.width, height: element.height };
     characters.update(setElementSize(character, width, keepProportions ? heightFor(width, ratio) : element.height));
   };
 
   const setHeight = (height: number): void => {
     if (!element) return;
-    const ratio = naturalSize ?? { width: element.width, height: element.height };
+    const ratio = naturalSize ? croppedSize(naturalSize, element.crop) : { width: element.width, height: element.height };
     characters.update(setElementSize(character, keepProportions ? widthFor(height, ratio) : element.width, height));
   };
 

@@ -16,6 +16,7 @@ export const STYLE_STARTER = `/*
  *     [data-state="idle"]       …or "speaking"
  *     [data-preview="true"]     …while it is being laid out in the editor
  *   .character                  the box its picture or video sits in
+ *   .visual-crop                the part of it that shows, after cropping
  *   .visual                     the picture or video itself
  *   .placeholder                what shows while it has no picture
  *   .text-speech                the line being said

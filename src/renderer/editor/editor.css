@@ -1662,3 +1662,42 @@ input {
   max-width: 640px;
   margin-top: 24px;
 }
+
+/* ---- cropping ------------------------------------------------------------- */
+
+.el-crop {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.crop-full,
+.crop-kept {
+  position: absolute;
+  overflow: hidden;
+}
+
+/* What will be cut off, still there to see what is being left out. */
+.crop-full {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.crop-full img,
+.crop-full video,
+.crop-kept img,
+.crop-kept video {
+  display: block;
+  pointer-events: none;
+}
+
+.crop-kept {
+  cursor: move;
+}
+
+.crop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

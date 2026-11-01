@@ -156,3 +156,18 @@ describe('sound while on screen', () => {
     expect(referencedAssets(withAmbient).has('rain.ogg')).toBe(true);
   });
 });
+
+describe('crop', () => {
+  const withCrop = (crop: unknown): unknown => {
+    const character = defaultCharacter('miku', 'Miku');
+    return { ...character, layout: { elements: character.layout.elements.map((element) => (element.type === 'character' ? { ...element, crop } : element)) } };
+  };
+
+  it('is optional, and has to leave something of the file', () => {
+    expect(characterSchema.safeParse(defaultCharacter('miku', 'Miku')).success).toBe(true);
+    expect(characterSchema.safeParse(withCrop({ top: 0.1, right: 0.2, bottom: 0.1, left: 0.3 })).success).toBe(true);
+    expect(characterSchema.safeParse(withCrop({ top: 0, right: 0.5, bottom: 0, left: 0.5 })).success).toBe(false);
+    expect(characterSchema.safeParse(withCrop({ top: 0.6, right: 0, bottom: 0.6, left: 0 })).success).toBe(false);
+    expect(characterSchema.safeParse(withCrop({ top: -0.1, right: 0, bottom: 0, left: 0 })).success).toBe(false);
+  });
+});

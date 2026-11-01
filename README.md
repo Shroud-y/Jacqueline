@@ -43,7 +43,8 @@ away; there is no Save button.
   sits, how big, in what font (yours too: drop in a `.ttf`), colour, outline,
   shadow, background, and how it appears (typed out, faded in, or at once).
   While this tab is open the character shows sample text on your desktop, so
-  you can see it where it will be.
+  you can see it where it will be. **Crop** trims the picture or video: drag its
+  edges, the file stays whole, and what is cut off takes no mouse.
 - **Behaviour** — rules. Each one reads as a sentence: *When **dota2.exe**
   starts → say a line from **greet***. Open one to change it:
   - **When**: a program starts, closes or comes to the front; every day at a

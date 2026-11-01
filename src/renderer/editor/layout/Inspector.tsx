@@ -15,10 +15,21 @@ interface InspectorProps {
   onChange: (element: LayoutElement) => void;
   onRemove: (element: LayoutElement) => void;
   onChooseFont: (element: TextElementType) => void;
+  /** Cropping the character's picture or video. */
+  crop: {
+    /** False until there is a file, and its size is known. */
+    available: boolean;
+    cropping: boolean;
+    cropped: boolean;
+    onStart: () => void;
+    onDone: () => void;
+    onCancel: () => void;
+    onReset: () => void;
+  };
 }
 
 /** Everything about the selected element, folded into sections. */
-export default function Inspector({ element, fontFiles, onChange, onRemove, onChooseFont }: InspectorProps): JSX.Element {
+export default function Inspector({ element, fontFiles, onChange, onRemove, onChooseFont, crop }: InspectorProps): JSX.Element {
   if (!element) {
     return (
       <aside className="inspector">
@@ -42,6 +53,33 @@ export default function Inspector({ element, fontFiles, onChange, onRemove, onCh
           <div className="field-hint">The character stays where it is on the desktop; moving it here moves everything else around it.</div>
         ) : null}
       </Fold>
+
+      {element.type === 'character' && crop.available ? (
+        <Fold title="Crop">
+          {crop.cropping ? (
+            <div className="crop-actions">
+              <button type="button" className="button primary" onClick={crop.onDone}>
+                Keep this
+              </button>
+              <button type="button" className="button" onClick={crop.onCancel}>
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="crop-actions">
+              <button type="button" className="button" onClick={crop.onStart}>
+                Crop
+              </button>
+              {crop.cropped ? (
+                <button type="button" className="button quiet" onClick={crop.onReset}>
+                  Show it all
+                </button>
+              ) : null}
+            </div>
+          )}
+          <div className="field-hint">Only what shows counts: the rest takes no mouse and the file stays whole.</div>
+        </Fold>
+      ) : null}
 
       {element.type === 'character' ? null : (
         <TextSections element={element} fontFiles={fontFiles} onChange={onChange} onChooseFont={onChooseFont} />

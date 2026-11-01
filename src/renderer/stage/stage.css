@@ -29,11 +29,17 @@ body,
   cursor: grabbing;
 }
 
-/* Sized in the component to the file's own shape, as large as fits the box.
-   Never letterboxed. */
+/* Sized in the component to what is left of the file after cropping, as large
+   as fits the box. Never letterboxed. */
+.visual-crop {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  pointer-events: none;
+}
+
 .visual {
   display: block;
-  flex: none;
   pointer-events: none;
 }
 

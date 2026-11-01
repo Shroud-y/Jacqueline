@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { cropGeometry, type Crop } from '@shared/crop';
 import { SAMPLE_LINE } from '@shared/textStyle';
 import type { StagePayload } from '@shared/types';
 import TextElement from '../shared/TextElement';
@@ -74,7 +75,7 @@ export default function Stage(): JSX.Element | null {
       {stage.stylesheet ? <link rel="stylesheet" href={stage.stylesheet} /> : null}
       {stage.elements.map((element) => {
         const box = { left: element.x - stage.frame.x, top: element.y - stage.frame.y, width: element.width, height: element.height };
-        if (element.type === 'character') return <CharacterElement key={element.id} stage={stage} {...box} />;
+        if (element.type === 'character') return <CharacterElement key={element.id} stage={stage} crop={element.crop} {...box} />;
         const { speech } = stage;
         if (speech && element.type === 'speech') {
           // Keyed by the line, so every line arrives from the start.
@@ -103,13 +104,14 @@ export default function Stage(): JSX.Element | null {
 
 interface CharacterElementProps {
   stage: StagePayload;
+  crop: Crop | undefined;
   left: number;
   top: number;
   width: number;
   height: number;
 }
 
-function CharacterElement({ stage, left, top, width, height }: CharacterElementProps): JSX.Element {
+function CharacterElement({ stage, crop, left, top, width, height }: CharacterElementProps): JSX.Element {
   const press = useRef<{ x: number; y: number; dragging: boolean } | null>(null);
   const video = useRef<HTMLVideoElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -212,14 +214,16 @@ function CharacterElement({ stage, left, top, width, height }: CharacterElementP
   // box and letterbox itself, a video paints the leftover strips black, and a
   // transparent window shows them.
   const known = natural && natural.url === visual?.url && natural.width > 0 && natural.height > 0 ? natural : null;
-  const scale = known ? Math.min(width / known.width, height / known.height) : 0;
-  const look: CSSProperties = {
-    width: known ? Math.round(known.width * scale) : 0,
-    height: known ? Math.round(known.height * scale) : 0,
+  const shown = known ? cropGeometry({ width, height }, known, crop) : null;
+  const frame: CSSProperties = {
+    width: shown?.width ?? 0,
+    height: shown?.height ?? 0,
     visibility: known ? 'visible' : 'hidden',
     opacity: stage.opacity,
     transform: stage.flip ? 'scaleX(-1)' : undefined
   };
+  // The whole file, slid so only what is left after cropping shows through the frame.
+  const look: CSSProperties = shown ? { position: 'absolute', ...shown.file } : {};
   const painted = (): void => window.jacqueline?.painted();
   const measured = (width: number, height: number): void => {
     if (visual) setNatural({ url: visual.url, width, height });
@@ -240,34 +244,38 @@ function CharacterElement({ stage, left, top, width, height }: CharacterElementP
         window.jacqueline?.menu();
       }}
     >
-      {visual?.type === 'image' ? (
-        // An image that fails to load still gets its window, or it could never be fixed.
-        <img
-          className="visual"
-          style={look}
-          src={visual.url}
-          alt=""
-          draggable={false}
-          onLoad={(event) => {
-            measured(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight);
-            painted();
-          }}
-          onError={painted}
-        />
-      ) : visual?.type === 'video' ? (
-        <video
-          ref={video}
-          className="visual"
-          style={look}
-          src={visual.url}
-          muted
-          playsInline
-          disablePictureInPicture
-          preload="auto"
-          onLoadedMetadata={(event) => measured(event.currentTarget.videoWidth, event.currentTarget.videoHeight)}
-          onLoadedData={painted}
-          onError={painted}
-        />
+      {visual ? (
+        <div className="visual-crop" style={frame}>
+          {visual.type === 'image' ? (
+            // An image that fails to load still gets its window, or it could never be fixed.
+            <img
+              className="visual"
+              style={look}
+              src={visual.url}
+              alt=""
+              draggable={false}
+              onLoad={(event) => {
+                measured(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight);
+                painted();
+              }}
+              onError={painted}
+            />
+          ) : (
+            <video
+              ref={video}
+              className="visual"
+              style={look}
+              src={visual.url}
+              muted
+              playsInline
+              disablePictureInPicture
+              preload="auto"
+              onLoadedMetadata={(event) => measured(event.currentTarget.videoWidth, event.currentTarget.videoHeight)}
+              onLoadedData={painted}
+              onError={painted}
+            />
+          )}
+        </div>
       ) : (
         <div className="placeholder">{stage.name}</div>
       )}
