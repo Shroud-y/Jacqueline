@@ -702,7 +702,13 @@ export class CharacterWindows {
       speech,
       stylesheet: character.appearance.stylesheet ? this.versioned(character.id, character.appearance.stylesheet) : null,
       script: this.scriptPage(character),
-      mood: this.moods.get(character.id) ?? null
+      mood: this.moods.get(character.id) ?? null,
+      sound: {
+        audible: this.presence.isWatching() && !this.presence.isSilenced() && live !== undefined && !live.parked && live.onItsOwn,
+        volume: character.audio.volume,
+        videoSound: character.audio.videoSound,
+        ambient: character.audio.ambient ? this.versioned(character.id, character.audio.ambient) : null
+      }
     };
   }
 

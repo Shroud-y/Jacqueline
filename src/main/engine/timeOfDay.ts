@@ -21,3 +21,15 @@ export function minutesOfDay(now: number): number {
   const d = new Date(now);
   return d.getHours() * 60 + d.getMinutes();
 }
+
+/** Until the next of two times of day comes round, just past it; null if neither is a time. */
+export function msUntilClockChange(now: number, from: string, to: string): number | null {
+  const date = new Date(now);
+  const sinceMidnight = (date.getHours() * 60 + date.getMinutes()) * 60_000 + date.getSeconds() * 1000 + date.getMilliseconds();
+  const waits = [parseClock(from), parseClock(to)].flatMap((clock) => {
+    if (clock === null) return [];
+    const wait = clock * 60_000 - sinceMidnight;
+    return [wait > 0 ? wait : wait + 24 * 60 * 60_000];
+  });
+  return waits.length > 0 ? Math.min(...waits) + 50 : null;
+}

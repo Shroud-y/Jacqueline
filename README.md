@@ -68,7 +68,9 @@ away; there is no Save button.
   (the character's), `{time}`, `{program}` (for rules about a program) and
   `{minutes}` (how long you were away). A line whose slot cannot be filled
   is skipped, never shown with a hole in it. **Test** says it on your desktop.
-- **Audio** — volume, and sounds for coming on screen and leaving.
+- **Audio** — volume, a video's own sound (on unless you turn it off), an
+  ambient sound that loops while the character is on screen, and sounds for
+  coming on screen and leaving.
 
 On the desktop: **drag** a character anywhere (other monitors too), **click**
 it to set off its "clicked" rules, click while it is talking to dismiss the

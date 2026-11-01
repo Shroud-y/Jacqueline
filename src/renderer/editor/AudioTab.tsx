@@ -3,10 +3,10 @@ import type { AssetKind, Character } from '@shared/character';
 import { assetUrl } from '@shared/assetUrl';
 import type { AssetInfo } from '@shared/types';
 import FileSlot, { type SlotFile } from './FileSlot';
-import { Field, Group, Slider } from './fields';
+import { Checkbox, Field, Group, Slider } from './fields';
 import type { Characters } from './useCharacters';
 
-type Entry = 'appear' | 'disappear';
+type Entry = 'appear' | 'disappear' | 'ambient';
 
 const SOUND_KINDS: AssetKind[] = ['audio'];
 
@@ -95,7 +95,7 @@ export default function AudioTab({ character, characters }: { character: Charact
   return (
     <div className="form">
       <Group title="Volume">
-        <Field hint="For every sound the character makes: its lines, its rules, its coming and going.">
+        <Field hint="For every sound the character makes: its video, its ambient sound, its lines, its rules, its coming and going.">
           <Slider
             label="Volume"
             value={Math.round(audio.volume * 100)}
@@ -105,6 +105,18 @@ export default function AudioTab({ character, characters }: { character: Charact
             onCommit={(percent) => characters.update({ ...character, audio: { ...audio, volume: percent / 100 } })}
           />
         </Field>
+      </Group>
+
+      <Group title="While it is on screen">
+        {Object.values(character.appearance.states).some((visual) => visual.type === 'video') ? (
+          <Checkbox
+            label="Play the video's own sound"
+            checked={audio.videoSound}
+            onChange={(videoSound) => characters.update({ ...character, audio: { ...audio, videoSound } })}
+          />
+        ) : null}
+        {slot('ambient', 'Ambient sound', 'Plays on a loop for as long as the character is on screen.')}
+        <div className="prose quiet-prose">Both stay silent while everyone is muted, in quiet hours, or while nobody is at the computer.</div>
       </Group>
 
       <Group title="Coming and going">

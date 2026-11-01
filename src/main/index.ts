@@ -18,7 +18,7 @@ import { registerEditorIpc } from './characters/editorIpc';
 import { handleScriptHost } from './characters/scriptHost';
 import { ScriptTrust } from './characters/scriptTrust';
 import { isPresent } from './characters/presence';
-import { isWithinClockWindow, minutesOfDay } from './engine/timeOfDay';
+import { isWithinClockWindow, minutesOfDay, msUntilClockChange } from './engine/timeOfDay';
 import { pickLine, runActions, type ActionDeps } from './engine/actions';
 import { BehaviourScripts } from './engine/behaviourScripts';
 import { clock } from './engine/ruleEngine';
@@ -331,9 +331,28 @@ async function bootstrap(): Promise<void> {
   characters.onChange(resync);
   scriptTrust.onChange(resync);
   visibility.onChange(resync);
+  // Quiet hours start and end on their own: what is sounding has to hear about it. Armed only while they are on.
+  let quietTimer: NodeJS.Timeout | null = null;
+  const armQuietHours = (): void => {
+    if (quietTimer) clearTimeout(quietTimer);
+    quietTimer = null;
+    const { enabled, from, to } = settings.current.quietHours;
+    if (!enabled) return;
+    const wait = msUntilClockChange(Date.now(), from, to);
+    if (wait === null) return;
+    quietTimer = setTimeout(() => {
+      windows.refresh();
+      armQuietHours();
+    }, wait);
+    quietTimer.unref?.();
+  };
+  armQuietHours();
+
   settings.onChange((next) => {
     if (next.muted) director.silenceAll();
     tray.refresh();
+    windows.refresh();
+    armQuietHours();
     editor.send(IPC.editorSettingsChanged, settingsView());
   });
 

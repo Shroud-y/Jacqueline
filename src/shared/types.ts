@@ -81,6 +81,18 @@ export interface StagePayload {
   script: string | null;
   /** Set by its behaviour script, for its stylesheet's `[data-mood]`; null for none. */
   mood: string | null;
+  /** What keeps sounding while it is on screen: a video's own sound, and its ambient sound. */
+  sound: {
+    /**
+     * False while nothing may be heard: muted, quiet hours, nobody at the
+     * computer, put away, or out only to be laid out.
+     */
+    audible: boolean;
+    /** 0 to 1. */
+    volume: number;
+    videoSound: boolean;
+    ambient: string | null;
+  };
 }
 
 /* ------------------------------------------------------------------ */

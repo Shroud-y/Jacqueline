@@ -89,7 +89,7 @@ describe('referencedAssets', () => {
       ...base,
       appearance: { ...base.appearance, states: { idle: { type: 'video' as const, src: 'idle.webm' }, speaking: { type: 'image' as const, src: 'talk.png' } } },
       lines: { greet: [{ id: 'l1', text: 'hi', audio: 'hi.ogg' }, { id: 'l2', text: 'yo' }] },
-      audio: { volume: 1, appear: 'in.ogg', disappear: null },
+      audio: { volume: 1, appear: 'in.ogg', disappear: null, videoSound: true, ambient: null },
       layout: {
         elements: base.layout.elements.map((element) =>
           element.type === 'speech' ? { ...element, style: { ...element.style, font: 'Comic.ttf' } } : element
@@ -137,5 +137,22 @@ describe('stylesheet', () => {
     expect(assetKindOf('glow.js')).toBe('script');
     const scripted = { ...character, appearance: { ...character.appearance, script: 'glow.js' } };
     expect(referencedAssets(scripted).has('glow.js')).toBe(true);
+  });
+});
+
+describe('sound while on screen', () => {
+  it('plays a video’s own sound unless told not to, also for characters saved before the option', () => {
+    const character = defaultCharacter('miku', 'Miku');
+    expect(character.audio.videoSound).toBe(true);
+    const older = { ...character, audio: { volume: 1, appear: null, disappear: null } };
+    const parsed = characterSchema.parse(older);
+    expect(parsed.audio.videoSound).toBe(true);
+    expect(parsed.audio.ambient).toBeNull();
+  });
+
+  it('counts the ambient sound as a file the character uses', () => {
+    const character = defaultCharacter('miku', 'Miku');
+    const withAmbient = { ...character, audio: { ...character.audio, ambient: 'rain.ogg' } };
+    expect(referencedAssets(withAmbient).has('rain.ogg')).toBe(true);
   });
 });

@@ -35,6 +35,29 @@ export default function Stage(): JSX.Element | null {
     };
   }, []);
 
+  // Its ambient sound, on a loop. Held on to through a pause, so it picks up where it was.
+  const ambientUrl = stage?.sound.ambient ?? null;
+  const ambient = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => {
+    if (!ambientUrl) return;
+    const audio = new Audio(ambientUrl);
+    audio.loop = true;
+    ambient.current = audio;
+    return () => {
+      audio.pause();
+      ambient.current = null;
+    };
+  }, [ambientUrl]);
+  const audible = stage?.sound.audible ?? false;
+  const volume = stage?.sound.volume ?? 1;
+  useEffect(() => {
+    const audio = ambient.current;
+    if (!audio) return;
+    audio.volume = Math.min(1, Math.max(0, volume));
+    if (audible) void audio.play().catch(() => undefined);
+    else audio.pause();
+  }, [ambientUrl, audible, volume]);
+
   if (!stage) return null;
 
   // Hooks a character's own stylesheet can rely on: see `STYLE_STARTER` in shared/stylesheet.ts.
@@ -132,6 +155,17 @@ function CharacterElement({ stage, left, top, width, height }: CharacterElementP
       if (rest) clearTimeout(rest);
     };
   }, [playing, restSec, videoUrl]);
+
+  // Its own sound, when it has one and it may be heard. `muted` as an attribute is
+  // only read once, so it is set on the element.
+  const heard = stage.sound.audible && stage.sound.videoSound;
+  const soundVolume = stage.sound.volume;
+  useEffect(() => {
+    const element = video.current;
+    if (!element) return;
+    element.muted = !heard;
+    element.volume = Math.min(1, Math.max(0, soundVolume));
+  }, [heard, soundVolume, videoUrl]);
 
   useEffect(
     () => () => {

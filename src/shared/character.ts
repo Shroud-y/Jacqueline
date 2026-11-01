@@ -143,7 +143,11 @@ const lineSchema = z.object({
 const audioSchema = z.object({
   volume: z.number().min(0).max(1),
   appear: assetNameSchema.nullable(),
-  disappear: assetNameSchema.nullable()
+  disappear: assetNameSchema.nullable(),
+  /** A video plays its own sound unless this is turned off. */
+  videoSound: z.boolean().default(true),
+  /** Plays on a loop for as long as the character is on screen. */
+  ambient: assetNameSchema.nullable().default(null)
 });
 
 /* ------------------------------------------------------------------ */
@@ -207,7 +211,7 @@ export function defaultCharacter(id: string, name: string): Character {
     rules: [],
     behaviourScript: null,
     lines: {},
-    audio: { volume: 1, appear: null, disappear: null }
+    audio: { volume: 1, appear: null, disappear: null, videoSound: true, ambient: null }
   };
 }
 
@@ -277,6 +281,7 @@ export function referencedAssets(character: Character): Set<string> {
   }
   if (character.audio.appear) used.add(character.audio.appear);
   if (character.audio.disappear) used.add(character.audio.disappear);
+  if (character.audio.ambient) used.add(character.audio.ambient);
   for (const element of character.layout.elements) {
     if ('style' in element && assetKindOf(element.style.font) === 'font') used.add(element.style.font);
   }
