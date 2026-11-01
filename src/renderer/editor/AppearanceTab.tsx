@@ -3,6 +3,7 @@ import { characterElement, type AssetKind, type Character, type Visual } from '@
 import { croppedSize } from '@shared/crop';
 import { assetUrl } from '@shared/assetUrl';
 import type { AssetInfo } from '@shared/types';
+import { isAnimated } from '../shared/animationPlayer';
 import BackgroundSection from './BackgroundSection';
 import FileSlot, { type SlotFile } from './FileSlot';
 import { Checkbox, Field, Group, Notice, NumberInput, Slider } from './fields';
@@ -36,7 +37,13 @@ export default function AppearanceTab({ character, characters }: { character: Ch
   const slotFile = (visual: Visual | undefined): SlotFile | null => {
     if (!visual) return null;
     const info = assets?.find((entry) => entry.file === visual.src);
-    return { name: visual.src, url: assetUrl(id, visual.src), kind: visual.type, bytes: info?.bytes ?? null };
+    return {
+      name: visual.src,
+      url: assetUrl(id, visual.src),
+      kind: visual.type === 'video' ? 'video' : 'image',
+      bytes: info?.bytes ?? null,
+      ...(visual.type === 'animation' ? { label: 'Animation' } : {})
+    };
   };
 
   const setElementSize = (base: Character, width: number, height: number): Character => ({
@@ -70,7 +77,7 @@ export default function AppearanceTab({ character, characters }: { character: Ch
         if (imported.error) characters.report(imported.error);
         return;
       }
-      const type = imported.kind === 'video' ? 'video' : 'image';
+      const type = imported.kind === 'video' ? 'video' : (await isAnimated(assetUrl(id, imported.file))) ? 'animation' : 'image';
       let next: Character = {
         ...character,
         appearance: { ...appearance, states: { ...appearance.states, [state]: { type, src: imported.file } } }
@@ -241,7 +248,7 @@ export default function AppearanceTab({ character, characters }: { character: Ch
           onChoose={(path) => void choose('idle', path)}
           onRemove={() => void remove('idle')}
           onMeasured={(size) => idle && setNatural({ src: idle.src, ...size })}
-          hint={appearance.states.idle ? undefined : 'A picture or a video. Without one, the character shows as a placeholder with its name.'}
+          hint={appearance.states.idle ? undefined : 'A picture, a GIF or a video. Without one, the character shows as a placeholder with its name.'}
         />
         <FileSlot
           label="Speaking"
@@ -283,7 +290,7 @@ export default function AppearanceTab({ character, characters }: { character: Ch
         <Checkbox label="Mirror" checked={appearance.flip} onChange={(flip) => setLook({ flip })} />
       </Group>
 
-      {idle?.type === 'video' ? (
+      {idle && idle.type !== 'image' ? (
         <Group title="Motion">
           <Field label="Rest between plays" hint="0 plays it on a loop.">
             <NumberInput label="Rest between plays" value={appearance.restSec} min={0} max={3600} unit="s" onCommit={(restSec) => setLook({ restSec })} />

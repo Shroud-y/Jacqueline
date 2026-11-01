@@ -26,7 +26,7 @@ function useFrame(url: string, type: Visual['type']): { frame: HTMLCanvasElement
       frame.getContext('2d', { willReadFrequently: true })?.drawImage(source, 0, 0, frame.width, frame.height);
       setState({ frame, size: { width: frame.width, height: frame.height } });
     };
-    if (type === 'image') {
+    if (type !== 'video') {
       const image = new Image();
       image.crossOrigin = 'anonymous';
       image.onload = () => take(image, image.naturalWidth, image.naturalHeight);
@@ -92,7 +92,7 @@ export default function BackgroundSection({ character, characters, idle }: { cha
           {size ? (
             <Field hint="Click the background here to choose its colour.">
               <div ref={preview} className="chroma-preview" style={{ width: size.width, height: size.height }} onClick={pick}>
-                <KeyedMedia url={url} type={idle.type} chroma={chroma} style={{ display: 'block', width: '100%', height: '100%' }} />
+                <KeyedMedia url={url} type={idle.type === 'video' ? 'video' : 'image'} chroma={chroma} style={{ display: 'block', width: '100%', height: '100%' }} />
               </div>
             </Field>
           ) : null}

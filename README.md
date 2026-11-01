@@ -26,7 +26,7 @@ away; there is no Save button.
   while a program is the window you are working in, or only when it has
   something to say. It can step aside for fullscreen games. At the bottom,
   **What it costs** says what keeping it around takes.
-- **Appearance** — a picture or a video for when it is idle, and optionally
+- **Appearance** — a picture, a GIF or a video for when it is idle, and optionally
   another while it is speaking. Size, opacity, mirroring. A video can **rest**
   between plays, which is the cheapest way to have a character that moves.
 - **Appearance → Background** — takes a plain background colour out of a
@@ -110,10 +110,11 @@ You can copy a folder there by hand — its name has to be lowercase letters,
 digits and dashes — and Jacqueline picks it up the next time it starts. A `character.json` that cannot be read shows in the editor with the
 reason, and its files are left alone.
 
-Files it takes: pictures `.png .webp .jpg`, video `.webm .mp4`, sound
-`.ogg .wav .mp3`, fonts `.ttf .otf .woff .woff2`. For a moving character use a
-video, not a GIF — a video is decoded by the graphics card, a GIF frame by
-frame.
+Files it takes: pictures `.png .webp .jpg .gif`, video `.webm .mp4`, sound
+`.ogg .wav .mp3`, fonts `.ttf .otf .woff .woff2`. A GIF, or an animated PNG or
+WebP, moves and rests like a video and stops when nobody is there. A small one
+costs about what a video does; for anything big use a video, because a video is
+decoded by the graphics card and a GIF is not.
 
 </details>
 

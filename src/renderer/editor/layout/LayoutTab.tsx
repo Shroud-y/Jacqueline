@@ -310,11 +310,11 @@ export default function LayoutTab({ character, characters }: { character: Charac
   const media = (style: CSSProperties): JSX.Element | null =>
     idle ? (
       character.appearance.chroma ? (
-        <KeyedMedia url={assetUrl(id, idle.src)} type={idle.type} chroma={character.appearance.chroma} style={{ display: 'block', ...style }} />
-      ) : idle.type === 'image' ? (
-        <img src={assetUrl(id, idle.src)} alt="" draggable={false} style={style} />
-      ) : (
+        <KeyedMedia url={assetUrl(id, idle.src)} type={idle.type === 'video' ? 'video' : 'image'} chroma={character.appearance.chroma} style={{ display: 'block', ...style }} />
+      ) : idle.type === 'video' ? (
         <video src={assetUrl(id, idle.src)} muted preload="metadata" style={style} />
+      ) : (
+        <img src={assetUrl(id, idle.src)} alt="" draggable={false} style={style} />
       )
     ) : null;
 

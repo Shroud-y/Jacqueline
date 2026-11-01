@@ -48,7 +48,7 @@ export interface StageSound {
 
 /** What a character looks like right now, as something the page can load. */
 export interface StageVisual {
-  type: 'image' | 'video';
+  type: 'image' | 'video' | 'animation';
   url: string;
 }
 

@@ -1,5 +1,5 @@
 /** How big a picture or a video is, once it has loaded enough to say. Null if it never does. */
-export function probeMedia(url: string, type: 'image' | 'video', timeoutMs = 5000): Promise<{ width: number; height: number } | null> {
+export function probeMedia(url: string, type: 'image' | 'video' | 'animation', timeoutMs = 5000): Promise<{ width: number; height: number } | null> {
   return new Promise((resolve) => {
     let done = false;
     const finish = (size: { width: number; height: number } | null): void => {
@@ -10,7 +10,7 @@ export function probeMedia(url: string, type: 'image' | 'video', timeoutMs = 500
     };
     const timer = setTimeout(() => finish(null), timeoutMs);
 
-    if (type === 'image') {
+    if (type !== 'video') {
       const image = new Image();
       image.onload = () => finish({ width: image.naturalWidth, height: image.naturalHeight });
       image.onerror = () => finish(null);

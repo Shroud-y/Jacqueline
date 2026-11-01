@@ -76,7 +76,7 @@ describe('ids and asset names', () => {
     expect(assetKindOf('C:\\clips\\loop.webm')).toBe('video');
     expect(assetKindOf('hi.ogg')).toBe('audio');
     expect(assetKindOf('Saira.woff2')).toBe('font');
-    expect(assetKindOf('anim.gif')).toBeNull();
+    expect(assetKindOf('anim.gif')).toBe('image');
     expect(assetKindOf('run.exe')).toBeNull();
     expect(assetKindOf('noextension')).toBeNull();
   });

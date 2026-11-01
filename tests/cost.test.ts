@@ -11,6 +11,26 @@ const video = (restSec: number): Character => ({
   appearance: { states: { idle: { type: 'video', src: 'a.mp4' } }, opacity: 1, flip: false, restSec, chroma: null, stylesheet: null, script: null }
 });
 
+describe('what an animated picture costs', () => {
+  const animated = (restSec: number): Character => {
+    const base = video(restSec);
+    return { ...base, appearance: { ...base.appearance, states: { idle: { type: 'animation', src: 'a.gif' } } } };
+  };
+
+  it('counts as moving, and points a large one at a video', () => {
+    const { level, items } = estimateCost(animated(0));
+    expect(level).toBe('heavy');
+    expect(items[0]?.text).toMatch(/on a loop/);
+    expect(items[0]?.text).toMatch(/\.webm/);
+  });
+
+  it('is cheaper with a rest', () => {
+    const { level, items } = estimateCost(animated(10));
+    expect(level).toBe('moderate');
+    expect(items[0]?.text).toMatch(/resting 10 s/);
+  });
+});
+
 describe('what a character costs', () => {
   it('is light for a still picture always on screen', () => {
     const cost = estimateCost(still());

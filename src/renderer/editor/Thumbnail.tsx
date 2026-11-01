@@ -16,11 +16,11 @@ export default function Thumbnail({ character }: { character: Character | null }
   const url = assetUrl(character.id, visual.src);
   return (
     <span className="thumb" aria-hidden="true">
-      {visual.type === 'image' ? (
-        <img src={url} alt="" draggable={false} />
-      ) : (
+      {visual.type === 'video' ? (
         // Never played: it only has to show its first frame.
         <video src={url} muted preload="metadata" disablePictureInPicture />
+      ) : (
+        <img src={url} alt="" draggable={false} />
       )}
     </span>
   );

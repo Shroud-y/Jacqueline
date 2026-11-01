@@ -1,5 +1,8 @@
 import { useEffect, useRef, type RefObject } from 'react';
 import type { Chroma } from '@shared/character';
+import { ANIMATION_FRAME } from './animationPlayer';
+
+type KeySource = HTMLVideoElement | HTMLImageElement | HTMLCanvasElement;
 
 /*
  * Taking a background colour out of a picture or a video, on the graphics
@@ -104,7 +107,7 @@ export class ChromaRenderer {
     if (this.canvas.height !== height) this.canvas.height = height;
   }
 
-  draw(source: HTMLVideoElement | HTMLImageElement): void {
+  draw(source: KeySource): void {
     const { gl } = this;
     if (!gl) return;
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -119,8 +122,10 @@ export class ChromaRenderer {
   }
 }
 
-const isReady = (source: HTMLVideoElement | HTMLImageElement): boolean =>
-  source instanceof HTMLVideoElement ? source.readyState >= 2 : source.complete && source.naturalWidth > 0;
+const isReady = (source: KeySource): boolean => {
+  if (source instanceof HTMLCanvasElement) return true;
+  return source instanceof HTMLVideoElement ? source.readyState >= 2 : source.complete && source.naturalWidth > 0;
+};
 
 /**
  * Keeps `canvas` showing `source` without its background. A picture is drawn
@@ -129,7 +134,7 @@ const isReady = (source: HTMLVideoElement | HTMLImageElement): boolean =>
  */
 export function useChromaKey(
   canvas: RefObject<HTMLCanvasElement | null>,
-  source: RefObject<HTMLVideoElement | HTMLImageElement | null>,
+  source: RefObject<KeySource | null>,
   chroma: Chroma | null,
   /** Size of the canvas in pixels. */
   pixels: { width: number; height: number } | null,
@@ -167,6 +172,10 @@ export function useChromaKey(
     const draw = (): void => {
       if (isReady(element)) renderer.current?.draw(element);
     };
+    if (element instanceof HTMLCanvasElement) {
+      element.addEventListener(ANIMATION_FRAME, draw);
+      return () => element.removeEventListener(ANIMATION_FRAME, draw);
+    }
     if (element instanceof HTMLImageElement) {
       element.addEventListener('load', draw);
       return () => element.removeEventListener('load', draw);

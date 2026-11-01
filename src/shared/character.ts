@@ -33,7 +33,8 @@ const colorSchema = z.string().trim().min(1).max(64);
 /* ------------------------------------------------------------------ */
 
 const visualSchema = z.object({
-  type: z.enum(['image', 'video']),
+  /** `animation` is a picture file that moves: a GIF, an animated PNG or WebP. */
+  type: z.enum(['image', 'video', 'animation']),
   src: assetNameSchema
 });
 
@@ -247,7 +248,7 @@ export function describeIssue(error: z.ZodError): string {
 export type AssetKind = 'image' | 'video' | 'audio' | 'font' | 'style' | 'script';
 
 export const ASSET_EXTENSIONS: Record<AssetKind, readonly string[]> = {
-  image: ['.png', '.webp', '.jpg', '.jpeg'],
+  image: ['.png', '.webp', '.jpg', '.jpeg', '.gif'],
   video: ['.webm', '.mp4'],
   audio: ['.ogg', '.wav', '.mp3'],
   font: ['.ttf', '.otf', '.woff', '.woff2'],

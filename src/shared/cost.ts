@@ -27,12 +27,20 @@ const RANK: Record<CostLevel, number> = { light: 0, moderate: 1, heavy: 2 };
 export function estimateCost(character: Character): CostEstimate {
   const items: CostItem[] = [];
   const { appearance, presence, rules } = character;
-  const moving = Object.values(appearance.states).some((visual) => visual.type === 'video');
+  const states = Object.values(appearance.states);
+  const moving = states.some((visual) => visual.type !== 'image');
+  const hasVideo = states.some((visual) => visual.type === 'video');
   const element = characterElement(character);
   const area = element ? element.width * element.height : 0;
 
   if (!moving) {
     items.push({ text: 'A still picture: about 0.5% of one CPU core while it is on screen.', level: 'light' });
+  } else if (!hasVideo) {
+    const rest = appearance.restSec > 0 ? `, resting ${appearance.restSec} s between plays` : ' on a loop';
+    items.push({
+      text: `A GIF or animated picture${rest}: a small one costs about what a video does while it plays, but it is decoded without the graphics card's help, so a large or fast one costs several times more. For anything big, a .webm is cheaper.`,
+      level: appearance.restSec > 0 ? 'moderate' : 'heavy'
+    });
   } else if (appearance.restSec <= 0) {
     items.push({ text: 'A video on a loop: about 6% of one CPU core for as long as it is on screen and you are at the computer.', level: 'heavy' });
   } else {
@@ -45,7 +53,8 @@ export function estimateCost(character: Character): CostEstimate {
     items.push({ text: `It is ${element?.width} × ${element?.height}: a video this size costs more than the figure above.`, level: 'moderate' });
   }
 
-  if (appearance.chroma && moving) {
+  // Measured on a small GIF, the cut-out itself did not show against the GIF's own cost.
+  if (appearance.chroma && hasVideo) {
     items.push({ text: 'Cutting the background out of a video: about twice what the video costs on its own, for as long as it plays.', level: 'moderate' });
   }
 

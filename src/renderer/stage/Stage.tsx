@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } fr
 import { cropGeometry, type Crop } from '@shared/crop';
 import { SAMPLE_LINE } from '@shared/textStyle';
 import type { StagePayload } from '@shared/types';
+import { useAnimation } from '../shared/animationPlayer';
 import { useChromaKey } from '../shared/chromaKey';
 import TextElement from '../shared/TextElement';
 import ScriptLayer from './ScriptLayer';
@@ -221,7 +222,8 @@ function CharacterElement({ stage, crop, left, top, width, height }: CharacterEl
   // With its background taken out, the file plays unseen and a canvas shows the result.
   const { chroma } = stage;
   const keyed = useRef<HTMLCanvasElement>(null);
-  const keyedSource = useRef<HTMLVideoElement | HTMLImageElement | null>(null);
+  const keyedSource = useRef<HTMLVideoElement | HTMLImageElement | HTMLCanvasElement | null>(null);
+  const animation = useRef<HTMLCanvasElement | null>(null);
   const ratio = window.devicePixelRatio || 1;
   useChromaKey(
     keyed,
@@ -244,6 +246,7 @@ function CharacterElement({ stage, crop, left, top, width, height }: CharacterEl
   const measured = (width: number, height: number): void => {
     if (visual) setNatural({ url: visual.url, width, height });
   };
+  useAnimation(animation, visual?.type === 'animation' ? visual.url : null, playing, restSec, { onMeasured: measured, onPainted: painted });
 
   return (
     <div
@@ -281,6 +284,16 @@ function CharacterElement({ stage, crop, left, top, width, height }: CharacterEl
                 painted();
               }}
               onError={painted}
+            />
+          ) : visual.type === 'animation' ? (
+            <canvas
+              // Decoded here rather than loaded, so turning the cut-out on needs nothing new.
+              ref={(element) => {
+                animation.current = element;
+                keyedSource.current = element;
+              }}
+              className={chroma ? undefined : 'visual'}
+              style={chroma ? unseen : look}
             />
           ) : (
             <video

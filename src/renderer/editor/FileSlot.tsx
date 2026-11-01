@@ -8,6 +8,8 @@ export interface SlotFile {
   kind: AssetKind;
   /** Null while the folder has not been read yet. */
   bytes: number | null;
+  /** What to call it, when its kind says too little. */
+  label?: string;
 }
 
 interface FileSlotProps {
@@ -56,7 +58,7 @@ export default function FileSlot({ label, hint, file, kinds, onChoose, onRemove,
 
   const drop = { onDragOver, onDragLeave: () => setOver(false), onDrop };
   const dims = size && file && size.url === file.url ? `${size.width} × ${size.height}` : null;
-  const meta = file ? [KIND_LABEL[file.kind], dims, file.bytes !== null ? formatBytes(file.bytes) : null].filter(Boolean).join(' · ') : '';
+  const meta = file ? [file.label ?? KIND_LABEL[file.kind], dims, file.bytes !== null ? formatBytes(file.bytes) : null].filter(Boolean).join(' · ') : '';
 
   return (
     <div className="slot-field">
