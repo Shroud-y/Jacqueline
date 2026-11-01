@@ -4,11 +4,11 @@ import { estimateCost } from '@shared/cost';
 
 const still = (): Character => ({
   ...defaultCharacter('miku', 'Miku'),
-  appearance: { states: { idle: { type: 'image', src: 'a.png' } }, opacity: 1, flip: false, restSec: 0, stylesheet: null, script: null }
+  appearance: { states: { idle: { type: 'image', src: 'a.png' } }, opacity: 1, flip: false, restSec: 0, chroma: null, stylesheet: null, script: null }
 });
 const video = (restSec: number): Character => ({
   ...still(),
-  appearance: { states: { idle: { type: 'video', src: 'a.mp4' } }, opacity: 1, flip: false, restSec, stylesheet: null, script: null }
+  appearance: { states: { idle: { type: 'video', src: 'a.mp4' } }, opacity: 1, flip: false, restSec, chroma: null, stylesheet: null, script: null }
 });
 
 describe('what a character costs', () => {
@@ -22,6 +22,16 @@ describe('what a character costs', () => {
     expect(estimateCost(video(0)).level).toBe('heavy');
     expect(estimateCost(video(10)).level).toBe('moderate');
     expect(estimateCost(video(10)).items[0]?.text).toContain('rests 10 s');
+  });
+
+  it('says cutting the background out of a video costs extra, and of a picture nothing', () => {
+    const chroma = { color: '#00ff00', tolerance: 12, softness: 8 };
+    const keyedVideo = video(10);
+    keyedVideo.appearance.chroma = chroma;
+    expect(estimateCost(keyedVideo).items.some((item) => item.text.includes('Cutting the background'))).toBe(true);
+    const keyedStill = still();
+    keyedStill.appearance.chroma = chroma;
+    expect(estimateCost(keyedStill).level).toBe('light');
   });
 
   it('says a big video costs more', () => {

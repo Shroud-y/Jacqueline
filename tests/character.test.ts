@@ -171,3 +171,23 @@ describe('crop', () => {
     expect(characterSchema.safeParse(withCrop({ top: -0.1, right: 0, bottom: 0, left: 0 })).success).toBe(false);
   });
 });
+
+describe('background colour', () => {
+  const withChroma = (chroma: unknown): unknown => {
+    const character = defaultCharacter('miku', 'Miku');
+    return { ...character, appearance: { ...character.appearance, chroma } };
+  };
+
+  it('is off by default, also for characters saved before it existed', () => {
+    const character = defaultCharacter('miku', 'Miku');
+    expect(character.appearance.chroma).toBeNull();
+    const { chroma: _gone, ...older } = character.appearance;
+    expect(characterSchema.parse({ ...character, appearance: older }).appearance.chroma).toBeNull();
+  });
+
+  it('takes a colour and two percentages, and nothing else', () => {
+    expect(characterSchema.safeParse(withChroma({ color: '#00ff00', tolerance: 12, softness: 8 })).success).toBe(true);
+    expect(characterSchema.safeParse(withChroma({ color: 'green', tolerance: 12, softness: 8 })).success).toBe(false);
+    expect(characterSchema.safeParse(withChroma({ color: '#00ff00', tolerance: 101, softness: 8 })).success).toBe(false);
+  });
+});

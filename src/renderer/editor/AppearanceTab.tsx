@@ -3,6 +3,7 @@ import { characterElement, type AssetKind, type Character, type Visual } from '@
 import { croppedSize } from '@shared/crop';
 import { assetUrl } from '@shared/assetUrl';
 import type { AssetInfo } from '@shared/types';
+import BackgroundSection from './BackgroundSection';
 import FileSlot, { type SlotFile } from './FileSlot';
 import { Checkbox, Field, Group, Notice, NumberInput, Slider } from './fields';
 import { heightFor, probeMedia, widthFor } from './media';
@@ -290,6 +291,8 @@ export default function AppearanceTab({ character, characters }: { character: Ch
           <Notice kind="warn">A moving character costs about ten times a still one. A rest between plays is the cheapest way to have both.</Notice>
         </Group>
       ) : null}
+
+      {idle ? <BackgroundSection character={character} characters={characters} idle={idle} /> : null}
 
       <Group title="Style">
         <FileSlot

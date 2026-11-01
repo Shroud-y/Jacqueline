@@ -29,6 +29,12 @@ away; there is no Save button.
 - **Appearance** — a picture or a video for when it is idle, and optionally
   another while it is speaking. Size, opacity, mirroring. A video can **rest**
   between plays, which is the cheapest way to have a character that moves.
+- **Appearance → Background** — takes a plain background colour out of a
+  picture or a video, for files with no transparency of their own such as an
+  `.mp4`: click the background to choose the colour, then set how far from it
+  still counts. It needs a colour the character itself does not have, and a
+  video costs about twice as much this way; a `.webm` with transparency costs
+  nothing extra.
 - **Appearance → Style** — a stylesheet of the character's own: shadows,
   filters, animations, how its text looks. **Start one from a template** gives
   you a commented `style.css` listing what can be styled; save it in any

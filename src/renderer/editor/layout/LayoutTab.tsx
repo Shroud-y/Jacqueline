@@ -7,6 +7,7 @@ import { layoutAnchor, layoutFrame, type Rect } from '@shared/layout';
 import { SAMPLE_LINE, isFontFile } from '@shared/textStyle';
 import type { AssetInfo } from '@shared/types';
 import TextElement from '../../shared/TextElement';
+import KeyedMedia from '../KeyedMedia';
 import { probeMedia } from '../media';
 import type { Characters } from '../useCharacters';
 import Inspector from './Inspector';
@@ -308,7 +309,9 @@ export default function LayoutTab({ character, characters }: { character: Charac
   /** The character's file, muted and never played: a picture of it to arrange things around. */
   const media = (style: CSSProperties): JSX.Element | null =>
     idle ? (
-      idle.type === 'image' ? (
+      character.appearance.chroma ? (
+        <KeyedMedia url={assetUrl(id, idle.src)} type={idle.type} chroma={character.appearance.chroma} style={{ display: 'block', ...style }} />
+      ) : idle.type === 'image' ? (
         <img src={assetUrl(id, idle.src)} alt="" draggable={false} style={style} />
       ) : (
         <video src={assetUrl(id, idle.src)} muted preload="metadata" style={style} />

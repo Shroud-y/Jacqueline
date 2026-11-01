@@ -1,6 +1,6 @@
 /** Types that cross the IPC boundary. Type-only imports only, so it costs a bundle nothing. */
 
-import type { AssetKind, Character, CharacterEntry, LayoutElement } from './character';
+import type { AssetKind, Character, CharacterEntry, Chroma, LayoutElement } from './character';
 
 export interface QuietHours {
   enabled: boolean;
@@ -68,6 +68,8 @@ export interface StagePayload {
   playing: boolean;
   /** Seconds a video holds still between plays; 0 loops it. */
   restSec: number;
+  /** A background colour to take out of what it looks like; null to show it as it is. */
+  chroma: Chroma | null;
   /**
    * Being laid out in the editor right now: the text elements show sample
    * text, so the layout can be judged where it will actually be.

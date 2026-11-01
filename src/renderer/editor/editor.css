@@ -1701,3 +1701,13 @@ input {
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* The file with its background taken out, over the checks that mean "nothing here". */
+.chroma-preview {
+  position: relative;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: var(--r);
+  background: var(--bg) conic-gradient(var(--surface) 25%, transparent 0 50%, var(--surface) 0 75%, transparent 0) 0 0 / 20px 20px;
+  cursor: crosshair;
+}

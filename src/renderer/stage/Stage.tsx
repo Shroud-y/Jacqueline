@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } fr
 import { cropGeometry, type Crop } from '@shared/crop';
 import { SAMPLE_LINE } from '@shared/textStyle';
 import type { StagePayload } from '@shared/types';
+import { useChromaKey } from '../shared/chromaKey';
 import TextElement from '../shared/TextElement';
 import ScriptLayer from './ScriptLayer';
 import SpeechText from './SpeechText';
@@ -113,7 +114,7 @@ interface CharacterElementProps {
 
 function CharacterElement({ stage, crop, left, top, width, height }: CharacterElementProps): JSX.Element {
   const press = useRef<{ x: number; y: number; dragging: boolean } | null>(null);
-  const video = useRef<HTMLVideoElement>(null);
+  const video = useRef<HTMLVideoElement | null>(null);
   const [dragging, setDragging] = useState(false);
   // The picture's own proportions, once it has told us. Per address: a new
   // file is a new shape.
@@ -131,6 +132,8 @@ function CharacterElement({ stage, crop, left, top, width, height }: CharacterEl
   // frame it does not draw is one the whole window does not composite.
   const { playing, restSec } = stage;
   const videoUrl = visual?.type === 'video' ? visual.url : null;
+  // Turning the cut-out on or off makes a new element: it has to be set going again.
+  const chromaOn = stage.chroma !== null;
   useEffect(() => {
     const element = video.current;
     if (!element || !videoUrl) return;
@@ -156,7 +159,7 @@ function CharacterElement({ stage, crop, left, top, width, height }: CharacterEl
       element.removeEventListener('ended', onEnded);
       if (rest) clearTimeout(rest);
     };
-  }, [playing, restSec, videoUrl]);
+  }, [playing, restSec, videoUrl, chromaOn]);
 
   // Its own sound, when it has one and it may be heard. `muted` as an attribute is
   // only read once, so it is set on the element.
@@ -167,7 +170,7 @@ function CharacterElement({ stage, crop, left, top, width, height }: CharacterEl
     if (!element) return;
     element.muted = !heard;
     element.volume = Math.min(1, Math.max(0, soundVolume));
-  }, [heard, soundVolume, videoUrl]);
+  }, [heard, soundVolume, videoUrl, chromaOn]);
 
   useEffect(
     () => () => {
@@ -215,6 +218,19 @@ function CharacterElement({ stage, crop, left, top, width, height }: CharacterEl
   // transparent window shows them.
   const known = natural && natural.url === visual?.url && natural.width > 0 && natural.height > 0 ? natural : null;
   const shown = known ? cropGeometry({ width, height }, known, crop) : null;
+  // With its background taken out, the file plays unseen and a canvas shows the result.
+  const { chroma } = stage;
+  const keyed = useRef<HTMLCanvasElement>(null);
+  const keyedSource = useRef<HTMLVideoElement | HTMLImageElement | null>(null);
+  const ratio = window.devicePixelRatio || 1;
+  useChromaKey(
+    keyed,
+    keyedSource,
+    chroma,
+    shown ? { width: Math.round(shown.file.width * ratio), height: Math.round(shown.file.height * ratio) } : null,
+    visual?.url ?? ''
+  );
+  const unseen: CSSProperties = { position: 'absolute', width: 1, height: 1, opacity: 0 };
   const frame: CSSProperties = {
     width: shown?.width ?? 0,
     height: shown?.height ?? 0,
@@ -249,8 +265,14 @@ function CharacterElement({ stage, crop, left, top, width, height }: CharacterEl
           {visual.type === 'image' ? (
             // An image that fails to load still gets its window, or it could never be fixed.
             <img
-              className="visual"
-              style={look}
+              // crossOrigin only counts when the file is loaded: turned on, it has to load again.
+              key={chroma ? 'keyed' : 'plain'}
+              ref={(element) => {
+                keyedSource.current = element;
+              }}
+              className={chroma ? undefined : 'visual'}
+              style={chroma ? unseen : look}
+              crossOrigin={chroma ? 'anonymous' : undefined}
               src={visual.url}
               alt=""
               draggable={false}
@@ -262,9 +284,16 @@ function CharacterElement({ stage, crop, left, top, width, height }: CharacterEl
             />
           ) : (
             <video
-              ref={video}
-              className="visual"
-              style={look}
+              // crossOrigin only counts when the file is loaded: turned on, it has to load again.
+              key={chroma ? 'keyed' : 'plain'}
+              // The same element serves its playing and its background.
+              ref={(element) => {
+                video.current = element;
+                keyedSource.current = element;
+              }}
+              className={chroma ? undefined : 'visual'}
+              style={chroma ? unseen : look}
+              crossOrigin={chroma ? 'anonymous' : undefined}
               src={visual.url}
               muted
               playsInline
@@ -275,6 +304,7 @@ function CharacterElement({ stage, crop, left, top, width, height }: CharacterEl
               onError={painted}
             />
           )}
+          {chroma ? <canvas ref={keyed} className="visual" style={look} /> : null}
         </div>
       ) : (
         <div className="placeholder">{stage.name}</div>

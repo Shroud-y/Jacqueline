@@ -40,6 +40,15 @@ const visualSchema = z.object({
 /** `idle` is what shows with nothing going on; `speaking` replaces it while a line is up. */
 const stateNameSchema = z.string().regex(/^[a-z][a-zA-Z0-9]{0,31}$/, 'not a valid state name');
 
+/** A colour taken out of the picture or video, for a file with a plain background and no transparency. */
+const chromaSchema = z.object({
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'must be a colour like #00ff00'),
+  /** How far from that colour still counts as background, 0 to 100. */
+  tolerance: z.number().min(0).max(100),
+  /** How gradually the edge fades, 0 to 100. */
+  softness: z.number().min(0).max(100)
+});
+
 const appearanceSchema = z.object({
   /** Empty until the user has given the character something to look like. */
   states: z.record(stateNameSchema, visualSchema),
@@ -52,6 +61,7 @@ const appearanceSchema = z.object({
    * one for as long as it moves, so this is the cheapest way to have both.
    */
   restSec: z.number().min(0).max(3600).default(0),
+  chroma: chromaSchema.nullable().default(null),
   /** A `.css` among the assets, applied to the character's window. */
   stylesheet: assetNameSchema.nullable().default(null),
   /** A `.js` among the assets, run in a sealed layer over the character (scriptHost.ts). */
@@ -175,6 +185,7 @@ export const characterSchema = z.object({
 
 export type Character = z.infer<typeof characterSchema>;
 export type Visual = z.infer<typeof visualSchema>;
+export type Chroma = z.infer<typeof chromaSchema>;
 export type TextStyle = z.infer<typeof textStyleSchema>;
 export type LayoutElement = z.infer<typeof layoutElementSchema>;
 export type Presence = z.infer<typeof presenceSchema>;
@@ -205,7 +216,7 @@ export function defaultCharacter(id: string, name: string): Character {
     id,
     name,
     enabled: true,
-    appearance: { states: {}, opacity: 1, flip: false, restSec: 0, stylesheet: null, script: null },
+    appearance: { states: {}, opacity: 1, flip: false, restSec: 0, chroma: null, stylesheet: null, script: null },
     layout: {
       elements: [
         { id: 'character', type: 'character', x: 260, y: 0, width: 240, height: 240 },

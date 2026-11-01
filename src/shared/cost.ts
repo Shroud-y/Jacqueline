@@ -45,6 +45,10 @@ export function estimateCost(character: Character): CostEstimate {
     items.push({ text: `It is ${element?.width} × ${element?.height}: a video this size costs more than the figure above.`, level: 'moderate' });
   }
 
+  if (appearance.chroma && moving) {
+    items.push({ text: 'Cutting the background out of a video: about twice what the video costs on its own, for as long as it plays.', level: 'moderate' });
+  }
+
   if (appearance.stylesheet) {
     items.push({ text: 'Its own stylesheet: an animation in it costs about as much as a video, for as long as it runs.', level: 'light' });
   }

@@ -698,6 +698,7 @@ export class CharacterWindows {
       // Put away: nobody can see it move.
       playing: this.presence.isWatching() && !live?.parked,
       restSec: character.appearance.restSec,
+      chroma: character.appearance.chroma,
       preview: character.id === this.previewId,
       speech,
       stylesheet: character.appearance.stylesheet ? this.versioned(character.id, character.appearance.stylesheet) : null,
