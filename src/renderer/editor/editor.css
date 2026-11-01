@@ -9,6 +9,8 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  /* Only the panes scroll: the window itself never moves. */
+  overflow: hidden;
 }
 
 body {
@@ -237,6 +239,7 @@ input {
 }
 
 .pane-body {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -373,6 +376,7 @@ input {
 
 /* The one switch: a character on or off. Neutral, square, with its word. */
 .switch {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -432,6 +436,7 @@ input {
 }
 
 .checkbox label {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -480,6 +485,7 @@ input {
 }
 
 .option {
+  position: relative;
   display: flex;
   gap: 10px;
   padding: 6px 8px;
