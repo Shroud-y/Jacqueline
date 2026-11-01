@@ -18,7 +18,7 @@ percent of one CPU core, and nothing at all while it is off screen.
 
 ## Making a character
 
-Right-click the tray icon → **Characters…** opens the editor. Every change is
+Right-click the tray icon → **Options…** opens the editor. Every change is
 saved as you make it and shows on the character on your desktop straight
 away; there is no Save button.
 

@@ -60,7 +60,7 @@ export function trayMenu(entries: readonly CharacterEntry[], state: MenuState): 
     },
     { kind: 'check', label: 'Mute', checked: state.muted, action: { type: 'setMuted', muted: !state.muted } },
     { kind: 'separator' },
-    { kind: 'action', label: 'Characters…', action: { type: 'openEditor' } },
+    { kind: 'action', label: 'Options…', action: { type: 'openEditor' } },
     { kind: 'action', label: 'Open characters folder', action: { type: 'openCharactersFolder' } },
     { kind: 'separator' },
     { kind: 'action', label: 'Quit', action: { type: 'quit' } }
