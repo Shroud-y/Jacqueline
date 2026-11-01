@@ -55,6 +55,13 @@ away; there is no Save button.
     (even if it would not be on screen otherwise), hide for a while.
   - **Wait at least** … before it can happen again.
   - **Test now** does what the rule does, right away.
+- **Behaviour → Script** — when rules are not enough: a `behaviour.js` with
+  logic of its own. It hears programs starting, clicks, the minute, you coming
+  back and its own lines ending; it says, plays, shows, hides, sets a mood
+  and keeps a `state` that survives restarts. **Start one from a template**
+  gives you a commented file listing everything it can do. It runs in a
+  sandbox (QuickJS) with no internet and no files, 50 ms per event and 16 MB
+  at most; errors show in the editor with their line.
 - **Lines** — groups of lines a rule can pick from. Each line can have a
   weight (how often it comes up) and a sound. The same line is never said
   twice in a row. A line can mention what happened with a slot: `{name}`

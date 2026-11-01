@@ -23,6 +23,7 @@ let revealed: string[];
 let zipPath: string | null;
 let opened2: string[];
 let blocked: Set<string>;
+let restarted: string[];
 
 const handlers = (): ReturnType<typeof editorHandlers> =>
   editorHandlers(store, {
@@ -52,6 +53,8 @@ const handlers = (): ReturnType<typeof editorHandlers> =>
     scriptAllowed: (id) => !blocked.has(id),
     blockScript: (id) => blocked.add(id),
     allowScript: (id) => blocked.delete(id),
+    scriptStatus: (id) => (id === 'ran' ? { running: true, error: null } : null),
+    restartScript: (id) => restarted.push(id),
     settings: () => ({ settings: settings.current, autostartAvailable: false }),
     updateSettings: (patch) => settings.update(patch),
     now: () => new Date(2026, 0, 1, 9, 5).getTime()
@@ -74,6 +77,7 @@ beforeEach(() => {
   zipPath = null;
   opened2 = [];
   blocked = new Set();
+  restarted = [];
 });
 
 afterEach(() => {
@@ -310,7 +314,7 @@ describe('editor requests', () => {
   it('writes a starter script, and holds back the script of an imported character until it is allowed', async () => {
     const created = await make();
     const h = handlers();
-    const made = await h.newScript({ id: created.id });
+    const made = await h.newScript({ id: created.id, kind: 'visual' });
     expect(made).toEqual({ ok: true, file: 'script.js' });
     expect(readFileSync(join(root, created.id, 'assets', 'script.js'), 'utf8')).toContain('jacqueline.on');
     await h.save({ ...created, appearance: { ...created.appearance, script: 'script.js' } });
@@ -329,6 +333,28 @@ describe('editor requests', () => {
     expect(await h.scriptAllowed({ id: imported.character.id })).toBe(true);
     expect((await h.allowScript({ id: 'nobody' })).ok).toBe(false);
     expect(await h.scriptAllowed({ id: '../x' })).toBe(false);
+  });
+
+  it('writes a starter behaviour script, holds back an imported one, and restarts and reports on it', async () => {
+    const created = await make();
+    const h = handlers();
+    expect(await h.newScript({ id: created.id, kind: 'behaviour' })).toEqual({ ok: true, file: 'behaviour.js' });
+    expect(readFileSync(join(root, created.id, 'assets', 'behaviour.js'), 'utf8')).toContain("on('clicked'");
+    await h.save({ ...created, behaviourScript: 'behaviour.js' });
+
+    savePath = join(outside, 'behaving.zip');
+    expect((await h.exportCharacter({ id: created.id })).ok).toBe(true);
+    const imported = await h.importCharacter({ path: savePath });
+    if (!imported.ok) throw new Error(imported.error);
+    expect(imported.character.behaviourScript).toBe('behaviour.js');
+    expect(await h.scriptAllowed({ id: imported.character.id })).toBe(false);
+
+    expect(await h.restartScript({ id: created.id })).toEqual({ ok: true });
+    expect(restarted).toEqual([created.id]);
+    expect((await h.restartScript({ id: 'nobody' })).ok).toBe(false);
+    expect(await h.scriptStatus({ id: 'ran' })).toEqual({ running: true, error: null });
+    expect(await h.scriptStatus({ id: created.id })).toBeNull();
+    expect((await h.newScript({ id: created.id, kind: 'other' })).ok).toBe(false);
   });
 
   it('says what is running', async () => {

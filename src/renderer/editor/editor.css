@@ -1656,3 +1656,9 @@ input {
   justify-items: start;
   gap: 12px;
 }
+
+/* The behaviour script, under the rules, as wide as a form. */
+.behaviour-script {
+  max-width: 640px;
+  margin-top: 24px;
+}

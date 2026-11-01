@@ -79,6 +79,8 @@ export interface StagePayload {
   stylesheet: string | null;
   /** The sealed page its script runs in; null without a script, or one not allowed to run. */
   script: string | null;
+  /** Set by its behaviour script, for its stylesheet's `[data-mood]`; null for none. */
+  mood: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -126,10 +128,15 @@ export interface EditorApi {
   /** Writes a starter stylesheet among the character's assets and answers with its file name. Not yet used by the character. */
   newStylesheet(payload: { id: string }): Promise<EditorResult<{ file: string }>>;
   /** Writes a starter script among the character's assets and answers with its file name. Not yet used by the character. */
-  newScript(payload: { id: string }): Promise<EditorResult<{ file: string }>>;
+  newScript(payload: { id: string; kind: 'visual' | 'behaviour' }): Promise<EditorResult<{ file: string }>>;
   /** False while a script that came with an imported character waits for the user's yes. */
   scriptAllowed(payload: { id: string }): Promise<boolean>;
   allowScript(payload: { id: string }): Promise<EditorResult>;
+  /** The behaviour script's state: null when it is not running at all (none, off, or not allowed). */
+  scriptStatus(payload: { id: string }): Promise<ScriptStatus | null>;
+  /** Starts a behaviour script again from scratch — one stopped for its limits too. */
+  restartScript(payload: { id: string }): Promise<EditorResult>;
+  onScriptStatus(handler: (update: { id: string; status: ScriptStatus | null }) => void): () => void;
   /** Opens one of the character's files in the program the system opens it with. */
   openAsset(payload: { id: string; file: string }): Promise<EditorResult>;
   /** Saves the character and the files it uses as one zip, then shows it. An empty `error`: the save dialog was closed. */
@@ -142,6 +149,14 @@ export interface EditorApi {
   /** Where on disk a file dropped on the window is. Not IPC — answered by the preload itself. */
   pathForFile(file: File): string;
   openFolder(payload: { id: string }): Promise<EditorResult>;
+}
+
+/** A behaviour script as the editor shows it. */
+export interface ScriptStatus {
+  /** False once stopped for running into its limits. */
+  running: boolean;
+  /** The last thing that went wrong, with its line; null when nothing has. */
+  error: string | null;
 }
 
 /** One file in a character's assets folder. */

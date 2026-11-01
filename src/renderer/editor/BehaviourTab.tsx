@@ -14,6 +14,7 @@ import {
   TRIGGER_LABELS
 } from '@shared/ruleText';
 import { ClockInput, Field, Notice, NumberInput, Segmented, Select, TextInput } from './fields';
+import BehaviourScriptSection from './BehaviourScriptSection';
 import type { Characters } from './useCharacters';
 
 const PROGRAMS_LIST = 'running-programs';
@@ -48,12 +49,17 @@ export default function BehaviourTab({ character, characters }: { character: Cha
 
   if (rules.length === 0) {
     return (
-      <div className="blank">
-        <h1>No rules yet</h1>
-        <p>A rule says when the character does something: when a program starts, at a time of day, when it is clicked.</p>
-        <button type="button" className="button primary" onClick={add}>
-          Add a rule
-        </button>
+      <div className="behaviour">
+        <div className="blank">
+          <h1>No rules yet</h1>
+          <p>A rule says when the character does something: when a program starts, at a time of day, when it is clicked.</p>
+          <button type="button" className="button primary" onClick={add}>
+            Add a rule
+          </button>
+        </div>
+        <div className="behaviour-script">
+          <BehaviourScriptSection character={character} characters={characters} />
+        </div>
       </div>
     );
   }
@@ -80,6 +86,9 @@ export default function BehaviourTab({ character, characters }: { character: Cha
       <button type="button" className="button primary rules-add" onClick={add}>
         Add a rule
       </button>
+      <div className="behaviour-script">
+        <BehaviourScriptSection character={character} characters={characters} />
+      </div>
     </div>
   );
 }

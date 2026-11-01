@@ -157,6 +157,8 @@ export const characterSchema = z.object({
   layout: layoutSchema,
   presence: presenceSchema,
   rules: z.array(ruleSchema).max(500),
+  /** A `.js` among the assets, run alongside the rules in a sandbox (engine/behaviourScript.ts). */
+  behaviourScript: assetNameSchema.nullable().default(null),
   /** Groups of lines, by group id. A `say` action names a group. */
   lines: z.record(z.string().min(1).max(64), z.array(lineSchema).max(500)),
   audio: audioSchema
@@ -203,6 +205,7 @@ export function defaultCharacter(id: string, name: string): Character {
     },
     presence: { mode: 'always', apps: [], position: null, hideOnFullscreen: false },
     rules: [],
+    behaviourScript: null,
     lines: {},
     audio: { volume: 1, appear: null, disappear: null }
   };
@@ -265,6 +268,7 @@ export function referencedAssets(character: Character): Set<string> {
   for (const visual of Object.values(character.appearance.states)) used.add(visual.src);
   if (character.appearance.stylesheet) used.add(character.appearance.stylesheet);
   if (character.appearance.script) used.add(character.appearance.script);
+  if (character.behaviourScript) used.add(character.behaviourScript);
   for (const lines of Object.values(character.lines)) {
     for (const line of lines) if (line.audio) used.add(line.audio);
   }

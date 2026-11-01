@@ -56,6 +56,13 @@ export function estimateCost(character: Character): CostEstimate {
     });
   }
 
+  if (character.behaviourScript) {
+    items.push({
+      text: 'A behaviour script: the script engine takes about 24 MB once, shared by every character with one, and CPU only for the moment a script handles something.',
+      level: 'light'
+    });
+  }
+
   // What has to be watched on its behalf. Listing running programs takes about 8 ms; the rest is close to free.
   const active = rules.filter((rule) => rule.enabled);
   const programs =

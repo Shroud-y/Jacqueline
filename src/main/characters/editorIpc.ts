@@ -4,9 +4,9 @@ import { z } from 'zod';
 import { ASSET_EXTENSIONS, assetKindOf, assetNameSchema, characterIdSchema, referencedAssets, type AssetKind, type Character, type Line } from '@shared/character';
 import { IPC } from '@shared/ipc';
 import { unknownSlots } from '@shared/lines';
-import { SCRIPT_NAME, SCRIPT_STARTER } from '@shared/scriptTemplate';
+import { BEHAVIOUR_NAME, BEHAVIOUR_STARTER, SCRIPT_NAME, SCRIPT_STARTER } from '@shared/scriptTemplate';
 import { STYLE_STARTER, STYLESHEET_NAME } from '@shared/stylesheet';
-import type { EditorApi, EditorResult, Settings, SettingsResult, SettingsView } from '@shared/types';
+import type { EditorApi, EditorResult, ScriptStatus, Settings, SettingsResult, SettingsView } from '@shared/types';
 import { sampleSlots, type Fired } from '../engine/ruleEngine';
 import { fillSlots } from '../engine/slots';
 import type { CharacterStore } from './store';
@@ -37,6 +37,8 @@ export interface EditorIpcDeps {
   /** A script that came from somewhere else waits for the user's yes. */
   blockScript: (id: string) => void;
   allowScript: (id: string) => void;
+  scriptStatus: (id: string) => ScriptStatus | null;
+  restartScript: (id: string) => void;
   settings: () => SettingsView;
   /** Validated by the settings store, which refuses what it cannot use. */
   updateSettings: (patch: Partial<Settings>) => SettingsResult;
@@ -54,6 +56,7 @@ const assetPayload = z.object({ id: characterIdSchema, file: assetNameSchema });
 const previewPayload = z.object({ id: characterIdSchema.nullable() });
 const testLinePayload = z.object({ id: characterIdSchema, group: z.string().min(1).max(64), line: z.string().min(1).max(64) });
 const testRulePayload = z.object({ id: characterIdSchema, rule: z.string().min(1).max(64) });
+const newScriptPayload = z.object({ id: characterIdSchema, kind: z.enum(['visual', 'behaviour']).default('visual') });
 const zipPayload = z.object({ path: z.string().min(1).max(4096).optional() });
 
 /** 'Kasane Teto' → 'Kasane Teto.zip'; whatever a file name cannot hold is dropped. */
@@ -176,9 +179,11 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
     },
 
     newScript: (payload) => {
-      const parsed = idPayload.safeParse(payload);
+      const parsed = newScriptPayload.safeParse(payload);
       if (!parsed.success) return refused;
-      return store.writeAsset(parsed.data.id, SCRIPT_NAME, SCRIPT_STARTER);
+      return parsed.data.kind === 'behaviour'
+        ? store.writeAsset(parsed.data.id, BEHAVIOUR_NAME, BEHAVIOUR_STARTER)
+        : store.writeAsset(parsed.data.id, SCRIPT_NAME, SCRIPT_STARTER);
     },
 
     scriptAllowed: (payload) => {
@@ -191,6 +196,19 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
       if (!parsed.success) return refused;
       if (!store.has(parsed.data.id)) return { ok: false, error: 'Unknown character.' };
       deps.allowScript(parsed.data.id);
+      return { ok: true };
+    },
+
+    scriptStatus: (payload) => {
+      const parsed = idPayload.safeParse(payload);
+      return parsed.success ? deps.scriptStatus(parsed.data.id) : null;
+    },
+
+    restartScript: (payload) => {
+      const parsed = idPayload.safeParse(payload);
+      if (!parsed.success) return refused;
+      if (!store.has(parsed.data.id)) return { ok: false, error: 'Unknown character.' };
+      deps.restartScript(parsed.data.id);
       return { ok: true };
     },
 
@@ -235,7 +253,7 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
       }
       const imported = importCharacter(store, zip);
       // Someone else's code: it runs only once the user has looked and said yes.
-      if (imported.ok && imported.character.appearance.script) deps.blockScript(imported.character.id);
+      if (imported.ok && (imported.character.appearance.script || imported.character.behaviourScript)) deps.blockScript(imported.character.id);
       return imported;
     },
 
@@ -261,7 +279,7 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
 
 /** The handlers take what came over the wire, not what the editor's types promise it sent. */
 type EditorHandlers = {
-  [K in Exclude<keyof EditorApi, 'onChanged' | 'onSettings' | 'pathForFile'>]: (payload?: unknown) => ReturnType<EditorApi[K]> | Awaited<ReturnType<EditorApi[K]>>;
+  [K in Exclude<keyof EditorApi, 'onChanged' | 'onSettings' | 'onScriptStatus' | 'pathForFile'>]: (payload?: unknown) => ReturnType<EditorApi[K]> | Awaited<ReturnType<EditorApi[K]>>;
 };
 
 const CHANNELS: { [K in keyof EditorHandlers]: string } = {
@@ -283,6 +301,8 @@ const CHANNELS: { [K in keyof EditorHandlers]: string } = {
   newScript: IPC.editorNewScript,
   scriptAllowed: IPC.editorScriptAllowed,
   allowScript: IPC.editorAllowScript,
+  scriptStatus: IPC.editorScriptStatus,
+  restartScript: IPC.editorRestartScript,
   openAsset: IPC.editorOpenAsset,
   exportCharacter: IPC.editorExport,
   importCharacter: IPC.editorImport,

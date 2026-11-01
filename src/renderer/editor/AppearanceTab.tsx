@@ -176,7 +176,7 @@ export default function AppearanceTab({ character, characters }: { character: Ch
     if (!api) return;
     setScriptBusy(true);
     try {
-      const made = await api.newScript({ id });
+      const made = await api.newScript({ id, kind: 'visual' });
       if (!made.ok) {
         characters.report(made.error);
         return;

@@ -45,7 +45,8 @@ export default function Stage(): JSX.Element | null {
       data-speaking={stage.speech ? 'true' : 'false'}
       data-state={stage.speech ? 'speaking' : 'idle'}
       data-preview={stage.preview ? 'true' : 'false'}
-      data-mood={stage.script && mood ? mood : undefined}
+      // A visual script's own mood first; otherwise whatever the behaviour script set.
+      data-mood={(stage.script && mood) || stage.mood || undefined}
     >
       {stage.stylesheet ? <link rel="stylesheet" href={stage.stylesheet} /> : null}
       {stage.elements.map((element) => {

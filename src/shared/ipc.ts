@@ -46,6 +46,9 @@ export const IPC = {
   /** Whether a character's script may run; and the user saying it may. */
   editorScriptAllowed: 'editor:scriptAllowed',
   editorAllowScript: 'editor:allowScript',
+  /** A behaviour script's state: invoke to ask, and main → editor whenever it changes. */
+  editorScriptStatus: 'editor:scriptStatus',
+  editorRestartScript: 'editor:restartScript',
   /** Opens one of a character's files in whatever the system opens it with. */
   editorOpenAsset: 'editor:openAsset',
   /** Saves a character as a zip, where the user picks. */

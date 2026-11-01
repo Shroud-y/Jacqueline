@@ -16,6 +16,8 @@ export interface RuleRunnerDeps {
   /** Seconds since the last keyboard or mouse input anywhere. */
   idleSeconds: () => number;
   onFired: (fired: Fired) => void;
+  /** Every event as it happens, before the rules see it — for behaviour scripts. Never `every`, which is the rules' own. */
+  onEvent?: (event: RuleEvent) => void;
   rng?: Rng;
   now?: () => number;
 }
@@ -29,6 +31,8 @@ export class RuleRunner {
   private readonly engine: RuleEngine;
   private readonly now: () => number;
   private needs: RuleNeeds = { startStop: new Set(), running: new Set(), focus: false, time: false, every: false, returned: false };
+  /** What behaviour scripts want watched, on top of what the rules do. */
+  private extra: Omit<RuleNeeds, 'every'> = { startStop: new Set(), running: new Set(), focus: false, time: false, returned: false };
 
   private sensors: DesktopSensors | null = null;
   private sensorsLoading: Promise<void> | null = null;
@@ -51,13 +55,37 @@ export class RuleRunner {
   /** Whose rules run. Called again whenever any of them changes. */
   setCharacters(characters: readonly Character[]): void {
     this.engine.setCharacters(characters, this.now());
-    this.needs = this.engine.needs;
+    this.mergeNeeds();
+  }
+
+  /** What behaviour scripts subscribed to: watched exactly as if a rule had asked. */
+  setExtraNeeds(extra: Omit<RuleNeeds, 'every'>): void {
+    this.extra = extra;
+    this.mergeNeeds();
+  }
+
+  /** Whether a watched program is running, by stem; null when it is not watched or not looked at yet. */
+  isRunning(program: string): boolean | null {
+    return this.running.get(program) ?? null;
+  }
+
+  private mergeNeeds(): void {
+    const rules = this.engine.needs;
+    this.needs = {
+      startStop: new Set([...rules.startStop, ...this.extra.startStop]),
+      running: new Set([...rules.running, ...this.extra.running]),
+      focus: rules.focus || this.extra.focus,
+      time: rules.time || this.extra.time,
+      every: rules.every,
+      returned: rules.returned || this.extra.returned
+    };
     void this.reconfigure();
   }
 
   /** Something that happened outside: Jacqueline started, a character was clicked. */
   event(event: RuleEvent): void {
     if (this.stopped) return;
+    if (event.type !== 'every') this.deps.onEvent?.(event);
     const fired = this.engine.handle(event, { now: this.now(), isRunning: (program) => this.running.get(program) ?? null });
     for (const one of fired) {
       log.info(`"${one.character.name}" / ${one.rule.name || one.rule.id}: ${describe(event)}`);

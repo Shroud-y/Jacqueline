@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { CharacterEntry } from '@shared/character';
-import type { EditorApi, SettingsView } from '@shared/types';
+import type { EditorApi, ScriptStatus, SettingsView } from '@shared/types';
 
 /**
  * The editor window's entire surface. Channel names are written out
@@ -27,6 +27,8 @@ const CHANNEL = {
   editorNewScript: 'editor:newScript',
   editorScriptAllowed: 'editor:scriptAllowed',
   editorAllowScript: 'editor:allowScript',
+  editorScriptStatus: 'editor:scriptStatus',
+  editorRestartScript: 'editor:restartScript',
   editorOpenAsset: 'editor:openAsset',
   editorExport: 'editor:export',
   editorImport: 'editor:import',
@@ -61,6 +63,15 @@ const api: EditorApi = {
   newScript: (payload) => ipcRenderer.invoke(CHANNEL.editorNewScript, payload),
   scriptAllowed: (payload) => ipcRenderer.invoke(CHANNEL.editorScriptAllowed, payload),
   allowScript: (payload) => ipcRenderer.invoke(CHANNEL.editorAllowScript, payload),
+  scriptStatus: (payload) => ipcRenderer.invoke(CHANNEL.editorScriptStatus, payload),
+  restartScript: (payload) => ipcRenderer.invoke(CHANNEL.editorRestartScript, payload),
+
+  onScriptStatus(handler) {
+    const listener = (_event: unknown, update: { id: string; status: ScriptStatus | null }): void => handler(update);
+    ipcRenderer.on(CHANNEL.editorScriptStatus, listener);
+    return () => ipcRenderer.off(CHANNEL.editorScriptStatus, listener);
+  },
+
   openAsset: (payload) => ipcRenderer.invoke(CHANNEL.editorOpenAsset, payload),
   exportCharacter: (payload) => ipcRenderer.invoke(CHANNEL.editorExport, payload),
   importCharacter: (payload) => ipcRenderer.invoke(CHANNEL.editorImport, payload),

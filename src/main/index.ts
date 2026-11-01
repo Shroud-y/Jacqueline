@@ -1,5 +1,7 @@
 import { app, dialog, powerMonitor, screen, shell } from 'electron';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { newQuickJSWASMModuleFromVariant, type QuickJSSyncVariant } from 'quickjs-emscripten-core';
 
 import { ASSET_EXTENSIONS, type Character } from '@shared/character';
 import { IPC } from '@shared/ipc';
@@ -17,7 +19,10 @@ import { handleScriptHost } from './characters/scriptHost';
 import { ScriptTrust } from './characters/scriptTrust';
 import { isPresent } from './characters/presence';
 import { isWithinClockWindow, minutesOfDay } from './engine/timeOfDay';
-import { runActions, type ActionDeps } from './engine/actions';
+import { pickLine, runActions, type ActionDeps } from './engine/actions';
+import { BehaviourScripts } from './engine/behaviourScripts';
+import { clock } from './engine/ruleEngine';
+import { fillSlots } from './engine/slots';
 import { SpeechDirector } from './engine/director';
 import { RuleRunner } from './engine/ruleRunner';
 import { RecentHistory } from './engine/selector';
@@ -114,7 +119,15 @@ async function bootstrap(): Promise<void> {
   });
 
   const director = new SpeechDirector();
-  director.onChange(() => windows.refresh());
+  // Who was speaking at the last change: a line ending is something a behaviour script hears.
+  const speaking = new Set<string>();
+  director.onChange((id) => {
+    windows.refresh();
+    const now = director.isSpeaking(id);
+    if (speaking.has(id) && !now) scripts.speechEnded(id);
+    if (now) speaking.add(id);
+    else speaking.delete(id);
+  });
 
   // Behaviour: rules fire, their actions run, lines go to the director.
   const history = new RecentHistory();
@@ -134,12 +147,58 @@ async function bootstrap(): Promise<void> {
   const rules = new RuleRunner({
     loadSensors: loadDesktopSensors,
     idleSeconds: () => powerMonitor.getSystemIdleTime(),
-    onFired: (fired) => runActions(fired, actionDeps)
+    onFired: (fired) => runActions(fired, actionDeps),
+    onEvent: (event) => scripts.event(event)
+  });
+
+  // Behaviour scripts: what they do goes the way a rule's actions do, mute and quiet hours included.
+  const scripts = new BehaviourScripts({
+    // Required, not imported: a plain require works the same from the dev folder and from inside the
+    // packaged app's asar. Only now, when some character first needs it — it is 24 MB once loaded.
+    loadModule: () => {
+      const variant = createRequire(__filename)('@jitl/quickjs-singlefile-cjs-release-sync') as { default: QuickJSSyncVariant };
+      return newQuickJSWASMModuleFromVariant(variant.default);
+    },
+    assetPath: (id, file) => characters.assetPath(id, file),
+    isAllowed: (id) => scriptTrust.isAllowed(id),
+    stateDir: paths.scriptStateDir(),
+    actionsFor: (id) => {
+      const current = (): Character | null => characters.get(id);
+      return {
+        say: (what) => {
+          const character = current();
+          if (!character || isSilenced()) return;
+          const slots = { name: character.name, time: clock(Date.now()) };
+          if ('group' in what) {
+            const picked = pickLine(character, what.group, slots, actionDeps);
+            if (!picked) return void log.info(`"${character.name}" script: nothing to say from "${what.group}"`);
+            actionDeps.say(character, picked.text, picked.line);
+            if (picked.line.audio) windows.playSound(id, picked.line.audio, character.audio.volume);
+          } else {
+            actionDeps.say(character, fillSlots(what.text, slots) ?? what.text, { id: 'script', text: what.text });
+          }
+        },
+        sound: (file) => {
+          const character = current();
+          if (character && !isSilenced()) windows.playSound(id, file, character.audio.volume);
+        },
+        show: (seconds) => windows.showFor(id, seconds * 1000),
+        hide: (minutes) => visibility.hideFor(id, minutes * 60_000),
+        setMood: (mood) => windows.setMood(id, mood),
+        log: (message) => log.info(`"${current()?.name ?? id}" script: ${message}`),
+        isRunning: (stem) => rules.isRunning(stem),
+        now: () => Date.now()
+      };
+    },
+    onNeeds: (needs) =>
+      rules.setExtraNeeds({ startStop: needs.startStop, running: needs.running, focus: needs.focus, time: needs.minute, returned: needs.returned }),
+    onStatus: (id, status) => editor.send(IPC.editorScriptStatus, { id, status })
   });
   // Someone hidden for now does nothing either.
   const acting = (): Character[] =>
     characters.list().flatMap((entry) => (entry.ok && entry.character.enabled && !visibility.isHidden(entry.id) ? [entry.character] : []));
   rules.setCharacters(acting());
+  scripts.setCharacters(acting());
   presence.onChange(() => windows.refresh());
   presence.setCharacters(watched());
   windows.start();
@@ -189,6 +248,8 @@ async function bootstrap(): Promise<void> {
     scriptAllowed: (id) => scriptTrust.isAllowed(id),
     blockScript: (id) => scriptTrust.block(id),
     allowScript: (id) => scriptTrust.allow(id),
+    scriptStatus: (id) => scripts.status(id),
+    restartScript: (id) => scripts.restart(id),
     openPath: async (path) => {
       const failure = await shell.openPath(path);
       return failure ? { ok: false, error: failure } : { ok: true };
@@ -259,6 +320,7 @@ async function bootstrap(): Promise<void> {
     presence.setCharacters(watched());
     const active = acting();
     rules.setCharacters(active);
+    scripts.setCharacters(active);
     // Whoever is off, gone or hidden stops mid-sentence.
     const activeIds = new Set(active.map((character) => character.id));
     for (const entry of characters.list()) if (!activeIds.has(entry.id)) director.forget(entry.id);
@@ -288,6 +350,7 @@ async function bootstrap(): Promise<void> {
   app.on('before-quit', () => {
     editor.destroy();
     rules.stop();
+    scripts.stop();
     director.silenceAll();
     windows.stop();
     presence.stop();

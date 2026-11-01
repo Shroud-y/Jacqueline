@@ -149,6 +149,8 @@ export class CharacterWindows {
   /** Sounds asked for before their character's window was up. */
   private readonly pendingSounds = new Map<string, StageSound[]>();
   private readonly entrySounds = new EntrySounds();
+  /** Moods set by behaviour scripts, by character. */
+  private readonly moods = new Map<string, string>();
   /** Disappear sounds playing in the host page, which must outlive them. */
   private farewells = 0;
   private stopping = false;
@@ -232,6 +234,16 @@ export class CharacterWindows {
       const character = changed ? this.store.get(changed) : null;
       if (live && character) this.update(live, character);
     }
+  }
+
+  /** A behaviour script's mood for the character, for its stylesheet; null clears it. */
+  setMood(id: string, mood: string | null): void {
+    if ((this.moods.get(id) ?? null) === mood) return;
+    if (mood === null) this.moods.delete(id);
+    else this.moods.set(id, mood);
+    const live = this.live.get(id);
+    const character = this.store.get(id);
+    if (live && character && !live.win.isDestroyed()) live.win.webContents.send(IPC.stageUpdate, this.payload(character, live.geometry, live));
   }
 
   /** How many characters are on screen right now. */
@@ -689,7 +701,8 @@ export class CharacterWindows {
       preview: character.id === this.previewId,
       speech,
       stylesheet: character.appearance.stylesheet ? this.versioned(character.id, character.appearance.stylesheet) : null,
-      script: this.scriptPage(character)
+      script: this.scriptPage(character),
+      mood: this.moods.get(character.id) ?? null
     };
   }
 
