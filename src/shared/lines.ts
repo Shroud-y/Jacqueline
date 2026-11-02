@@ -31,6 +31,7 @@ const KNOWN_SLOTS = new Set(SLOTS.map((slot) => slot.name));
 
 /** Whether anything about this character needs to know what is playing. */
 export function usesMusic(character: Character): boolean {
+  if (character.appearance.states.music) return true;
   const asks = character.rules.some(
     (rule) => rule.enabled && (rule.when.type === 'musicStarted' || rule.when.type === 'musicStopped' || rule.when.type === 'trackChanged' || rule.if.some((condition) => condition.type === 'musicPlaying'))
   );

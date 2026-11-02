@@ -25,6 +25,12 @@ describe('what knowing the music costs', () => {
     expect(mentionsMusic({ ...base, rules: [{ ...rule, when: { type: 'clicked' }, if: [{ type: 'musicPlaying', playing: true }] }] })).toBe(true);
   });
 
+  it('comes up for a look to wear while music plays', () => {
+    const base = still();
+    const states = { ...base.appearance.states, music: { type: 'image' as const, src: 'b.png' } };
+    expect(mentionsMusic({ ...base, appearance: { ...base.appearance, states } })).toBe(true);
+  });
+
   it('does not come up for a rule that is off', () => {
     const rule = { id: 'r', name: '', enabled: false, when: { type: 'musicStarted' as const }, if: [], then: [{ type: 'show' as const, seconds: 5 }], cooldownSec: 0 };
     expect(mentionsMusic({ ...still(), rules: [rule] })).toBe(false);

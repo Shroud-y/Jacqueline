@@ -288,6 +288,49 @@ describe('RuleRunner', () => {
       r.stop();
     });
 
+    it('says when what is playing may have changed, the first answer included', async () => {
+      const d = desk();
+      let changes = 0;
+      let listener: ((sessions: { app: string; playing: boolean; title: string; artist: string }[]) => void) | null = null;
+      const r = new RuleRunner({
+        loadSensors: async () => d.sensors,
+        watchMedia: (onSessions) => {
+          listener = onSessions;
+          return () => undefined;
+        },
+        onMusic: () => {
+          changes += 1;
+        },
+        idleSeconds: () => d.idle,
+        onFired: (one) => fired.push(one),
+        rng: () => 0.5,
+        now: () => Date.now()
+      });
+      const report = async (sessions: { app: string; playing: boolean; title: string; artist: string }[]): Promise<void> => {
+        (listener as unknown as (s: typeof sessions) => void)(sessions);
+        await vi.advanceTimersByTimeAsync(400);
+      };
+      r.setExtraNeeds({ startStop: new Set(), running: new Set(), focus: false, time: false, returned: false, music: true });
+      await settle();
+      expect(changes).toBe(0);
+
+      // Already playing when the watching began: no event, but the windows must hear.
+      await report([{ app: 'Spotify.exe', playing: true, title: 'One', artist: 'Band' }]);
+      expect(changes).toBe(1);
+      expect(r.musicNow()?.playing).toBe(true);
+
+      await report([]);
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(changes).toBe(2);
+
+      // Nobody asks any more: not known is not playing.
+      r.setExtraNeeds({ startStop: new Set(), running: new Set(), focus: false, time: false, returned: false, music: false });
+      await settle();
+      expect(changes).toBe(3);
+      expect(r.musicNow()).toBeNull();
+      r.stop();
+    });
+
     it('watches for a script too', async () => {
       const d = desk();
       const { r, started } = watching(d);

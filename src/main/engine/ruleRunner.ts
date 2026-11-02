@@ -19,6 +19,8 @@ export interface RuleRunnerDeps {
   /** Seconds since the last keyboard or mouse input anywhere. */
   idleSeconds: () => number;
   onFired: (fired: Fired) => void;
+  /** Whether something is playing may have changed. */
+  onMusic?: () => void;
   /** Every event as it happens, before the rules see it — for behaviour scripts. Never `every`, which is the rules' own. */
   onEvent?: (event: RuleEvent) => void;
   rng?: Rng;
@@ -159,14 +161,22 @@ export class RuleRunner {
 
   private startMusic(): void {
     if (!this.deps.watchMedia) return;
-    const tracker = new MusicTracker((type, { track, artist, app }) => this.event({ type, track, artist, app }));
+    const tracker = new MusicTracker(
+      (type, { track, artist, app }) => {
+        this.deps.onMusic?.();
+        this.event({ type, track, artist, app });
+      },
+      () => this.deps.onMusic?.()
+    );
     this.music = { tracker, stop: this.deps.watchMedia((sessions) => tracker.update(sessions)) };
   }
 
   private stopMusic(): void {
-    this.music?.stop();
-    this.music?.tracker.stop();
+    if (!this.music) return;
+    this.music.stop();
+    this.music.tracker.stop();
     this.music = null;
+    this.deps.onMusic?.();
   }
 
   private loadSensors(): Promise<void> {

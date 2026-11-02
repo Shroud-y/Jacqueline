@@ -114,6 +114,8 @@ export interface PresenceSource {
   speechFor(id: string): { id: string; text: string; durationMs: number } | null;
   /** Speaking, or only just finished: on screen whatever its presence rules say. */
   isOnStage(id: string): boolean;
+  /** Something is playing, as far as anything has asked to know. */
+  isMusicPlaying(): boolean;
   /** Muted, or inside quiet hours: no sound plays. */
   isSilenced(): boolean;
   /** False for a character whose script the user has not allowed to run. */
@@ -685,8 +687,9 @@ export class CharacterWindows {
   private payload(character: Character, geometry: Geometry, live?: Live): StagePayload {
     const states = character.appearance.states;
     const speech = this.presence.speechFor(character.id);
-    // While a line is up it wears its speaking look, if it has one.
-    const idle = (speech ? states.speaking : undefined) ?? states.idle ?? Object.values(states)[0] ?? null;
+    const music = this.presence.isMusicPlaying();
+    // While a line is up it wears its speaking look, if it has one; while something plays, its music look.
+    const idle = (speech ? states.speaking : undefined) ?? (music ? states.music : undefined) ?? states.idle ?? Object.values(states)[0] ?? null;
     return {
       id: character.id,
       name: character.name,
@@ -701,6 +704,7 @@ export class CharacterWindows {
       chroma: character.appearance.chroma,
       preview: character.id === this.previewId,
       speech,
+      music,
       stylesheet: character.appearance.stylesheet ? this.versioned(character.id, character.appearance.stylesheet) : null,
       script: this.scriptPage(character),
       mood: this.moods.get(character.id) ?? null,

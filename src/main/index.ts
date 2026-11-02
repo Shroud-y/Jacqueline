@@ -115,6 +115,7 @@ async function bootstrap(): Promise<void> {
     onClick: (id) => (director.isSpeaking(id) ? director.dismiss(id) : rules.event({ type: 'clicked', characterId: id })),
     speechFor: (id) => director.current(id),
     isOnStage: (id) => director.isOnStage(id),
+    isMusicPlaying: () => rules.musicNow()?.playing === true,
     isSilenced,
     scriptAllowed: (id) => scriptTrust.isAllowed(id)
   });
@@ -148,6 +149,7 @@ async function bootstrap(): Promise<void> {
   const rules = new RuleRunner({
     loadSensors: loadDesktopSensors,
     watchMedia: watchMediaSessions,
+    onMusic: () => windows.refresh(),
     idleSeconds: () => powerMonitor.getSystemIdleTime(),
     onFired: (fired) => runActions(fired, actionDeps),
     onEvent: (event) => scripts.event(event)

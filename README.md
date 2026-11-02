@@ -27,7 +27,7 @@ away; there is no Save button.
   something to say. It can step aside for fullscreen games. At the bottom,
   **What it costs** says what keeping it around takes.
 - **Appearance** — a picture, a GIF or a video for when it is idle, and optionally
-  another while it is speaking. Size, opacity, mirroring. A video can **rest**
+  another while it is speaking and another while music plays. Size, opacity, mirroring. A video can **rest**
   between plays, which is the cheapest way to have a character that moves.
 - **Appearance → Background** — takes a plain background colour out of a
   picture or a video, for files with no transparency of their own such as an

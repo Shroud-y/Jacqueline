@@ -81,6 +81,8 @@ export interface StagePayload {
   stylesheet: string | null;
   /** The sealed page its script runs in; null without a script, or one not allowed to run. */
   script: string | null;
+  /** Something is playing, as far as anything has asked to know. */
+  music: boolean;
   /** Set by its behaviour script, for its stylesheet's `[data-mood]`; null for none. */
   mood: string | null;
   /** What keeps sounding while it is on screen: a video's own sound, and its ambient sound. */

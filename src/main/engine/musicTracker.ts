@@ -40,7 +40,11 @@ export class MusicTracker {
   private current: MusicNow = { playing: false, track: '', artist: '', app: '' };
   private playerId: string | null = null;
 
-  constructor(private readonly onEvent: (type: MusicEventType, now: MusicNow) => void) {}
+  constructor(
+    private readonly onEvent: (type: MusicEventType, now: MusicNow) => void,
+    /** Windows has first answered: `now` is known, and no event says so. */
+    private readonly onKnown?: () => void
+  ) {}
 
   /** What is going on; null until Windows has first answered. */
   get now(): MusicNow | null {
@@ -72,6 +76,7 @@ export class MusicTracker {
     if (!this.known) {
       this.known = true;
       if (session) this.take(session);
+      this.onKnown?.();
       return;
     }
 

@@ -10,7 +10,7 @@ import { Checkbox, Field, Group, Notice, NumberInput, Slider } from './fields';
 import { heightFor, probeMedia, widthFor } from './media';
 import type { Characters } from './useCharacters';
 
-type StateName = 'idle' | 'speaking';
+type StateName = 'idle' | 'speaking' | 'music';
 
 const VISUAL_KINDS: AssetKind[] = ['image', 'video'];
 const MIN_SIZE = 16;
@@ -258,6 +258,15 @@ export default function AppearanceTab({ character, characters }: { character: Ch
           onChoose={(path) => void choose('speaking', path)}
           onRemove={() => void remove('speaking')}
           hint="Shown instead of idle while it has a line up."
+        />
+        <FileSlot
+          label="Music"
+          file={slotFile(appearance.states.music)}
+          kinds={VISUAL_KINDS}
+          busy={busy === 'music'}
+          onChoose={(path) => void choose('music', path)}
+          onRemove={() => void remove('music')}
+          hint="Shown instead of idle while something is playing, a video in a browser too. A line still takes over."
         />
       </div>
 
