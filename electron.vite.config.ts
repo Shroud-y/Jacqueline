@@ -24,7 +24,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         external: EXTERNAL,
-        input: { index: resolve('src/main/index.ts') },
+        input: { index: resolve('src/main/index.ts'), mediaWorker: resolve('src/main/sensors/mediaWorker.ts') },
         output: {
           format: 'cjs',
           entryFileNames: '[name].js',

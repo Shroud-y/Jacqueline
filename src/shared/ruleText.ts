@@ -28,13 +28,17 @@ export const TRIGGER_LABELS: Record<Trigger['type'], string> = {
   every: 'Every so often',
   returned: 'You come back to the computer',
   startup: 'Jacqueline starts',
-  clicked: 'The character is clicked'
+  clicked: 'The character is clicked',
+  musicStarted: 'Music starts playing',
+  musicStopped: 'Music stops',
+  trackChanged: 'The track changes'
 };
 
 export const CONDITION_LABELS: Record<RuleCondition['type'], string> = {
   chance: 'By chance',
   timeBetween: 'Between two times',
-  programRunning: 'A program'
+  programRunning: 'A program',
+  musicPlaying: 'Music'
 };
 
 export const ACTION_LABELS: Record<RuleAction['type'], string> = {
@@ -76,6 +80,12 @@ function triggerParts(trigger: Trigger): Part[] {
       return [plain('When Jacqueline starts')];
     case 'clicked':
       return [plain('When it is clicked')];
+    case 'musicStarted':
+      return [plain('When music starts playing')];
+    case 'musicStopped':
+      return [plain('When music stops')];
+    case 'trackChanged':
+      return [plain('When the track changes')];
   }
 }
 
@@ -110,6 +120,8 @@ function conditionText(condition: RuleCondition): string {
       return `${condition.from}–${condition.to}`;
     case 'programRunning':
       return condition.running ? `while ${condition.program} runs` : `unless ${condition.program} runs`;
+    case 'musicPlaying':
+      return condition.playing ? 'while music plays' : 'unless music plays';
   }
 }
 
@@ -162,6 +174,9 @@ export function defaultTrigger(type: Trigger['type'], character: Character): Tri
       return { type, afterMinutes: 15 };
     case 'startup':
     case 'clicked':
+    case 'musicStarted':
+    case 'musicStopped':
+    case 'trackChanged':
       return { type };
   }
 }
@@ -174,6 +189,8 @@ export function defaultCondition(type: RuleCondition['type'], character: Charact
       return { type, from: '09:00', to: '18:00' };
     case 'programRunning':
       return { type, program: likelyProgram(character), running: true };
+    case 'musicPlaying':
+      return { type, playing: true };
   }
 }
 

@@ -12,9 +12,10 @@ import { shouldInterruptAfterDeadline, type QuickJSContext, type QuickJSHandle, 
 import { appStem } from '../characters/presence';
 
 /** What a script can subscribe to. Program events take a program as the second argument. */
-export const SCRIPT_EVENTS = ['programStarted', 'programStopped', 'programFocused', 'clicked', 'startup', 'returned', 'speechEnd', 'minute'] as const;
+export const SCRIPT_EVENTS = ['programStarted', 'programStopped', 'programFocused', 'clicked', 'startup', 'returned', 'speechEnd', 'minute', 'musicStarted', 'musicStopped', 'trackChanged'] as const;
 export type ScriptEventName = (typeof SCRIPT_EVENTS)[number];
 const PROGRAM_EVENTS = new Set<ScriptEventName>(['programStarted', 'programStopped', 'programFocused']);
+const MUSIC_EVENTS = new Set<ScriptEventName>(['musicStarted', 'musicStopped', 'trackChanged']);
 
 export const LIMITS = {
   memoryBytes: 16 * 1024 * 1024,
@@ -40,6 +41,8 @@ export interface ScriptActions {
   log(message: string): void;
   /** By stem; null when it is not known (yet). */
   isRunning(stem: string): boolean | null;
+  /** What is playing; null when it is not known (yet). */
+  music(): { playing: boolean; track: string; artist: string; app: string } | null;
   now(): number;
 }
 
@@ -49,6 +52,7 @@ export interface ScriptNeeds {
   focus: boolean;
   minute: boolean;
   returned: boolean;
+  music: boolean;
 }
 
 export interface ScriptEvent {
@@ -82,7 +86,7 @@ export class BehaviourScript {
   private strikes = 0;
   private lastState: string;
   private disposed = false;
-  readonly needs: ScriptNeeds = { startStop: new Set(), running: new Set(), focus: false, minute: false, returned: false };
+  readonly needs: ScriptNeeds = { startStop: new Set(), running: new Set(), focus: false, minute: false, returned: false, music: false };
   /** The last thing that went wrong, in words, with the line where it did. */
   error: string | null = null;
   /** False once it has been stopped for running into its limits. */
@@ -164,6 +168,7 @@ export class BehaviourScript {
       if (name === 'programFocused') this.needs.focus = true;
       if (name === 'minute') this.needs.minute = true;
       if (name === 'returned') this.needs.returned = true;
+      if (MUSIC_EVENTS.has(name)) this.needs.music = true;
       this.onChange({ needs: true });
     });
 
@@ -212,6 +217,23 @@ export class BehaviourScript {
       }
       const running = this.actions.isRunning(stem);
       return running === null ? ctx.null : running ? ctx.true : ctx.false;
+    });
+    define('music', () => {
+      if (!this.needs.music) {
+        // Asked for the first time: watched from now on, known a moment later.
+        this.needs.music = true;
+        this.onChange({ needs: true });
+      }
+      const music = this.actions.music();
+      if (!music) return ctx.null;
+      const result = ctx.newObject();
+      ctx.setProp(result, 'playing', music.playing ? ctx.true : ctx.false);
+      for (const key of ['track', 'artist', 'app'] as const) {
+        const value = ctx.newString(music[key]);
+        ctx.setProp(result, key, value);
+        value.dispose();
+      }
+      return result;
     });
     define('now', () => ctx.newNumber(this.actions.now()));
 

@@ -5,8 +5,10 @@
  */
 
 import type { Character } from '@shared/character';
+import { usesMusic } from '@shared/lines';
 import type { Rule, RuleCondition, Trigger } from '@shared/rules';
 import { appStem } from '../characters/presence';
+import type { MusicEventType, MusicNow } from './musicTracker';
 import { isWithinClockWindow, minutesOfDay } from './timeOfDay';
 import type { Rng } from './selector';
 
@@ -17,6 +19,7 @@ export type RuleEvent =
   | { type: 'returned'; awayMinutes: number }
   | { type: 'startup' }
   | { type: 'clicked'; characterId: string }
+  | { type: MusicEventType; track: string; artist: string; app: string }
   /** An `every` rule's turn has come round. Made by the engine itself. */
   | { type: 'every'; characterId: string; ruleId: string };
 
@@ -37,12 +40,16 @@ export interface RuleNeeds {
   time: boolean;
   every: boolean;
   returned: boolean;
+  /** What is playing, for a rule or a line that asks. */
+  music: boolean;
 }
 
 export interface RuleContext {
   now: number;
   /** Whether a program is running, by stem; null when that is not known. */
   isRunning: (program: string) => boolean | null;
+  /** What is playing; null when that is not known. */
+  music?: () => MusicNow | null;
 }
 
 const MINUTE = 60_000;
@@ -52,8 +59,9 @@ function activeRules(character: Character): Rule[] {
 }
 
 export function ruleNeeds(characters: readonly Character[]): RuleNeeds {
-  const needs: RuleNeeds = { startStop: new Set(), running: new Set(), focus: false, time: false, every: false, returned: false };
+  const needs: RuleNeeds = { startStop: new Set(), running: new Set(), focus: false, time: false, every: false, returned: false, music: false };
   for (const character of characters) {
+    if (character.enabled && usesMusic(character)) needs.music = true;
     for (const rule of activeRules(character)) {
       const { when } = rule;
       if (when.type === 'programStarted' || when.type === 'programStopped') needs.startStop.add(appStem(when.program));
@@ -85,6 +93,10 @@ export function triggerMatches(trigger: Trigger, event: RuleEvent, character: Ch
       return event.type === 'clicked' && event.characterId === character.id;
     case 'every':
       return event.type === 'every' && event.characterId === character.id && event.ruleId === rule.id;
+    case 'musicStarted':
+    case 'musicStopped':
+    case 'trackChanged':
+      return event.type === trigger.type;
   }
 }
 
@@ -99,6 +111,10 @@ export function conditionPasses(condition: RuleCondition, ctx: RuleContext, rng:
       // Not known is not the same as not running: neither answer is safe, so the rule waits.
       return running !== null && running === condition.running;
     }
+    case 'musicPlaying': {
+      const music = ctx.music?.() ?? null;
+      return music !== null && music.playing === condition.playing;
+    }
   }
 }
 
@@ -108,9 +124,19 @@ export function clock(now: number): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+/** `{track}` and `{artist}`, for as far as they are known. A line asking for one that is not is not said. */
+export function musicSlots(music: { track: string; artist: string } | null | undefined): Record<string, string> {
+  const slots: Record<string, string> = {};
+  if (music?.track) slots.track = music.track;
+  if (music?.artist) slots.artist = music.artist;
+  return slots;
+}
+
 /** What `{slots}` in a line can be filled from, for this event. */
-function slotsFor(event: RuleEvent, character: Character, now: number): Record<string, string | number> {
-  const slots: Record<string, string | number> = { name: character.name, time: clock(now) };
+function slotsFor(event: RuleEvent, character: Character, now: number, music: MusicNow | null): Record<string, string | number> {
+  const playing = music?.playing ? music : null;
+  // The event's own track first: by the time music has stopped, it is the only one there is.
+  const slots: Record<string, string | number> = { name: character.name, time: clock(now), ...musicSlots('track' in event ? event : playing) };
   if ('program' in event) slots.program = event.program;
   if (event.type === 'returned') slots.minutes = Math.round(event.awayMinutes);
   return slots;
@@ -121,7 +147,7 @@ function slotsFor(event: RuleEvent, character: Character, now: number): Record<s
  * gives, and a likely value for what only an event could.
  */
 export function sampleSlots(character: Character, now: number): Record<string, string | number> {
-  return { name: character.name, time: clock(now), program: character.presence.apps[0] ?? 'notepad.exe', minutes: 15 };
+  return { name: character.name, time: clock(now), program: character.presence.apps[0] ?? 'notepad.exe', minutes: 15, track: 'Some Song', artist: 'Someone' };
 }
 
 interface Planned {
@@ -170,7 +196,7 @@ export class RuleEngine {
         // Every condition is checked — the dice too — before anything is spent.
         if (!rule.if.every((condition) => conditionPasses(condition, ctx, this.rng))) continue;
         this.lastFired.set(key, ctx.now);
-        fired.push({ character, rule, slots: slotsFor(event, character, ctx.now) });
+        fired.push({ character, rule, slots: slotsFor(event, character, ctx.now, ctx.music?.() ?? null) });
       }
     }
     return fired;

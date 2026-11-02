@@ -1,6 +1,7 @@
 import type { Character } from '@shared/character';
 import { createLogger } from '../app/logger';
 import type { DesktopSensors } from '../sensors/win32';
+import { MusicTracker, type MediaSession, type MusicNow } from './musicTracker';
 import { RuleEngine, type Fired, type RuleEvent, type RuleNeeds } from './ruleEngine';
 import type { Rng } from './selector';
 
@@ -13,6 +14,8 @@ const AWAY_MIN_SECONDS = 60;
 
 export interface RuleRunnerDeps {
   loadSensors: () => Promise<DesktopSensors | null>;
+  /** Starts listening to what is playing; what it returns stops that. */
+  watchMedia?: (onSessions: (sessions: MediaSession[]) => void) => () => void;
   /** Seconds since the last keyboard or mouse input anywhere. */
   idleSeconds: () => number;
   onFired: (fired: Fired) => void;
@@ -30,9 +33,9 @@ export interface RuleRunnerDeps {
 export class RuleRunner {
   private readonly engine: RuleEngine;
   private readonly now: () => number;
-  private needs: RuleNeeds = { startStop: new Set(), running: new Set(), focus: false, time: false, every: false, returned: false };
+  private needs: RuleNeeds = { startStop: new Set(), running: new Set(), focus: false, time: false, every: false, returned: false, music: false };
   /** What behaviour scripts want watched, on top of what the rules do. */
-  private extra: Omit<RuleNeeds, 'every'> = { startStop: new Set(), running: new Set(), focus: false, time: false, returned: false };
+  private extra: Omit<RuleNeeds, 'every'> = { startStop: new Set(), running: new Set(), focus: false, time: false, returned: false, music: false };
 
   private sensors: DesktopSensors | null = null;
   private sensorsLoading: Promise<void> | null = null;
@@ -40,6 +43,7 @@ export class RuleRunner {
   private minuteTimer: NodeJS.Timeout | null = null;
   private everyTimer: NodeJS.Timeout | null = null;
   private unhookFocus: (() => void) | null = null;
+  private music: { tracker: MusicTracker; stop: () => void } | null = null;
 
   /** The programs being watched and whether each was running at the last look. */
   private running = new Map<string, boolean>();
@@ -69,6 +73,11 @@ export class RuleRunner {
     return this.running.get(program) ?? null;
   }
 
+  /** What is playing; null when nothing asks to know, or Windows has not answered yet. */
+  musicNow(): MusicNow | null {
+    return this.music?.tracker.now ?? null;
+  }
+
   private mergeNeeds(): void {
     const rules = this.engine.needs;
     this.needs = {
@@ -77,7 +86,8 @@ export class RuleRunner {
       focus: rules.focus || this.extra.focus,
       time: rules.time || this.extra.time,
       every: rules.every,
-      returned: rules.returned || this.extra.returned
+      returned: rules.returned || this.extra.returned,
+      music: rules.music || this.extra.music
     };
     void this.reconfigure();
   }
@@ -86,7 +96,7 @@ export class RuleRunner {
   event(event: RuleEvent): void {
     if (this.stopped) return;
     if (event.type !== 'every') this.deps.onEvent?.(event);
-    const fired = this.engine.handle(event, { now: this.now(), isRunning: (program) => this.running.get(program) ?? null });
+    const fired = this.engine.handle(event, { now: this.now(), isRunning: (program) => this.running.get(program) ?? null, music: () => this.musicNow() });
     for (const one of fired) {
       log.info(`"${one.character.name}" / ${one.rule.name || one.rule.id}: ${describe(event)}`);
       this.deps.onFired(one);
@@ -100,6 +110,7 @@ export class RuleRunner {
     this.pollTimer = this.minuteTimer = this.everyTimer = null;
     this.unhookFocus?.();
     this.unhookFocus = null;
+    this.stopMusic();
   }
 
   /* ------------------------------------------------------------------ */
@@ -140,7 +151,22 @@ export class RuleRunner {
       this.minuteTimer = null;
     }
 
+    if (this.needs.music && !this.music) this.startMusic();
+    else if (!this.needs.music) this.stopMusic();
+
     this.armEvery();
+  }
+
+  private startMusic(): void {
+    if (!this.deps.watchMedia) return;
+    const tracker = new MusicTracker((type, { track, artist, app }) => this.event({ type, track, artist, app }));
+    this.music = { tracker, stop: this.deps.watchMedia((sessions) => tracker.update(sessions)) };
+  }
+
+  private stopMusic(): void {
+    this.music?.stop();
+    this.music?.tracker.stop();
+    this.music = null;
   }
 
   private loadSensors(): Promise<void> {
@@ -236,6 +262,12 @@ function describe(event: RuleEvent): string {
       return 'Jacqueline started';
     case 'clicked':
       return 'clicked';
+    case 'musicStarted':
+      return 'music started';
+    case 'musicStopped':
+      return 'music stopped';
+    case 'trackChanged':
+      return 'the track changed';
     case 'every':
       return 'its turn came round';
   }

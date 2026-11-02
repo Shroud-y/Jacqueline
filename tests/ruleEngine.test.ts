@@ -165,7 +165,7 @@ describe('ruleNeeds', () => {
         rule({ id: 'r3', when: { type: 'programFocused', program: 'code' }, enabled: false })
       ])
     ]);
-    expect(needs).toEqual({ startStop: new Set(['dota2']), running: new Set(['steam']), focus: false, time: true, every: false, returned: false });
+    expect(needs).toEqual({ startStop: new Set(['dota2']), running: new Set(['steam']), focus: false, time: true, every: false, returned: false, music: false });
   });
 });
 

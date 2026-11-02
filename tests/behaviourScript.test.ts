@@ -34,6 +34,7 @@ const actions: ScriptActions = {
   setMood: (mood) => done.push(`mood ${mood}`),
   log: (message) => done.push(`log ${message}`),
   isRunning: (stem) => running.get(stem) ?? null,
+  music: () => ({ playing: true, track: 'One', artist: 'Band', app: 'spotify' }),
   now: () => 1000
 };
 
@@ -61,6 +62,28 @@ describe('behaviour scripts', () => {
     script.dispatch({ name: 'clicked' });
     script.dispatch({ name: 'returned', detail: { minutes: 12 } });
     expect(done).toEqual(['say {"group":"greet"}', 'say {"text":"hi"}', 'log back after 12']);
+  });
+
+  it('hears the music it asks for, and can ask what is playing', () => {
+    const quiet = load(`on('clicked', () => {});`);
+    expect(quiet.needs.music).toBe(false);
+
+    const script = load(`
+      on('trackChanged', (e) => log(e.track, e.artist, e.app));
+      on('clicked', () => log(JSON.stringify(music())));
+    `);
+    expect(script.needs.music).toBe(true);
+    script.dispatch({ name: 'trackChanged', detail: { track: 'Two', artist: 'Band', app: 'spotify' } });
+    script.dispatch({ name: 'clicked' });
+    expect(done).toEqual(['log Two Band spotify', 'log {"playing":true,"track":"One","artist":"Band","app":"spotify"}']);
+  });
+
+  it('starts watching the music the first time a script asks', () => {
+    const script = load(`on('clicked', () => log(typeof music()));`);
+    expect(script.needs.music).toBe(false);
+    script.dispatch({ name: 'clicked' });
+    expect(script.needs.music).toBe(true);
+    expect(script.error).toBeNull();
   });
 
   it('does what the app does, within bounds', () => {

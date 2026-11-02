@@ -39,7 +39,13 @@ export const triggerSchema = z.discriminatedUnion('type', [
   /** Jacqueline has just started. */
   z.object({ type: z.literal('startup') }),
   /** The character itself was clicked. */
-  z.object({ type: z.literal('clicked') })
+  z.object({ type: z.literal('clicked') }),
+  /** Something starts playing, in any player that tells Windows about it. */
+  z.object({ type: z.literal('musicStarted') }),
+  /** Nothing is playing any more. */
+  z.object({ type: z.literal('musicStopped') }),
+  /** The next track has come on. */
+  z.object({ type: z.literal('trackChanged') })
 ]);
 
 /* ------------------------------------------------------------------ */
@@ -52,7 +58,9 @@ export const conditionSchema = z.discriminatedUnion('type', [
   /** Only between these times of day; may run past midnight. */
   z.object({ type: z.literal('timeBetween'), from: clockSchema, to: clockSchema }),
   /** Only while a program is (or is not) running. */
-  z.object({ type: z.literal('programRunning'), program: programSchema, running: z.boolean() })
+  z.object({ type: z.literal('programRunning'), program: programSchema, running: z.boolean() }),
+  /** Only while something is (or is not) playing. */
+  z.object({ type: z.literal('musicPlaying'), playing: z.boolean() })
 ]);
 
 /* ------------------------------------------------------------------ */

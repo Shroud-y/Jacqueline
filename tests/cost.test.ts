@@ -11,6 +11,26 @@ const video = (restSec: number): Character => ({
   appearance: { states: { idle: { type: 'video', src: 'a.mp4' } }, opacity: 1, flip: false, restSec, chroma: null, stylesheet: null, script: null }
 });
 
+describe('what knowing the music costs', () => {
+  const says = (text: string): Character => ({ ...still(), lines: { greet: [{ id: 'a', text }] } });
+  const mentionsMusic = (character: Character): boolean => estimateCost(character).items.some((item) => /what is playing/.test(item.text));
+
+  it('comes up for a rule about it, or a line that names the track', () => {
+    const base = still();
+    const rule = { id: 'r', name: '', enabled: true, if: [], then: [{ type: 'show' as const, seconds: 5 }], cooldownSec: 0 };
+    expect(mentionsMusic(base)).toBe(false);
+    expect(mentionsMusic(says('Hello, {name}'))).toBe(false);
+    expect(mentionsMusic(says('Nice, {track}'))).toBe(true);
+    expect(mentionsMusic({ ...base, rules: [{ ...rule, when: { type: 'trackChanged' } }] })).toBe(true);
+    expect(mentionsMusic({ ...base, rules: [{ ...rule, when: { type: 'clicked' }, if: [{ type: 'musicPlaying', playing: true }] }] })).toBe(true);
+  });
+
+  it('does not come up for a rule that is off', () => {
+    const rule = { id: 'r', name: '', enabled: false, when: { type: 'musicStarted' as const }, if: [], then: [{ type: 'show' as const, seconds: 5 }], cooldownSec: 0 };
+    expect(mentionsMusic({ ...still(), rules: [rule] })).toBe(false);
+  });
+});
+
 describe('what an animated picture costs', () => {
   const animated = (restSec: number): Character => {
     const base = video(restSec);

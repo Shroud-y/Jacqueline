@@ -22,10 +22,20 @@ export const SLOTS: readonly { name: string; hint: string }[] = [
   { name: 'name', hint: "the character's name" },
   { name: 'time', hint: 'the time, like 14:05' },
   { name: 'program', hint: 'the program a rule is about' },
-  { name: 'minutes', hint: 'how many minutes you were away' }
+  { name: 'minutes', hint: 'how many minutes you were away' },
+  { name: 'track', hint: 'the track playing right now' },
+  { name: 'artist', hint: 'who it is by' }
 ];
 
 const KNOWN_SLOTS = new Set(SLOTS.map((slot) => slot.name));
+
+/** Whether anything about this character needs to know what is playing. */
+export function usesMusic(character: Character): boolean {
+  const asks = character.rules.some(
+    (rule) => rule.enabled && (rule.when.type === 'musicStarted' || rule.when.type === 'musicStopped' || rule.when.type === 'trackChanged' || rule.if.some((condition) => condition.type === 'musicPlaying'))
+  );
+  return asks || Object.values(character.lines).some((lines) => lines.some((line) => /\{(track|artist)\}/.test(line.text)));
+}
 
 export type TextPart = { text: string; slot: null } | { text: string; slot: string; known: boolean };
 

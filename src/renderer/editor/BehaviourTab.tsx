@@ -421,6 +421,16 @@ function ConditionEditor({ character, condition, onChange }: { character: Charac
           <span className="rule-word">to</span>
           <ClockInput label="To" value={condition.to} onChange={(to) => onChange({ ...condition, to })} />
         </>
+      ) : condition.type === 'musicPlaying' ? (
+        <Segmented<'yes' | 'no'>
+          label="Playing"
+          value={condition.playing ? 'yes' : 'no'}
+          options={[
+            { value: 'yes', label: 'is playing' },
+            { value: 'no', label: 'is not playing' }
+          ]}
+          onChange={(value) => onChange({ ...condition, playing: value === 'yes' })}
+        />
       ) : (
         <>
           <ProgramInput value={condition.program} onChange={(program) => onChange({ ...condition, program })} />

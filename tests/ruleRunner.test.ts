@@ -219,6 +219,85 @@ describe('RuleRunner', () => {
     r.stop();
   });
 
+  describe('what is playing', () => {
+    const watching = (d: Desk): { r: RuleRunner; report: (sessions: { app: string; playing: boolean; title: string; artist: string }[]) => Promise<void>; started: () => number; stopped: () => number } => {
+      let listener: ((sessions: { app: string; playing: boolean; title: string; artist: string }[]) => void) | null = null;
+      let started = 0;
+      let stopped = 0;
+      const r = new RuleRunner({
+        loadSensors: async () => d.sensors,
+        watchMedia: (onSessions) => {
+          started += 1;
+          listener = onSessions;
+          return () => {
+            stopped += 1;
+          };
+        },
+        idleSeconds: () => d.idle,
+        onFired: (one) => fired.push(one),
+        rng: () => 0.5,
+        now: () => Date.now()
+      });
+      return {
+        r,
+        report: async (sessions) => {
+          listener?.(sessions);
+          await vi.advanceTimersByTimeAsync(400);
+        },
+        started: () => started,
+        stopped: () => stopped
+      };
+    };
+
+    it('listens only while a rule asks, and fires with the track in its slots', async () => {
+      const d = desk();
+      const { r, report, started, stopped } = watching(d);
+      r.setCharacters([character([rule({ type: 'startup' })])]);
+      await settle();
+      expect(started()).toBe(0);
+
+      r.setCharacters([character([rule({ type: 'musicStarted' })])]);
+      await settle();
+      expect(started()).toBe(1);
+      await report([]);
+      await report([{ app: 'Spotify.exe', playing: true, title: 'One', artist: 'Band' }]);
+      expect(fired.map((f) => [f.rule.when.type, f.slots.track, f.slots.artist])).toEqual([['musicStarted', 'One', 'Band']]);
+
+      r.setCharacters([character([])]);
+      await settle();
+      expect(stopped()).toBe(1);
+      r.stop();
+    });
+
+    it('fills the slots of a rule about something else, only while it plays', async () => {
+      const d = desk();
+      const { r, report } = watching(d);
+      r.setCharacters([character([rule({ type: 'startup' }), rule({ type: 'musicStopped' })])]);
+      await settle();
+      await report([{ app: 'Spotify.exe', playing: true, title: 'One', artist: 'Band' }]);
+      r.event({ type: 'startup' });
+      expect(fired[0]?.slots.track).toBe('One');
+      fired = [];
+
+      await report([]);
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(fired.map((f) => f.slots.track)).toEqual(['One']);
+      fired = [];
+      r.event({ type: 'startup' });
+      expect(fired[0]?.slots.track).toBeUndefined();
+      r.stop();
+    });
+
+    it('watches for a script too', async () => {
+      const d = desk();
+      const { r, started } = watching(d);
+      r.setExtraNeeds({ startStop: new Set(), running: new Set(), focus: false, time: false, returned: false, music: true });
+      await settle();
+      expect(started()).toBe(1);
+      r.stop();
+    });
+  });
+
   it('does nothing once stopped', async () => {
     const d = desk();
     const r = runner(d);

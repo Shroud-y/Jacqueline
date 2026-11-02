@@ -55,9 +55,11 @@ away; there is no Save button.
   starts → say a line from **greet***. Open one to change it:
   - **When**: a program starts, closes or comes to the front; every day at a
     time; every so often (somewhere between N and M minutes); you come back
-    after being away; Jacqueline starts; the character is clicked.
+    after being away; Jacqueline starts; the character is clicked; music
+    starts or stops; the track changes.
   - **Only if**: by chance (a percentage), between two times of day, a
-    program is or is not running.
+    program is or is not running, music is or is not playing. "Music" is
+    anything a player reports to Windows, so a video in a browser counts.
   - **Then**: say a line from a group, play a sound, come out for a while
     (even if it would not be on screen otherwise), hide for a while.
   - **Wait at least** … before it can happen again.
@@ -73,7 +75,8 @@ away; there is no Save button.
   weight (how often it comes up) and a sound. The same line is never said
   twice in a row. A line can mention what happened with a slot: `{name}`
   (the character's), `{time}`, `{program}` (for rules about a program) and
-  `{minutes}` (how long you were away). A line whose slot cannot be filled
+  `{minutes}` (how long you were away), `{track}` and `{artist}` (what is
+  playing). A line whose slot cannot be filled
   is skipped, never shown with a hole in it. **Test** says it on your desktop.
 - **Audio** — volume, a video's own sound (on unless you turn it off), an
   ambient sound that loops while the character is on screen, and sounds for
@@ -128,6 +131,8 @@ need it:
   rules tied to a program;
 - **which program is in front** — told by Windows when it changes, not polled;
 - whether that window **covers the whole screen**, for "step aside";
+- **what is playing** — the player, track and artist Windows reports, told when
+  it changes, only for characters whose rules, lines or scripts ask;
 - how long since you last **touched the mouse or keyboard**, so a video stops
   moving while nobody is watching and "you come back" rules know when you did.
 

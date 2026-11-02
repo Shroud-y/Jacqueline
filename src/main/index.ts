@@ -21,13 +21,14 @@ import { isPresent } from './characters/presence';
 import { isWithinClockWindow, minutesOfDay, msUntilClockChange } from './engine/timeOfDay';
 import { pickLine, runActions, type ActionDeps } from './engine/actions';
 import { BehaviourScripts } from './engine/behaviourScripts';
-import { clock } from './engine/ruleEngine';
+import { clock, musicSlots } from './engine/ruleEngine';
 import { fillSlots } from './engine/slots';
 import { SpeechDirector } from './engine/director';
 import { RuleRunner } from './engine/ruleRunner';
 import { RecentHistory } from './engine/selector';
 import { CharacterStore } from './characters/store';
 import { Visibility } from './characters/visibility';
+import { watchMediaSessions } from './sensors/mediaSessions';
 import { PresenceWatcher } from './sensors/presenceWatcher';
 import { loadDesktopSensors } from './sensors/win32';
 import { CharacterWindows } from './windows/characterWindows';
@@ -146,6 +147,7 @@ async function bootstrap(): Promise<void> {
   };
   const rules = new RuleRunner({
     loadSensors: loadDesktopSensors,
+    watchMedia: watchMediaSessions,
     idleSeconds: () => powerMonitor.getSystemIdleTime(),
     onFired: (fired) => runActions(fired, actionDeps),
     onEvent: (event) => scripts.event(event)
@@ -168,7 +170,8 @@ async function bootstrap(): Promise<void> {
         say: (what) => {
           const character = current();
           if (!character || isSilenced()) return;
-          const slots = { name: character.name, time: clock(Date.now()) };
+          const music = rules.musicNow();
+          const slots = { name: character.name, time: clock(Date.now()), ...musicSlots(music?.playing ? music : null) };
           if ('group' in what) {
             const picked = pickLine(character, what.group, slots, actionDeps);
             if (!picked) return void log.info(`"${character.name}" script: nothing to say from "${what.group}"`);
@@ -187,11 +190,12 @@ async function bootstrap(): Promise<void> {
         setMood: (mood) => windows.setMood(id, mood),
         log: (message) => log.info(`"${current()?.name ?? id}" script: ${message}`),
         isRunning: (stem) => rules.isRunning(stem),
+        music: () => rules.musicNow(),
         now: () => Date.now()
       };
     },
     onNeeds: (needs) =>
-      rules.setExtraNeeds({ startStop: needs.startStop, running: needs.running, focus: needs.focus, time: needs.minute, returned: needs.returned }),
+      rules.setExtraNeeds({ startStop: needs.startStop, running: needs.running, focus: needs.focus, time: needs.minute, returned: needs.returned, music: needs.music }),
     onStatus: (id, status) => editor.send(IPC.editorScriptStatus, { id, status })
   });
   // Someone hidden for now does nothing either.

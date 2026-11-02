@@ -6,6 +6,7 @@
  */
 
 import { characterElement, type Character } from './character';
+import { usesMusic } from './lines';
 
 export type CostLevel = 'light' | 'moderate' | 'heavy';
 
@@ -84,6 +85,9 @@ export function estimateCost(character: Character): CostEstimate {
   if (programs) items.push({ text: 'Looks at the running programs every 5 seconds: about 0.2% of one core.', level: 'light' });
   if (presence.mode === 'whileFocused' || presence.hideOnFullscreen || active.some((rule) => rule.when.type === 'programFocused')) {
     items.push({ text: 'Is told when the window in front changes: next to nothing.', level: 'light' });
+  }
+  if (usesMusic(character)) {
+    items.push({ text: 'Is told when what is playing changes: about 18 MB once, shared by every character that asks, and next to no CPU.', level: 'light' });
   }
   if (presence.mode !== 'always') {
     items.push({ text: 'Off screen whenever it is not wanted, and then it costs nothing.', level: 'light' });

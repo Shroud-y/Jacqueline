@@ -60,6 +60,7 @@ export const BEHAVIOUR_STARTER = `/*
  *   on('returned', (e) => …)                      back at the computer after e.minutes away
  *   on('speechEnd', () => …)                      its line is over
  *   on('minute', (e) => …)                        every minute, e.time like "14:05"
+ *   on('musicStarted', (e) => …)                  also 'musicStopped', 'trackChanged'; e.track, e.artist, e.app
  *
  * Doing things:
  *   say('greet')            a line from one of its groups (Lines tab)
@@ -72,6 +73,7 @@ export const BEHAVIOUR_STARTER = `/*
  * And:
  *   after(5000, fn) / every(60000, fn) → id, cancel(id)   (every: once a second at most)
  *   running('obs.exe')      true / false — null the first time, while it is being looked at
+ *   music()                 { playing, track, artist, app } — null the first time, while it is being looked at
  *   now()                   milliseconds, like Date.now()
  *   state                   an object kept across restarts (64 KB at most)
  *

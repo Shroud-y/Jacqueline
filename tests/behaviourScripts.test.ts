@@ -45,6 +45,7 @@ beforeEach(() => {
       setMood: () => undefined,
       log: () => undefined,
       isRunning: () => null,
+      music: () => null,
       now: () => 0
     }),
     onNeeds: (next) => needs.push(next),

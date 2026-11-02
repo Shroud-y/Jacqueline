@@ -238,7 +238,7 @@ describe('editor requests', () => {
     const rule = { id: 'r1', name: '', enabled: true, when: { type: 'startup' as const }, if: [], then: [{ type: 'show' as const, seconds: 5 }], cooldownSec: 60 };
     await handlers().save({ ...created, rules: [rule] });
     expect(await handlers().testRule({ id: created.id, rule: 'r1' })).toEqual({ ok: true });
-    expect(ran).toEqual([{ id: created.id, rule: 'r1', slots: { name: 'Miku', time: '09:05', program: 'notepad.exe', minutes: 15 } }]);
+    expect(ran).toEqual([{ id: created.id, rule: 'r1', slots: { name: 'Miku', time: '09:05', program: 'notepad.exe', minutes: 15, track: 'Some Song', artist: 'Someone' } }]);
     expect((await handlers().testRule({ id: created.id, rule: 'nope' })).ok).toBe(false);
     expect((await handlers().testRule({ id: 'nobody', rule: 'r1' })).ok).toBe(false);
     expect((await handlers().testRule({ id: created.id })).ok).toBe(false);
