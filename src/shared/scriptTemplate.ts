@@ -68,6 +68,8 @@ export const BEHAVIOUR_STARTER = `/*
  *   sound('beep.wav')       one of its own files
  *   show(10) / hide(30)     come out for 10 seconds / hide for 30 minutes
  *   setMood('sleepy')       data-mood on its window, for its stylesheet; setMood(null) clears it
+ *   setState('nap', 10)     wear one of its own states for 10 seconds, or until changed without a number;
+ *                           setState(null) goes back. The key is shown under the state's name in Appearance
  *   log('…')                into Jacqueline's log
  *
  * And:

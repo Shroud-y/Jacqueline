@@ -16,9 +16,12 @@ const fileSchema = z
   .max(120)
   .regex(/^[A-Za-z0-9_][A-Za-z0-9_ .-]*$/, 'not a valid asset file name')
   .refine((name) => !name.includes('..'), 'not a valid asset file name');
+export const STATE_NAME = /^[a-z][a-zA-Z0-9]{0,31}$/;
+/** A key in `appearance.states`. What the user reads is the state's own name; this stays when that changes. */
+export const stateNameSchema = z.string().regex(STATE_NAME, 'not a valid state name');
 
 /* ------------------------------------------------------------------ */
-/* When                                                                */
+/* When                                                               */
 /* ------------------------------------------------------------------ */
 
 export const triggerSchema = z.discriminatedUnion('type', [
@@ -77,7 +80,9 @@ export const actionSchema = z.discriminatedUnion('type', [
   /** Come on screen for a while, whatever its presence rules say. */
   z.object({ type: z.literal('show'), seconds: z.number().min(1).max(MAX_SHOW_SECONDS) }),
   /** Get out of sight for a while. */
-  z.object({ type: z.literal('hide'), minutes: z.number().min(1).max(1440) })
+  z.object({ type: z.literal('hide'), minutes: z.number().min(1).max(1440) }),
+  /** Wear one of its own states, for a while or until told otherwise. Null goes back to its usual look. */
+  z.object({ type: z.literal('setState'), state: stateNameSchema.nullable(), seconds: z.number().min(1).max(MAX_SHOW_SECONDS).nullable() })
 ]);
 
 /** The whole seconds a character stays out to play a video through, within what `show` allows. */

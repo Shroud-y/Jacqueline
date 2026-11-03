@@ -69,7 +69,7 @@ export default function Stage(): JSX.Element | null {
       className="stage"
       data-character={stage.id}
       data-speaking={stage.speech ? 'true' : 'false'}
-      data-state={stage.speech ? 'speaking' : stage.music ? 'music' : 'idle'}
+      data-state={stage.state}
       data-music={stage.music ? 'true' : 'false'}
       data-preview={stage.preview ? 'true' : 'false'}
       // A visual script's own mood first; otherwise whatever the behaviour script set.

@@ -64,6 +64,8 @@ export interface StagePayload {
   flip: boolean;
   /** Null until the character has been given something to look like. */
   visual: StageVisual | null;
+  /** What its stylesheet's `[data-state]` says: idle, speaking, music, or one of its own. */
+  state: string;
   /** False while nobody is there to see it move: a video holds its frame. */
   playing: boolean;
   /** Put away until it is called again: its video goes back to the start, so the next call plays it whole. */

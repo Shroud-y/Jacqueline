@@ -142,6 +142,7 @@ async function bootstrap(): Promise<void> {
     playSound: (character, file) => windows.playSound(character.id, file, character.audio.volume),
     show: (character, ms) => windows.showFor(character.id, ms),
     hide: (character, ms) => visibility.hideFor(character.id, ms),
+    setState: (character, state, ms) => windows.setState(character.id, state, ms),
     log: (message) => log.info(message),
     history,
     rng: Math.random
@@ -190,6 +191,9 @@ async function bootstrap(): Promise<void> {
         show: (seconds) => windows.showFor(id, seconds * 1000),
         hide: (minutes) => visibility.hideFor(id, minutes * 60_000),
         setMood: (mood) => windows.setMood(id, mood),
+        setState: (state, seconds) => {
+          if (!windows.setState(id, state, seconds === null ? null : seconds * 1000)) log.info(`"${current()?.name ?? id}" script: it has no state "${state}"`);
+        },
         log: (message) => log.info(`"${current()?.name ?? id}" script: ${message}`),
         isRunning: (stem) => rules.isRunning(stem),
         music: () => rules.musicNow(),

@@ -7,7 +7,7 @@ import {
   type WebPreferences
 } from 'electron';
 import { statSync, watch, type FSWatcher } from 'node:fs';
-import type { Character } from '@shared/character';
+import { currentLook, isCustomState, type Character } from '@shared/character';
 import { IPC } from '@shared/ipc';
 import {
   anchorInWindow,
@@ -26,6 +26,7 @@ import { createLogger } from '../app/logger';
 import { assetUrl } from '../characters/assetProtocol';
 import { scriptHostUrl } from '@shared/assetUrl';
 import type { CharacterStore } from '../characters/store';
+import { ActiveStates } from './activeStates';
 import { ClickThroughController } from './clickThrough';
 import { EntrySounds, type EntryKind } from './entrySounds';
 import { distanceToRect, nextPollMs } from './hotPoll';
@@ -153,6 +154,7 @@ export class CharacterWindows {
   private readonly entrySounds = new EntrySounds();
   /** Moods set by behaviour scripts, by character. */
   private readonly moods = new Map<string, string>();
+  private readonly activeStates = new ActiveStates((id) => this.sendStage(id));
   /** Disappear sounds playing in the host page, which must outlive them. */
   private farewells = 0;
   private stopping = false;
@@ -211,6 +213,7 @@ export class CharacterWindows {
     ipcMain.removeAllListeners(IPC.stageClick);
     for (const timer of this.shownFor.values()) clearTimeout(timer.timer);
     this.shownFor.clear();
+    this.activeStates.stop();
     for (const live of [...this.live.values()]) this.close(live);
     this.destroyHost();
   }
@@ -243,6 +246,22 @@ export class CharacterWindows {
     if ((this.moods.get(id) ?? null) === mood) return;
     if (mood === null) this.moods.delete(id);
     else this.moods.set(id, mood);
+    this.sendStage(id);
+  }
+
+  /**
+   * One of its own states to wear, or null for its usual look; for `ms`, or
+   * until it is changed. False when it has no such state.
+   */
+  setState(id: string, state: string | null, ms: number | null): boolean {
+    if (state !== null && !(isCustomState(state) && this.store.get(id)?.appearance.states[state])) return false;
+    const changed = this.activeStates.get(id) !== state;
+    this.activeStates.set(id, state, ms);
+    if (changed) this.sendStage(id);
+    return true;
+  }
+
+  private sendStage(id: string): void {
     const live = this.live.get(id);
     const character = this.store.get(id);
     if (live && character && !live.win.isDestroyed()) live.win.webContents.send(IPC.stageUpdate, this.payload(character, live.geometry, live));
@@ -685,11 +704,9 @@ export class CharacterWindows {
   }
 
   private payload(character: Character, geometry: Geometry, live?: Live): StagePayload {
-    const states = character.appearance.states;
     const speech = this.presence.speechFor(character.id);
     const music = this.presence.isMusicPlaying();
-    // While a line is up it wears its speaking look, if it has one; while something plays, its music look.
-    const idle = (speech ? states.speaking : undefined) ?? (music ? states.music : undefined) ?? states.idle ?? Object.values(states)[0] ?? null;
+    const look = currentLook(character.appearance.states, { speaking: speech !== null, custom: this.activeStates.get(character.id), music });
     return {
       id: character.id,
       name: character.name,
@@ -697,7 +714,8 @@ export class CharacterWindows {
       elements: character.layout.elements,
       opacity: character.appearance.opacity,
       flip: character.appearance.flip,
-      visual: idle ? this.visual(character.id, idle.type, idle.src) : null,
+      visual: look.visual ? this.visual(character.id, look.visual.type, look.visual.src) : null,
+      state: look.state,
       // Put away: nobody can see it move.
       playing: this.presence.isWatching() && !live?.parked,
       rewind: live?.parked === true && character.presence.mode === 'onSpeech',

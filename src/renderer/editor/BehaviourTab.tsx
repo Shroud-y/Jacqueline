@@ -506,14 +506,14 @@ function ActionEditor({ character, action, busy, onChange, onChooseSound }: Acti
             <VideoLengthButton url={assetUrl(character.id, idle.src)} onLength={(seconds) => onChange({ ...action, seconds })} />
           ) : null}
         </>
-      ) : (
+      ) : action.type === 'hide' ? (
         <>
           <span className="rule-word">for</span>
           <span className="rule-number">
             <NumberInput label="Minutes" value={action.minutes} min={1} max={1440} unit="min" onCommit={(minutes) => onChange({ ...action, minutes })} />
           </span>
         </>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -17,6 +17,8 @@ export interface ActionDeps {
   playSound(character: Character, file: string): boolean;
   show(character: Character, ms: number): void;
   hide(character: Character, ms: number): void;
+  /** False when it has no such state. */
+  setState(character: Character, state: string | null, ms: number | null): boolean;
   log(message: string): void;
   history: RecentHistory;
   rng: Rng;
@@ -67,6 +69,11 @@ export function runActions(fired: Fired, deps: ActionDeps): void {
         break;
       case 'hide':
         deps.hide(character, action.minutes * 60_000);
+        break;
+      case 'setState':
+        if (!deps.setState(character, action.state, action.seconds === null ? null : action.seconds * 1000)) {
+          deps.log(`${label}: it has no state "${action.state}"`);
+        }
         break;
     }
   }

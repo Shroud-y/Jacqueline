@@ -7,7 +7,7 @@
  */
 
 import { z } from 'zod';
-import { ruleSchema, type Rule } from './rules';
+import { ruleSchema, stateNameSchema, type Rule } from './rules';
 
 export const CHARACTER_SCHEMA_VERSION = 1;
 
@@ -35,11 +35,20 @@ const colorSchema = z.string().trim().min(1).max(64);
 const visualSchema = z.object({
   /** `animation` is a picture file that moves: a GIF, an animated PNG or WebP. */
   type: z.enum(['image', 'video', 'animation']),
-  src: assetNameSchema
+  src: assetNameSchema,
+  /** What the user calls one of their own states. */
+  name: z.string().trim().min(1).max(40).optional()
 });
 
-/** `idle` is what shows with nothing going on; `speaking` replaces it while a line is up. */
-const stateNameSchema = z.string().regex(/^[a-z][a-zA-Z0-9]{0,31}$/, 'not a valid state name');
+/**
+ * `idle` is what shows with nothing going on; `speaking` replaces it while a
+ * line is up and `music` while something plays. Any other state is the user's
+ * own, worn when a rule or a script asks for it.
+ */
+const BUILT_IN_STATES: readonly string[] = ['idle', 'speaking', 'music'];
+export const MAX_CUSTOM_STATES = 20;
+
+export const isCustomState = (key: string): boolean => !BUILT_IN_STATES.includes(key);
 
 /** A colour taken out of the picture or video, for a file with a plain background and no transparency. */
 const chromaSchema = z.object({
@@ -52,7 +61,9 @@ const chromaSchema = z.object({
 
 const appearanceSchema = z.object({
   /** Empty until the user has given the character something to look like. */
-  states: z.record(stateNameSchema, visualSchema),
+  states: z
+    .record(stateNameSchema, visualSchema)
+    .refine((states) => Object.keys(states).filter(isCustomState).length <= MAX_CUSTOM_STATES, `at most ${MAX_CUSTOM_STATES} states of its own`),
   opacity: z.number().min(0).max(1),
   /** Mirrored left to right. */
   flip: z.boolean(),
@@ -192,6 +203,26 @@ export type LayoutElement = z.infer<typeof layoutElementSchema>;
 export type Presence = z.infer<typeof presenceSchema>;
 export type { Rule };
 export type Line = z.infer<typeof lineSchema>;
+
+/**
+ * What it looks like right now, and what its stylesheet is told about that. A
+ * line goes before its own state, its own state before music, and a look it
+ * does not have falls through to the next.
+ */
+export function currentLook(
+  states: Character['appearance']['states'],
+  now: { speaking: boolean; custom: string | null; music: boolean }
+): { state: string; visual: Visual | null } {
+  const custom = now.custom !== null && states[now.custom] ? now.custom : null;
+  const visual =
+    (now.speaking ? states.speaking : undefined) ??
+    (custom !== null ? states[custom] : undefined) ??
+    (now.music ? states.music : undefined) ??
+    states.idle ??
+    Object.values(states)[0] ??
+    null;
+  return { state: now.speaking ? 'speaking' : (custom ?? (now.music ? 'music' : 'idle')), visual };
+}
 
 /** A character as the list shows it: usable, or a folder whose file could not be read. */
 export type CharacterEntry =

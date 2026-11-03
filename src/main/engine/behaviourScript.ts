@@ -9,6 +9,7 @@
  */
 
 import { shouldInterruptAfterDeadline, type QuickJSContext, type QuickJSHandle, type QuickJSRuntime, type QuickJSWASMModule } from 'quickjs-emscripten-core';
+import { STATE_NAME } from '@shared/rules';
 import { appStem } from '../characters/presence';
 
 /** What a script can subscribe to. Program events take a program as the second argument. */
@@ -38,6 +39,8 @@ export interface ScriptActions {
   show(seconds: number): void;
   hide(minutes: number): void;
   setMood(mood: string | null): void;
+  /** One of its own states, or null for its usual look; `seconds` null lasts until it is changed. */
+  setState(state: string | null, seconds: number | null): void;
   log(message: string): void;
   /** By stem; null when it is not known (yet). */
   isRunning(stem: string): boolean | null;
@@ -262,6 +265,14 @@ export class BehaviourScript {
       const value = text(mood);
       if (!MOOD.test(value)) fail('setMood(): lowercase letters, digits and dashes, starting with a letter');
       this.actions.setMood(value);
+    });
+    define('setState', (state, seconds) => {
+      const raw: unknown = state ? ctx.dump(state) : null;
+      if (raw === null || raw === undefined) return void this.actions.setState(null, null);
+      const value = text(state);
+      if (!STATE_NAME.test(value)) fail("setState(): the state's key, shown under its name in the Appearance tab");
+      const length = number(seconds);
+      this.actions.setState(value, Number.isFinite(length) ? Math.min(3600, Math.max(1, length)) : null);
     });
     define('log', (...args) => {
       this.actions.log(args.map((arg) => (ctx.typeof(arg) === 'string' ? ctx.getString(arg) : JSON.stringify(ctx.dump(arg)))).join(' ').slice(0, 1000));

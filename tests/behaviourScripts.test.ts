@@ -43,6 +43,7 @@ beforeEach(() => {
       show: () => undefined,
       hide: () => undefined,
       setMood: () => undefined,
+      setState: () => undefined,
       log: () => undefined,
       isRunning: () => null,
       music: () => null,

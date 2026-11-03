@@ -191,6 +191,7 @@ function deps(over: Partial<ActionDeps> = {}): ActionDeps & { said: string[]; so
     },
     show: (_character, ms) => shown.push(ms),
     hide: (_character, ms) => hidden.push(ms),
+    setState: () => true,
     log: (message) => logs.push(message),
     history: new RecentHistory(),
     rng: () => 0,
@@ -236,5 +237,24 @@ describe('actions', () => {
     runActions({ character: withLines, rule: rule({ when: { type: 'startup' }, then: [{ type: 'say', group: 'missing' }] }), slots: {} }, d);
     expect(d.said).toEqual([]);
     expect(d.logs[0]).toMatch(/nothing to say/);
+  });
+
+  it('changes look, in milliseconds, and says so in the log when the state is gone', () => {
+    const asked: unknown[] = [];
+    const d = deps({
+      setState: (_character, state, ms) => {
+        asked.push([state, ms]);
+        return state !== 'gone';
+      }
+    });
+    const then = [
+      { type: 'setState' as const, state: 'nap', seconds: 5 },
+      { type: 'setState' as const, state: 'gone', seconds: null },
+      { type: 'setState' as const, state: null, seconds: null }
+    ];
+    runActions({ character: withLines, rule: rule({ when: { type: 'startup' }, then }), slots: {} }, d);
+    expect(asked).toEqual([['nap', 5000], ['gone', null], [null, null]]);
+    expect(d.logs).toHaveLength(1);
+    expect(d.logs[0]).toMatch(/no state "gone"/);
   });
 });

@@ -4,7 +4,7 @@
  * values a part starts with when it is picked. Pure.
  */
 
-import type { Character } from './character';
+import { isCustomState, type Character } from './character';
 import type { Rule, RuleAction, RuleCondition, Trigger } from './rules';
 
 /** A run of a sentence; `strong` runs are what the user filled in. */
@@ -45,7 +45,8 @@ export const ACTION_LABELS: Record<RuleAction['type'], string> = {
   say: 'Say a line',
   sound: 'Play a sound',
   show: 'Come out for a while',
-  hide: 'Hide for a while'
+  hide: 'Hide for a while',
+  setState: 'Change look'
 };
 
 /** "45 s", "10 min", "2 h", "1 h 30 min". */
@@ -89,7 +90,7 @@ function triggerParts(trigger: Trigger): Part[] {
   }
 }
 
-function actionParts(action: RuleAction): Part[] {
+function actionParts(action: RuleAction, character?: Character): Part[] {
   switch (action.type) {
     case 'say':
       return [plain('say a line from '), strong(action.group)];
@@ -99,15 +100,20 @@ function actionParts(action: RuleAction): Part[] {
       return [plain('come out for '), strong(formatDuration(action.seconds))];
     case 'hide':
       return [plain('hide for '), strong(formatDuration(action.minutes * 60))];
+    case 'setState': {
+      if (action.state === null) return [plain('go back to its usual look')];
+      const parts = [plain('change look to '), strong(character?.appearance.states[action.state]?.name ?? action.state)];
+      return action.seconds === null ? parts : [...parts, plain(' for '), strong(formatDuration(action.seconds))];
+    }
   }
 }
 
 /** "When **dota2.exe** starts → say a line from **greet** and play **hi.ogg**" */
-export function ruleSentence(rule: Rule): Part[] {
+export function ruleSentence(rule: Rule, character?: Character): Part[] {
   const parts = [...triggerParts(rule.when), plain(' → ')];
   rule.then.forEach((action, index) => {
     if (index > 0) parts.push(plain(index === rule.then.length - 1 ? ' and ' : ', '));
-    parts.push(...actionParts(action));
+    parts.push(...actionParts(action, character));
   });
   return parts;
 }
@@ -145,6 +151,8 @@ export function ruleProblems(character: Character, rule: Rule, assets?: Readonly
       else if (lines.length === 0) problems.push(`"${action.group}" has no lines yet.`);
     } else if (action.type === 'sound' && assets && !assets.has(action.file)) {
       problems.push(`${action.file} is not in the character's folder.`);
+    } else if (action.type === 'setState' && action.state !== null && !character.appearance.states[action.state]) {
+      problems.push('The state this rule changes to is gone.');
     }
   }
   return problems;
@@ -196,7 +204,8 @@ export function defaultCondition(type: RuleCondition['type'], character: Charact
 
 /**
  * Null for a sound: it needs a file chosen first. Null for a line too while
- * the character has no groups to say one from.
+ * the character has no groups to say one from, and for a change of look
+ * while it has no states of its own.
  */
 export function defaultAction(type: RuleAction['type'], character: Character): RuleAction | null {
   switch (type) {
@@ -210,6 +219,10 @@ export function defaultAction(type: RuleAction['type'], character: Character): R
       return { type, seconds: 10 };
     case 'hide':
       return { type, minutes: 30 };
+    case 'setState': {
+      const state = Object.keys(character.appearance.states).find(isCustomState);
+      return state === undefined ? null : { type, state, seconds: 10 };
+    }
   }
 }
 

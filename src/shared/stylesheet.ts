@@ -13,7 +13,7 @@ export const STYLE_STARTER = `/*
  * What there is to style:
  *   .stage                      the whole window
  *     [data-speaking="true"]    …while a line is up
- *     [data-state="idle"]       …or "speaking", or "music"
+ *     [data-state="idle"]       …or "speaking", "music", or the key of one of its own states
  *     [data-music="true"]       …while something plays, once a rule, a line, a script or the Music slot asks to know
  *     [data-preview="true"]     …while it is being laid out in the editor
  *   .character                  the box its picture or video sits in

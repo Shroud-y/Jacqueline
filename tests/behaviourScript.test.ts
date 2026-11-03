@@ -32,6 +32,7 @@ const actions: ScriptActions = {
   show: (s) => done.push(`show ${s}`),
   hide: (m) => done.push(`hide ${m}`),
   setMood: (mood) => done.push(`mood ${mood}`),
+  setState: (state, seconds) => done.push(`state ${state} ${seconds}`),
   log: (message) => done.push(`log ${message}`),
   isRunning: (stem) => running.get(stem) ?? null,
   music: () => ({ playing: true, track: 'One', artist: 'Band', app: 'spotify' }),
@@ -89,6 +90,12 @@ describe('behaviour scripts', () => {
   it('does what the app does, within bounds', () => {
     load(`sound('beep.wav'); show(99999); hide(0); setMood('happy'); setMood(null); log({ a: 1 }, 'x');`);
     expect(done).toEqual(['sound beep.wav', 'show 3600', 'hide 1', 'mood happy', 'mood null', 'log {"a":1} x']);
+  });
+
+  it('changes state, within bounds', () => {
+    load(`setState('nap', 99999); setState('nap', 0); setState('nap'); setState(null);`);
+    expect(done).toEqual(['state nap 3600', 'state nap 1', 'state nap null', 'state null null']);
+    expect(load(`setState('Bad State!');`).error).toContain('setState()');
   });
 
   it('runs timers no faster than allowed, and stops them on cancel', () => {
