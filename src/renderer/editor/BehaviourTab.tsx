@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useId, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { assetUrl } from '@shared/assetUrl';
 import type { Character } from '@shared/character';
-import type { Rule, RuleAction, RuleCondition, Trigger } from '@shared/rules';
+import { showSecondsFor, type Rule, type RuleAction, type RuleCondition, type Trigger } from '@shared/rules';
 import {
   ACTION_LABELS,
   CONDITION_LABELS,
@@ -15,6 +16,7 @@ import {
 } from '@shared/ruleText';
 import { ClockInput, Field, Notice, NumberInput, Segmented, Select, TextInput } from './fields';
 import BehaviourScriptSection from './BehaviourScriptSection';
+import { probeVideoLength } from './media';
 import type { Characters } from './useCharacters';
 
 const PROGRAMS_LIST = 'running-programs';
@@ -459,6 +461,7 @@ interface ActionEditorProps {
 
 function ActionEditor({ character, action, busy, onChange, onChooseSound }: ActionEditorProps): JSX.Element {
   const groups = Object.keys(character.lines);
+  const idle = character.appearance.states.idle;
   // A line can be picked only once there are groups; a sound only by choosing its file.
   const options = (Object.keys(ACTION_LABELS) as RuleAction['type'][])
     .filter((type) => type !== 'say' || groups.length > 0 || action.type === 'say')
@@ -499,6 +502,9 @@ function ActionEditor({ character, action, busy, onChange, onChooseSound }: Acti
           <span className="rule-number">
             <NumberInput label="Seconds" value={action.seconds} min={1} max={3600} unit="s" onCommit={(seconds) => onChange({ ...action, seconds })} />
           </span>
+          {idle?.type === 'video' ? (
+            <VideoLengthButton url={assetUrl(character.id, idle.src)} onLength={(seconds) => onChange({ ...action, seconds })} />
+          ) : null}
         </>
       ) : (
         <>
@@ -509,6 +515,37 @@ function ActionEditor({ character, action, busy, onChange, onChooseSound }: Acti
         </>
       )}
     </div>
+  );
+}
+
+/** Fills in the time once, from the video as it is now. */
+function VideoLengthButton({ url, onLength }: { url: string; onLength: (seconds: number) => void }): JSX.Element {
+  const [status, setStatus] = useState<'idle' | 'reading' | 'failed'>('idle');
+  // Reading takes a moment, and the rule may be edited meanwhile.
+  const latest = useRef(onLength);
+  useEffect(() => {
+    latest.current = onLength;
+  });
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  const read = async (): Promise<void> => {
+    setStatus('reading');
+    const length = await probeVideoLength(url);
+    if (!mounted.current) return;
+    setStatus(length === null ? 'failed' : 'idle');
+    if (length !== null) latest.current(showSecondsFor(length));
+  };
+
+  return (
+    <button type="button" className="button quiet" disabled={status === 'reading'} onClick={() => void read()}>
+      {status === 'reading' ? 'Reading…' : status === 'failed' ? 'Could not read the video' : 'Video length'}
+    </button>
   );
 }
 

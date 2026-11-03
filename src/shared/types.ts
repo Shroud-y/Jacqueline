@@ -66,6 +66,8 @@ export interface StagePayload {
   visual: StageVisual | null;
   /** False while nobody is there to see it move: a video holds its frame. */
   playing: boolean;
+  /** Put away until it is called again: its video goes back to the start, so the next call plays it whole. */
+  rewind: boolean;
   /** Seconds a video holds still between plays; 0 loops it. */
   restSec: number;
   /** A background colour to take out of what it looks like; null to show it as it is. */

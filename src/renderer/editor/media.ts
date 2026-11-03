@@ -31,6 +31,28 @@ export function probeMedia(url: string, type: 'image' | 'video' | 'animation', t
   });
 }
 
+/** How long a video runs, in seconds. Null if it never says. */
+export function probeVideoLength(url: string, timeoutMs = 5000): Promise<number | null> {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    const finish = (length: number | null): void => {
+      clearTimeout(timer);
+      video.onloadedmetadata = null;
+      video.onerror = null;
+      // Let go of the decoder at once; nothing here is ever played.
+      video.removeAttribute('src');
+      video.load();
+      resolve(length);
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    video.preload = 'metadata';
+    video.muted = true;
+    video.onloadedmetadata = () => finish(Number.isFinite(video.duration) && video.duration > 0 ? video.duration : null);
+    video.onerror = () => finish(null);
+    video.src = url;
+  });
+}
+
 /** "1.9 MB", "740 KB". */
 export function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;

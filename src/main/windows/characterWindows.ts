@@ -700,6 +700,7 @@ export class CharacterWindows {
       visual: idle ? this.visual(character.id, idle.type, idle.src) : null,
       // Put away: nobody can see it move.
       playing: this.presence.isWatching() && !live?.parked,
+      rewind: live?.parked === true && character.presence.mode === 'onSpeech',
       restSec: character.appearance.restSec,
       chroma: character.appearance.chroma,
       preview: character.id === this.previewId,

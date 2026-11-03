@@ -132,7 +132,7 @@ function CharacterElement({ stage, crop, left, top, width, height }: CharacterEl
   // A video moves only while someone is there to see it, and — if the
   // character asks for it — rests on its last frame between plays. Every
   // frame it does not draw is one the whole window does not composite.
-  const { playing, restSec } = stage;
+  const { playing, rewind, restSec } = stage;
   const videoUrl = visual?.type === 'video' ? visual.url : null;
   // Turning the cut-out on or off makes a new element: it has to be set going again.
   const chromaOn = stage.chroma !== null;
@@ -141,6 +141,8 @@ function CharacterElement({ stage, crop, left, top, width, height }: CharacterEl
     if (!element || !videoUrl) return;
     if (!playing) {
       element.pause();
+      // While it is hidden, so that coming back never shows where it had stopped.
+      if (rewind) element.currentTime = 0;
       return;
     }
 
@@ -161,7 +163,7 @@ function CharacterElement({ stage, crop, left, top, width, height }: CharacterEl
       element.removeEventListener('ended', onEnded);
       if (rest) clearTimeout(rest);
     };
-  }, [playing, restSec, videoUrl, chromaOn]);
+  }, [playing, rewind, restSec, videoUrl, chromaOn]);
 
   // Its own sound, when it has one and it may be heard. `muted` as an attribute is
   // only read once, so it is set on the element.

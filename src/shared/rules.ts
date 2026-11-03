@@ -67,16 +67,23 @@ export const conditionSchema = z.discriminatedUnion('type', [
 /* Then                                                                */
 /* ------------------------------------------------------------------ */
 
+const MAX_SHOW_SECONDS = 3600;
+
 export const actionSchema = z.discriminatedUnion('type', [
   /** Say a line picked from a group. */
   z.object({ type: z.literal('say'), group: groupSchema }),
   /** Play one of the character's sounds. */
   z.object({ type: z.literal('sound'), file: fileSchema }),
   /** Come on screen for a while, whatever its presence rules say. */
-  z.object({ type: z.literal('show'), seconds: z.number().min(1).max(3600) }),
+  z.object({ type: z.literal('show'), seconds: z.number().min(1).max(MAX_SHOW_SECONDS) }),
   /** Get out of sight for a while. */
   z.object({ type: z.literal('hide'), minutes: z.number().min(1).max(1440) })
 ]);
+
+/** The whole seconds a character stays out to play a video through, within what `show` allows. */
+export function showSecondsFor(videoLength: number): number {
+  return Math.min(MAX_SHOW_SECONDS, Math.max(1, Math.ceil(videoLength)));
+}
 
 export const ruleSchema = z.object({
   id: z.string().min(1).max(64),
