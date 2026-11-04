@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { assetUrl } from '@shared/assetUrl';
-import type { Character } from '@shared/character';
+import { customStates, type Character, type Visual } from '@shared/character';
 import { showSecondsFor, type Rule, type RuleAction, type RuleCondition, type Trigger } from '@shared/rules';
 import {
   ACTION_LABELS,
@@ -11,6 +11,7 @@ import {
   newRule,
   ruleDetail,
   ruleProblems,
+  ruleLook,
   ruleSentence,
   TRIGGER_LABELS
 } from '@shared/ruleText';
@@ -126,7 +127,7 @@ function RuleItem({ character, characters, rule, assets, open, onToggle, onAsset
           <span className="rule-text">
             {rule.name.trim() ? <span className="rule-name">{rule.name.trim()}</span> : null}
             <span className="rule-sentence">
-              {ruleSentence(rule).map((part, index) => (part.strong ? <b key={index}>{part.text}</b> : <span key={index}>{part.text}</span>))}
+              {ruleSentence(rule, character).map((part, index) => (part.strong ? <b key={index}>{part.text}</b> : <span key={index}>{part.text}</span>))}
             </span>
             {problems.map((problem) => (
               <span key={problem} className="rule-problem">
@@ -258,6 +259,7 @@ function RuleEditor({ character, characters, rule, setRule, onAssetsChanged }: R
             <ActionEditor
               character={character}
               action={action}
+              look={ruleLook(character, rule)}
               busy={busy}
               onChange={(next) => setAction(index, next)}
               onChooseSound={() => void chooseSound(index)}
@@ -454,17 +456,21 @@ function ConditionEditor({ character, condition, onChange }: { character: Charac
 interface ActionEditorProps {
   character: Character;
   action: RuleAction;
+  /** What it wears when this rule brings it out. */
+  look: Visual | undefined;
   busy: boolean;
   onChange: (action: RuleAction) => void;
   onChooseSound: () => void;
 }
 
-function ActionEditor({ character, action, busy, onChange, onChooseSound }: ActionEditorProps): JSX.Element {
+function ActionEditor({ character, action, look, busy, onChange, onChooseSound }: ActionEditorProps): JSX.Element {
   const groups = Object.keys(character.lines);
-  const idle = character.appearance.states.idle;
-  // A line can be picked only once there are groups; a sound only by choosing its file.
+  const { states } = character.appearance;
+  const own = customStates(states);
+  // A line can be picked only once there are groups; a sound only by choosing its file; a change of look only once there is one to change to.
   const options = (Object.keys(ACTION_LABELS) as RuleAction['type'][])
     .filter((type) => type !== 'say' || groups.length > 0 || action.type === 'say')
+    .filter((type) => type !== 'setState' || own.length > 0 || action.type === 'setState')
     .map((value) => ({ value, label: ACTION_LABELS[value] }));
 
   const pick = (type: RuleAction['type']): void => {
@@ -502,8 +508,8 @@ function ActionEditor({ character, action, busy, onChange, onChooseSound }: Acti
           <span className="rule-number">
             <NumberInput label="Seconds" value={action.seconds} min={1} max={3600} unit="s" onCommit={(seconds) => onChange({ ...action, seconds })} />
           </span>
-          {idle?.type === 'video' ? (
-            <VideoLengthButton url={assetUrl(character.id, idle.src)} onLength={(seconds) => onChange({ ...action, seconds })} />
+          {look?.type === 'video' ? (
+            <VideoLengthButton key={look.src} url={assetUrl(character.id, look.src)} onLength={(seconds) => onChange({ ...action, seconds })} />
           ) : null}
         </>
       ) : action.type === 'hide' ? (
@@ -513,8 +519,53 @@ function ActionEditor({ character, action, busy, onChange, onChooseSound }: Acti
             <NumberInput label="Minutes" value={action.minutes} min={1} max={1440} unit="min" onCommit={(minutes) => onChange({ ...action, minutes })} />
           </span>
         </>
-      ) : null}
+      ) : (
+        <StateActionEditor character={character} action={action} onChange={onChange} />
+      )}
     </div>
+  );
+}
+
+const USUAL_LOOK = '';
+const DEFAULT_LOOK_SECONDS = 10;
+
+function StateActionEditor({ character, action, onChange }: { character: Character; action: Extract<RuleAction, { type: 'setState' }>; onChange: (action: RuleAction) => void }): JSX.Element {
+  const { states } = character.appearance;
+  const worn = action.state === null ? undefined : states[action.state];
+  const gone = action.state !== null && !worn ? [{ value: action.state, label: `${action.state} (missing)` }] : [];
+  return (
+    <>
+      <span className="rule-word">to</span>
+      <Select
+        label="State"
+        value={action.state ?? USUAL_LOOK}
+        options={[...gone, ...customStates(states).map(([key, visual]) => ({ value: key, label: visual.name ?? key })), { value: USUAL_LOOK, label: 'Back to normal' }]}
+        onChange={(state) => onChange(state === USUAL_LOOK ? { ...action, state: null, seconds: null } : { ...action, state })}
+      />
+      {action.state !== null ? (
+        <>
+          <Select
+            label="How long"
+            value={action.seconds === null ? 'until' : 'for'}
+            options={[
+              { value: 'for', label: 'for' },
+              { value: 'until', label: 'until changed' }
+            ]}
+            onChange={(how) => onChange({ ...action, seconds: how === 'until' ? null : DEFAULT_LOOK_SECONDS })}
+          />
+          {action.seconds !== null ? (
+            <>
+              <span className="rule-number">
+                <NumberInput label="Seconds" value={action.seconds} min={1} max={3600} unit="s" onCommit={(seconds) => onChange({ ...action, seconds })} />
+              </span>
+              {worn?.type === 'video' ? (
+                <VideoLengthButton key={worn.src} url={assetUrl(character.id, worn.src)} onLength={(seconds) => onChange({ ...action, seconds })} />
+              ) : null}
+            </>
+          ) : null}
+        </>
+      ) : null}
+    </>
   );
 }
 

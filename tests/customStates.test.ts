@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { characterSchema, currentLook, defaultCharacter, MAX_CUSTOM_STATES, type Character, type Visual } from '../src/shared/character';
-import { defaultAction, ruleProblems, ruleSentence } from '../src/shared/ruleText';
+import { characterSchema, currentLook, defaultCharacter, MAX_CUSTOM_STATES, newStateKey, newStateName, type Character, type Visual } from '../src/shared/character';
+import { defaultAction, ruleLook, ruleProblems, ruleSentence } from '../src/shared/ruleText';
 import type { Rule } from '../src/shared/rules';
 import { ActiveStates } from '../src/main/windows/activeStates';
 
@@ -109,6 +109,29 @@ describe('a character with states of its own', () => {
     expect(characterSchema.safeParse(many(MAX_CUSTOM_STATES)).success).toBe(true);
     expect(characterSchema.safeParse(many(MAX_CUSTOM_STATES + 1)).success).toBe(false);
     expect(characterSchema.parse(character()).appearance.states.nap?.name).toBe('Сон');
+  });
+
+  it('names a new state after its file, and keeps names apart', () => {
+    expect(newStateName('sleepy cat.webm', {})).toBe('sleepy cat');
+    expect(newStateName('nap.png', { a: look('a.png', 'nap') })).toBe('nap 2');
+    expect(newStateName('nap.png', { a: look('a.png', 'nap'), b: look('b.png', 'nap 2') })).toBe('nap 3');
+  });
+
+  it('makes a valid key from a name, whatever language it is in', () => {
+    expect(newStateKey('sleepy cat', {})).toBe('sleepyCat');
+    expect(newStateKey('Сон', {})).toBe('state1');
+    expect(newStateKey('Сон', { state1: look('a.png') })).toBe('state2');
+    expect(newStateKey('2 fast', {})).toBe('fast');
+    expect(newStateKey('nap', { nap: look('a.png') })).toBe('nap2');
+    expect(newStateKey('idle', {})).toBe('idle2');
+    for (const name of ['a'.repeat(40), 'Сон 7', '123', 'music']) expect(characterSchema.shape.appearance.shape.states.safeParse({ [newStateKey(name, {})]: look('a.png') }).success).toBe(true);
+  });
+
+  it('brings a rule out in the state it changes to, or else in its idle look', () => {
+    const show = rule(null, null);
+    expect(ruleLook(character(), show)).toEqual(states.idle);
+    expect(ruleLook(character(), rule('nap', 5))).toEqual(states.nap);
+    expect(ruleLook(character(), rule('gone', 5))).toEqual(states.idle);
   });
 
   it('still reads a character from before there were any', () => {

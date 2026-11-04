@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
-import { characterElement, type AssetKind, type Character, type Visual } from '@shared/character';
+import { characterElement, customStates, MAX_CUSTOM_STATES, newStateKey, newStateName, type AssetKind, type Character, type Visual } from '@shared/character';
 import { croppedSize } from '@shared/crop';
 import { assetUrl } from '@shared/assetUrl';
 import type { AssetInfo } from '@shared/types';
 import { isAnimated } from '../shared/animationPlayer';
 import BackgroundSection from './BackgroundSection';
 import FileSlot, { type SlotFile } from './FileSlot';
-import { Checkbox, Field, Group, Notice, NumberInput, Slider } from './fields';
+import { Checkbox, Field, Group, Notice, NumberInput, Slider, TextInput } from './fields';
 import { heightFor, probeMedia, widthFor } from './media';
 import type { Characters } from './useCharacters';
 
-type StateName = 'idle' | 'speaking' | 'music';
+/** Marks the slot a new state is added through, while it is busy. Not a valid key, so never a state's. */
+const NEW_STATE = '+';
 
 const VISUAL_KINDS: AssetKind[] = ['image', 'video'];
 const MIN_SIZE = 16;
@@ -20,7 +21,7 @@ const MAX_SIZE = 4000;
 export default function AppearanceTab({ character, characters }: { character: Character; characters: Characters }): JSX.Element {
   const { id, appearance } = character;
   const [assets, setAssets] = useState<AssetInfo[] | null>(null);
-  const [busy, setBusy] = useState<StateName | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [keepProportions, setKeepProportions] = useState(true);
   // The idle file's own size, for keeping proportions. Per file: a new one is a new shape.
   const [natural, setNatural] = useState<{ src: string; width: number; height: number } | null>(null);
@@ -32,6 +33,7 @@ export default function AppearanceTab({ character, characters }: { character: Ch
 
   const element = characterElement(character);
   const idle = appearance.states.idle ?? null;
+  const own = customStates(appearance.states);
   const naturalSize = natural && idle && natural.src === idle.src ? natural : null;
 
   const slotFile = (visual: Visual | undefined): SlotFile | null => {
@@ -66,34 +68,71 @@ export default function AppearanceTab({ character, characters }: { character: Ch
     }
   });
 
+  /** A file copied in and looked at. Null if it was not, with the reason already reported. */
+  const importVisual = async (path?: string): Promise<Visual | null> => {
+    const api = window.jacquelineEditor;
+    if (!api) return null;
+    const imported = await api.importAsset({ id, kinds: VISUAL_KINDS, ...(path ? { path } : {}) });
+    if (!imported.ok) {
+      if (imported.error) characters.report(imported.error);
+      return null;
+    }
+    const type = imported.kind === 'video' ? 'video' : (await isAnimated(assetUrl(id, imported.file))) ? 'animation' : 'image';
+    return { type, src: imported.file };
+  };
+
+  /** A new state of its own, named after its file. */
+  const addState = async (path?: string): Promise<void> => {
+    setBusy(NEW_STATE);
+    try {
+      const visual = await importVisual(path);
+      if (!visual) return;
+      const name = newStateName(visual.src, appearance.states);
+      const key = newStateKey(name, appearance.states);
+      const saved = await characters.save({ ...character, appearance: { ...appearance, states: { ...appearance.states, [key]: { ...visual, name } } } });
+      // Not saved: the copy is not pointed at by anything, so it goes.
+      if (!saved) await window.jacquelineEditor?.releaseAsset({ id, file: visual.src });
+      loadAssets();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const renameState = (key: string, visual: Visual, name: string): void =>
+    characters.update({ ...character, appearance: { ...appearance, states: { ...appearance.states, [key]: { ...visual, name: name.trim() } } } });
+
+  const stateNameProblem = (key: string, name: string): string | null => {
+    const wanted = name.trim();
+    if (!wanted) return 'A state needs a name.';
+    return customStates(appearance.states).some(([other, visual]) => other !== key && visual.name === wanted) ? 'Another state is called that.' : null;
+  };
+
   /** Puts a file into a state, and lets the old one go once nothing points at it any more. */
-  const choose = async (state: StateName, path?: string): Promise<void> => {
+  const choose = async (state: string, path?: string): Promise<void> => {
     const api = window.jacquelineEditor;
     if (!api) return;
     setBusy(state);
     try {
-      const imported = await api.importAsset({ id, kinds: VISUAL_KINDS, ...(path ? { path } : {}) });
-      if (!imported.ok) {
-        if (imported.error) characters.report(imported.error);
-        return;
-      }
-      const type = imported.kind === 'video' ? 'video' : (await isAnimated(assetUrl(id, imported.file))) ? 'animation' : 'image';
+      const imported = await importVisual(path);
+      if (!imported) return;
+      const { type } = imported;
+      const name = appearance.states[state]?.name;
       let next: Character = {
         ...character,
-        appearance: { ...appearance, states: { ...appearance.states, [state]: { type, src: imported.file } } }
+        appearance: { ...appearance, states: { ...appearance.states, [state]: { ...imported, ...(name ? { name } : {}) } } }
       };
       // A new look for the character fits its box: same width, the file's own proportions, and
       // whole again: a crop was made for the file it replaces.
       if (state === 'idle' && element) {
-        const size = await probeMedia(assetUrl(id, imported.file), type);
+        const size = await probeMedia(assetUrl(id, imported.src), type);
         if (size) next = uncropped(setElementSize(next, element.width, heightFor(element.width, size)));
       }
       const old = appearance.states[state]?.src;
       if (await characters.save(next)) {
-        if (old && old !== imported.file) await api.releaseAsset({ id, file: old });
+        if (old && old !== imported.src) await api.releaseAsset({ id, file: old });
       } else {
         // Not saved: the copy is not pointed at by anything, so it goes.
-        await api.releaseAsset({ id, file: imported.file });
+        await api.releaseAsset({ id, file: imported.src });
       }
       loadAssets();
     } finally {
@@ -214,7 +253,7 @@ export default function AppearanceTab({ character, characters }: { character: Ch
     }
   };
 
-  const remove = async (state: StateName): Promise<void> => {
+  const remove = async (state: string): Promise<void> => {
     const old = appearance.states[state]?.src;
     const states = { ...appearance.states };
     delete states[state];
@@ -268,6 +307,37 @@ export default function AppearanceTab({ character, characters }: { character: Ch
           onRemove={() => void remove('music')}
           hint="Shown instead of idle while something is playing, a video in a browser too. A line still takes over."
         />
+        {own.map(([key, visual]) => (
+          <FileSlot
+            key={key}
+            label={
+              <TextInput
+                label="State name"
+                value={visual.name ?? key}
+                maxLength={40}
+                validate={(name) => stateNameProblem(key, name)}
+                onCommit={(name) => renameState(key, visual, name)}
+              />
+            }
+            file={slotFile(visual)}
+            kinds={VISUAL_KINDS}
+            busy={busy === key}
+            onChoose={(path) => void choose(key, path)}
+            onRemove={() => void remove(key)}
+            hint={`Rules switch to it with Change look. In scripts and stylesheets: ${key}`}
+          />
+        ))}
+        {own.length < MAX_CUSTOM_STATES ? (
+          <FileSlot
+            label="New state"
+            file={null}
+            kinds={VISUAL_KINDS}
+            busy={busy === NEW_STATE}
+            onChoose={(path) => void addState(path)}
+            onRemove={() => undefined}
+            hint="A look of your own, worn when a rule or a script asks for it. A line still takes over."
+          />
+        ) : null}
       </div>
 
       <Group title="Look">

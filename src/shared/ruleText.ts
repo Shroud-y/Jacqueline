@@ -4,7 +4,7 @@
  * values a part starts with when it is picked. Pure.
  */
 
-import { isCustomState, type Character } from './character';
+import { isCustomState, type Character, type Visual } from './character';
 import type { Rule, RuleAction, RuleCondition, Trigger } from './rules';
 
 /** A run of a sentence; `strong` runs are what the user filled in. */
@@ -161,6 +161,13 @@ export function ruleProblems(character: Character, rule: Rule, assets?: Readonly
 /* ------------------------------------------------------------------ */
 /* Starting values                                                     */
 /* ------------------------------------------------------------------ */
+
+/** What the character wears when this rule brings it out: the state the rule changes to, or else its idle look. */
+export function ruleLook(character: Character, rule: Rule): Visual | undefined {
+  const { states } = character.appearance;
+  for (const action of rule.then) if (action.type === 'setState' && action.state !== null && states[action.state]) return states[action.state];
+  return states.idle;
+}
 
 /** The program a new program trigger or condition starts with: one the character already knows. */
 export function likelyProgram(character: Character): string {

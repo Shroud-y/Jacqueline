@@ -13,7 +13,7 @@ export interface SlotFile {
 }
 
 interface FileSlotProps {
-  label: string;
+  label: ReactNode;
   hint?: string;
   file: SlotFile | null;
   /** What may be chosen or dropped here. */

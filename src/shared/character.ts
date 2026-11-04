@@ -224,6 +224,31 @@ export function currentLook(
   return { state: now.speaking ? 'speaking' : (custom ?? (now.music ? 'music' : 'idle')), visual };
 }
 
+/** The states that are the user's own, in the order they were added. */
+export function customStates(states: Character['appearance']['states']): [string, Visual][] {
+  return Object.entries(states).filter(([key]) => isCustomState(key));
+}
+
+/** What a new state is called at first: its file's name, numbered if that is taken. */
+export function newStateName(file: string, states: Character['appearance']['states']): string {
+  const stem = file.replace(/\.[^.]*$/, '').slice(0, 36).trim() || 'State';
+  const taken = new Set(Object.values(states).map((visual) => visual.name));
+  if (!taken.has(stem)) return stem;
+  for (let n = 2; ; n += 1) if (!taken.has(`${stem} ${n}`)) return `${stem} ${n}`;
+}
+
+/** A key for a new state: from the Latin letters and digits of its name if it has any, or else `state1`. */
+export function newStateKey(name: string, states: Character['appearance']['states']): string {
+  const words = name.match(/[A-Za-z0-9]+/g) ?? [];
+  const joined = words.map((word, index) => (index === 0 ? word.toLowerCase() : word[0]?.toUpperCase() + word.slice(1))).join('');
+  const bare = joined.replace(/^[0-9]+/, '').slice(0, 28);
+  const stem = bare.charAt(0).toLowerCase() + bare.slice(1);
+  const free = (key: string): boolean => isCustomState(key) && !states[key];
+  if (stem && free(stem)) return stem;
+  const base = stem || 'state';
+  for (let n = stem ? 2 : 1; ; n += 1) if (free(`${base}${n}`)) return `${base}${n}`;
+}
+
 /** A character as the list shows it: usable, or a folder whose file could not be read. */
 export type CharacterEntry =
   | { id: string; ok: true; character: Character }

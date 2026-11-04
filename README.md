@@ -29,6 +29,8 @@ away; there is no Save button.
 - **Appearance** — a picture, a GIF or a video for when it is idle, and optionally
   another while it is speaking and another while music plays. Size, opacity, mirroring. A video can **rest**
   between plays, which is the cheapest way to have a character that moves.
+  **New state** adds looks of your own, under names of your own, for rules and
+  scripts to switch to. A line still takes over from them, and they take over from music.
 - **Appearance → Background** — takes a plain background colour out of a
   picture or a video, for files with no transparency of their own such as an
   `.mp4`: click the background to choose the colour, then set how far from it
@@ -61,13 +63,14 @@ away; there is no Save button.
     program is or is not running, music is or is not playing. "Music" is
     anything a player reports to Windows, so a video in a browser counts.
   - **Then**: say a line from a group, play a sound, come out for a while
-    (even if it would not be on screen otherwise), hide for a while.
+    (even if it would not be on screen otherwise), hide for a while, change
+    look to one of its own states, for a while or until changed.
   - **Wait at least** … before it can happen again.
   - **Test now** does what the rule does, right away.
 - **Behaviour → Script** — when rules are not enough: a `behaviour.js` with
   logic of its own. It hears programs starting, clicks, the minute, you coming
-  back and its own lines ending; it says, plays, shows, hides, sets a mood
-  and keeps a `state` that survives restarts. **Start one from a template**
+  back and its own lines ending; it says, plays, shows, hides, sets a mood,
+  changes state and keeps a `state` that survives restarts. **Start one from a template**
   gives you a commented file listing everything it can do. It runs in a
   sandbox (QuickJS) with no internet and no files, 50 ms per event and 16 MB
   at most; errors show in the editor with their line.
