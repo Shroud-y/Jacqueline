@@ -9,11 +9,12 @@
  */
 
 import { shouldInterruptAfterDeadline, type QuickJSContext, type QuickJSHandle, type QuickJSRuntime, type QuickJSWASMModule } from 'quickjs-emscripten-core';
-import { STATE_NAME } from '@shared/rules';
+import { STATE_NAME, type ShowPlace } from '@shared/rules';
+import { SIGNAL_NAME } from '@shared/signal';
 import { appStem } from '../characters/presence';
 
-/** What a script can subscribe to. Program events take a program as the second argument. */
-export const SCRIPT_EVENTS = ['programStarted', 'programStopped', 'programFocused', 'clicked', 'startup', 'returned', 'speechEnd', 'minute', 'musicStarted', 'musicStopped', 'trackChanged'] as const;
+/** What a script can subscribe to. Program events take a program as the second argument; `signal` may take a name. */
+export const SCRIPT_EVENTS = ['programStarted', 'programStopped', 'programFocused', 'clicked', 'startup', 'returned', 'speechEnd', 'minute', 'musicStarted', 'musicStopped', 'trackChanged', 'signal'] as const;
 export type ScriptEventName = (typeof SCRIPT_EVENTS)[number];
 const PROGRAM_EVENTS = new Set<ScriptEventName>(['programStarted', 'programStopped', 'programFocused']);
 const MUSIC_EVENTS = new Set<ScriptEventName>(['musicStarted', 'musicStopped', 'trackChanged']);
@@ -36,7 +37,7 @@ export interface ScriptActions {
   /** A group of lines, or a line of its own. */
   say(what: { group: string } | { text: string }): void;
   sound(file: string): void;
-  show(seconds: number): void;
+  show(seconds: number, place: ShowPlace): void;
   hide(minutes: number): void;
   setMood(mood: string | null): void;
   /** One of its own states, or null for its usual look; `seconds` null lasts until it is changed. */
@@ -62,6 +63,8 @@ export interface ScriptEvent {
   name: ScriptEventName;
   /** Program events: the program, by stem. */
   program?: string;
+  /** `signal`: its name. */
+  signal?: string;
   /** Anything else the handler is given. */
   detail?: Record<string, string | number>;
 }
@@ -69,6 +72,8 @@ export interface ScriptEvent {
 interface Handler {
   name: ScriptEventName;
   program: string | null;
+  /** `signal` handlers for one name only; null hears every signal. */
+  signal: string | null;
   fn: QuickJSHandle;
 }
 
@@ -119,6 +124,7 @@ export class BehaviourScript {
     for (const handler of [...this.handlers]) {
       if (handler.name !== event.name) continue;
       if (handler.program !== null && handler.program !== event.program) continue;
+      if (handler.signal !== null && handler.signal !== event.signal) continue;
       this.call(handler.fn, event);
       if (!this.running) return;
     }
@@ -164,9 +170,13 @@ export class BehaviourScript {
       const isProgram = PROGRAM_EVENTS.has(name);
       const program = isProgram ? appStem(text(second)) : null;
       if (isProgram && !program) fail(`on('${name}', program, fn): which program?`);
-      const fn = isProgram ? third : second;
+      // A signal's name is optional: on('signal', fn) hears every one.
+      const named = name === 'signal' && second !== undefined && ctx.typeof(second) === 'string';
+      const signal = named ? text(second) : null;
+      if (signal !== null && !SIGNAL_NAME.test(signal)) fail(`on('signal', name, fn): "${signal}" is not a signal name`);
+      const fn = isProgram || named ? third : second;
       if (!fn || ctx.typeof(fn) !== 'function') fail(`on('${name}'): the last argument has to be a function`);
-      this.handlers.push({ name, program, fn: (fn as QuickJSHandle).dup() });
+      this.handlers.push({ name, program, signal, fn: (fn as QuickJSHandle).dup() });
       if (name === 'programStarted' || name === 'programStopped') this.needs.startStop.add(program as string);
       if (name === 'programFocused') this.needs.focus = true;
       if (name === 'minute') this.needs.minute = true;
@@ -251,9 +261,11 @@ export class BehaviourScript {
       fail("say(): a group's name, or { text: '…' }");
     });
     define('sound', (file) => this.actions.sound(text(file) || fail('sound(file): which file?')));
-    define('show', (seconds) => {
+    define('show', (seconds, place) => {
       const value = number(seconds);
-      this.actions.show(Math.min(3600, Math.max(1, Number.isFinite(value) ? value : 10)));
+      const where = text(place);
+      if (where !== '' && where !== 'usual' && where !== 'random') fail(`show(seconds, place): place is 'usual' or 'random', not "${where}"`);
+      this.actions.show(Math.min(3600, Math.max(1, Number.isFinite(value) ? value : 10)), where === 'random' ? 'random' : 'usual');
     });
     define('hide', (minutes) => {
       const value = number(minutes);

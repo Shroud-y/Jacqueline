@@ -17,7 +17,7 @@ describe('what knowing the music costs', () => {
 
   it('comes up for a rule about it, or a line that names the track', () => {
     const base = still();
-    const rule = { id: 'r', name: '', enabled: true, if: [], then: [{ type: 'show' as const, seconds: 5 }], cooldownSec: 0 };
+    const rule = { id: 'r', name: '', enabled: true, if: [], then: [{ type: 'show' as const, seconds: 5, place: 'usual' as const }], cooldownSec: 0 };
     expect(mentionsMusic(base)).toBe(false);
     expect(mentionsMusic(says('Hello, {name}'))).toBe(false);
     expect(mentionsMusic(says('Nice, {track}'))).toBe(true);
@@ -32,7 +32,7 @@ describe('what knowing the music costs', () => {
   });
 
   it('does not come up for a rule that is off', () => {
-    const rule = { id: 'r', name: '', enabled: false, when: { type: 'musicStarted' as const }, if: [], then: [{ type: 'show' as const, seconds: 5 }], cooldownSec: 0 };
+    const rule = { id: 'r', name: '', enabled: false, when: { type: 'musicStarted' as const }, if: [], then: [{ type: 'show' as const, seconds: 5, place: 'usual' as const }], cooldownSec: 0 };
     expect(mentionsMusic({ ...still(), rules: [rule] })).toBe(false);
   });
 });
@@ -94,7 +94,7 @@ describe('what a character costs', () => {
 
     const ruled: Character = {
       ...still(),
-      rules: [{ id: 'r', name: '', enabled: true, when: { type: 'programStarted', program: 'code.exe' }, if: [], then: [{ type: 'show', seconds: 5 }], cooldownSec: 0 }]
+      rules: [{ id: 'r', name: '', enabled: true, when: { type: 'programStarted', program: 'code.exe' }, if: [], then: [{ type: 'show', seconds: 5, place: 'usual' }], cooldownSec: 0 }]
     };
     expect(estimateCost(ruled).items.some((item) => item.text.includes('running programs'))).toBe(true);
     // A rule that is off asks nothing to be watched.

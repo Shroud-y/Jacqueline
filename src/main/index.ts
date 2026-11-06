@@ -1,10 +1,11 @@
-import { app, dialog, powerMonitor, screen, shell } from 'electron';
+import { app, clipboard, dialog, powerMonitor, screen, shell } from 'electron';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { newQuickJSWASMModuleFromVariant, type QuickJSSyncVariant } from 'quickjs-emscripten-core';
 
 import { ASSET_EXTENSIONS, type Character } from '@shared/character';
 import { IPC } from '@shared/ipc';
+import { parseSignalArgs, signalFromData } from '@shared/signal';
 import type { Settings, SettingsView } from '@shared/types';
 
 import { configureLogger, createLogger } from './app/logger';
@@ -39,7 +40,12 @@ const log = createLogger('main');
 // Must run before `app.whenReady` — character windows load their assets through it.
 registerAssetScheme();
 
-if (!app.requestSingleInstanceLock()) {
+// A signal is carried to the app that is already running and goes no further:
+// with nobody running, there is nobody it is for, and a build script must not
+// start the app behind the user's back.
+const signalArgs = parseSignalArgs(process.argv);
+const carried = signalArgs.kind === 'signal' ? { signal: signalArgs.signal } : {};
+if (!app.requestSingleInstanceLock(carried) || signalArgs.kind !== 'none') {
   app.exit(0);
 } else {
   void bootstrap();
@@ -140,7 +146,7 @@ async function bootstrap(): Promise<void> {
       director.say(character.id, text);
     },
     playSound: (character, file) => windows.playSound(character.id, file, character.audio.volume),
-    show: (character, ms) => windows.showFor(character.id, ms),
+    show: (character, ms, place) => windows.showFor(character.id, ms, place),
     hide: (character, ms) => visibility.hideFor(character.id, ms),
     setState: (character, state, ms) => windows.setState(character.id, state, ms),
     log: (message) => log.info(message),
@@ -188,7 +194,7 @@ async function bootstrap(): Promise<void> {
           const character = current();
           if (character && !isSilenced()) windows.playSound(id, file, character.audio.volume);
         },
-        show: (seconds) => windows.showFor(id, seconds * 1000),
+        show: (seconds, place) => windows.showFor(id, seconds * 1000, place),
         hide: (minutes) => visibility.hideFor(id, minutes * 60_000),
         setMood: (mood) => windows.setMood(id, mood),
         setState: (state, seconds) => {
@@ -270,6 +276,9 @@ async function bootstrap(): Promise<void> {
     },
     settings: settingsView,
     updateSettings: (patch) => settings.update(patch),
+    // A development run is electron.exe with the project beside it; the installed app is its own exe.
+    executable: () => (app.isPackaged ? [process.execPath] : [process.execPath, app.getAppPath()]),
+    copyText: (text) => clipboard.writeText(text),
     runningPrograms: async () => {
       const sensors = await loadDesktopSensors();
       if (!sensors) return [];
@@ -368,7 +377,20 @@ async function bootstrap(): Promise<void> {
 
   // Started again while already running: that is someone looking for the
   // app, and the editor is the only window it has to show them.
-  app.on('second-instance', () => editor.open());
+  app.on('second-instance', (_event, argv, _cwd, data) => {
+    // Started with a signal: that is a script talking to the characters, not someone looking for the editor.
+    const signal = signalFromData(data);
+    if (signal) {
+      log.info(`signal ${signal.name}${signal.text ? `: ${signal.text}` : ''}`);
+      rules.event({ type: 'signal', name: signal.name, text: signal.text });
+      return;
+    }
+    // A signal that did not make it through the lock is still not a reason to open the editor.
+    const asked = parseSignalArgs(argv);
+    if (asked.kind === 'invalid') return void log.warn(`signal refused: ${asked.error}`);
+    if (asked.kind !== 'none') return;
+    editor.open();
+  });
   if (process.argv.includes('--editor')) editor.open();
 
   // The app lives in the tray; it never quits from window state.

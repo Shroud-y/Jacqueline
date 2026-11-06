@@ -108,6 +108,26 @@ export function clampAnchor(position: Point, anchor: Rect, workArea: Rect): Poin
   };
 }
 
+/**
+ * Somewhere random in the work area: the whole frame, text and all, inside
+ * it when it fits; when it does not, at least the anchor. Answers where the
+ * anchor goes, as everything else here does.
+ */
+export function randomAnchorPosition(frame: Rect, anchor: Rect, workArea: Rect, rng: () => number = Math.random): Point {
+  const inside = anchorInWindow(frame, anchor);
+  const fits = frame.width <= workArea.width && frame.height <= workArea.height;
+  if (!fits) {
+    return clampAnchor(
+      { x: workArea.x + rng() * Math.max(0, workArea.width - anchor.width), y: workArea.y + rng() * Math.max(0, workArea.height - anchor.height) },
+      anchor,
+      workArea
+    );
+  }
+  const windowX = workArea.x + rng() * (workArea.width - frame.width);
+  const windowY = workArea.y + rng() * (workArea.height - frame.height);
+  return { x: Math.round(windowX) + inside.x, y: Math.round(windowY) + inside.y };
+}
+
 /** Bottom-right corner, for a character nobody has placed yet. */
 export function defaultAnchorPosition(anchor: Rect, workArea: Rect): Point {
   return clampAnchor(

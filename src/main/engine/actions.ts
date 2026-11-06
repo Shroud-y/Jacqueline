@@ -4,6 +4,7 @@
  */
 
 import type { Character, Line } from '@shared/character';
+import type { ShowPlace } from '@shared/rules';
 import type { Fired } from './ruleEngine';
 import { RecentHistory, selectPhrase, type Rng } from './selector';
 import { fillSlots } from './slots';
@@ -15,7 +16,7 @@ export interface ActionDeps {
   say(character: Character, text: string, line: Line): void;
   /** False when there was nowhere to play it — the character is not on screen. */
   playSound(character: Character, file: string): boolean;
-  show(character: Character, ms: number): void;
+  show(character: Character, ms: number, place: ShowPlace): void;
   hide(character: Character, ms: number): void;
   /** False when it has no such state. */
   setState(character: Character, state: string | null, ms: number | null): boolean;
@@ -65,7 +66,7 @@ export function runActions(fired: Fired, deps: ActionDeps): void {
         if (!deps.playSound(character, action.file)) deps.log(`${label}: ${action.file} not played — the character is not on screen`);
         break;
       case 'show':
-        deps.show(character, action.seconds * 1000);
+        deps.show(character, action.seconds * 1000, action.place);
         break;
       case 'hide':
         deps.hide(character, action.minutes * 60_000);

@@ -61,12 +61,15 @@ export const BEHAVIOUR_STARTER = `/*
  *   on('speechEnd', () => …)                      its line is over
  *   on('minute', (e) => …)                        every minute, e.time like "14:05"
  *   on('musicStarted', (e) => …)                  also 'musicStopped', 'trackChanged'; e.track, e.artist, e.app
+ *   on('signal', 'build-ok', (e) => …)            Jacqueline.exe --signal build-ok [--text "…"]; e.name, e.text
+ *                                                 on('signal', fn) hears every signal
  *
  * Doing things:
  *   say('greet')            a line from one of its groups (Lines tab)
  *   say({ text: 'Hi, {name}. It is {time}.' })
  *   sound('beep.wav')       one of its own files
  *   show(10) / hide(30)     come out for 10 seconds / hide for 30 minutes
+ *   show(10, 'random')      come out somewhere random on the cursor's screen, for that while only
  *   setMood('sleepy')       data-mood on its window, for its stylesheet; setMood(null) clears it
  *   setState('nap', 10)     wear one of its own states for 10 seconds, or until changed without a number;
  *                           setState(null) goes back. The key is shown under the state's name in Appearance

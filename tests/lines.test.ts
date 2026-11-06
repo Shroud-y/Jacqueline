@@ -22,7 +22,7 @@ const sayRule = (id: string, group: string): Rule => ({
   enabled: true,
   when: { type: 'startup' },
   if: [],
-  then: [{ type: 'say', group }, { type: 'show', seconds: 5 }],
+  then: [{ type: 'say', group }, { type: 'show', seconds: 5, place: 'usual' }],
   cooldownSec: 0
 });
 

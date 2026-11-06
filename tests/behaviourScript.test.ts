@@ -29,7 +29,7 @@ afterEach(() => {
 const actions: ScriptActions = {
   say: (what) => done.push(`say ${JSON.stringify(what)}`),
   sound: (file) => done.push(`sound ${file}`),
-  show: (s) => done.push(`show ${s}`),
+  show: (s, place) => done.push(place === 'random' ? `show ${s} random` : `show ${s}`),
   hide: (m) => done.push(`hide ${m}`),
   setMood: (mood) => done.push(`mood ${mood}`),
   setState: (state, seconds) => done.push(`state ${state} ${seconds}`),
@@ -90,6 +90,23 @@ describe('behaviour scripts', () => {
   it('does what the app does, within bounds', () => {
     load(`sound('beep.wav'); show(99999); hide(0); setMood('happy'); setMood(null); log({ a: 1 }, 'x');`);
     expect(done).toEqual(['sound beep.wav', 'show 3600', 'hide 1', 'mood happy', 'mood null', 'log {"a":1} x']);
+  });
+
+  it('comes out somewhere random when asked, and refuses a place it does not know', () => {
+    load(`show(5, 'random'); show(5, 'usual');`);
+    expect(done).toEqual(['show 5 random', 'show 5']);
+    expect(load(`show(5, 'moon');`).error).toContain('show(seconds, place)');
+  });
+
+  it('hears signals: one by name, or every one, with the text that came along', () => {
+    const script = load(`
+      on('signal', 'build-ok', (e) => log('ok', e.name, e.text));
+      on('signal', (e) => log('any', e.name, e.text === undefined));
+    `);
+    script.dispatch({ name: 'signal', signal: 'build-ok', detail: { name: 'build-ok', text: '3 tests' } });
+    script.dispatch({ name: 'signal', signal: 'other', detail: { name: 'other' } });
+    expect(done).toEqual(['log ok build-ok 3 tests', 'log any build-ok false', 'log any other true']);
+    expect(load(`on('signal', 'two words', () => {});`).error).toContain('not a signal name');
   });
 
   it('changes state, within bounds', () => {

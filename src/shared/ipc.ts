@@ -39,6 +39,8 @@ export const IPC = {
   editorRunningPrograms: 'editor:runningPrograms',
   /** Opens the folder every character lives in. */
   editorOpenRoot: 'editor:openRoot',
+  /** Puts the command that sends a signal on the clipboard. */
+  editorCopySignalCommand: 'editor:copySignalCommand',
   /** Writes a starter stylesheet into a character's assets. */
   editorNewStylesheet: 'editor:newStylesheet',
   /** Writes a starter script into a character's assets. */

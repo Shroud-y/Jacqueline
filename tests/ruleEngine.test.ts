@@ -30,7 +30,7 @@ describe('rule schema', () => {
         { type: 'timeBetween', from: '22:00', to: '02:00' },
         { type: 'programRunning', program: 'dota2.exe', running: false }
       ],
-      then: [{ type: 'say', group: 'idle' }, { type: 'sound', file: 'hi.ogg' }, { type: 'show', seconds: 10 }, { type: 'hide', minutes: 5 }]
+      then: [{ type: 'say', group: 'idle' }, { type: 'sound', file: 'hi.ogg' }, { type: 'show', seconds: 10, place: 'usual' }, { type: 'hide', minutes: 5 }]
     });
     expect(ruleSchema.safeParse(full).success).toBe(true);
   });
@@ -89,6 +89,23 @@ describe('RuleEngine', () => {
     engine.setCharacters([character([rule({ when: { type: 'returned', afterMinutes: 30 } })])], 0);
     expect(engine.handle({ type: 'returned', awayMinutes: 10 }, ctx(0))).toEqual([]);
     expect(engine.handle({ type: 'returned', awayMinutes: 45.4 }, ctx(0))[0]?.slots.minutes).toBe(45);
+  });
+
+  it('fires a signal rule for that signal only, with its text for {text} when one came', () => {
+    const engine = new RuleEngine();
+    engine.setCharacters([character([rule({ when: { type: 'signal', name: 'build-ok' } })])], 0);
+    expect(engine.handle({ type: 'signal', name: 'build-failed', text: null }, ctx(0))).toEqual([]);
+    const fired = engine.handle({ type: 'signal', name: 'build-ok', text: '3 tests' }, ctx(0));
+    expect(fired[0]?.slots.text).toBe('3 tests');
+    const bare = engine.handle({ type: 'signal', name: 'build-ok', text: null }, ctx(1));
+    expect(bare).toHaveLength(1);
+    expect('text' in (bare[0]?.slots ?? {})).toBe(false);
+  });
+
+  it('reads a show action saved before it had a place as coming out where it usually is', () => {
+    const parsed = ruleSchema.parse({ ...rule({ when: { type: 'startup' } }), then: [{ type: 'show', seconds: 5 }] });
+    expect(parsed.then[0]).toEqual({ type: 'show', seconds: 5, place: 'usual' });
+    expect(ruleSchema.safeParse({ ...rule({ when: { type: 'signal', name: 'no spaces' } }) }).success).toBe(false);
   });
 
   it('waits out the cooldown', () => {
@@ -224,7 +241,7 @@ describe('actions', () => {
 
   it('says nothing when it is quiet, but still shows and hides', () => {
     const d = deps({ isSilenced: () => true });
-    const all = rule({ when: { type: 'startup' }, then: [{ type: 'say', group: 'greet' }, { type: 'sound', file: 'x.ogg' }, { type: 'show', seconds: 5 }, { type: 'hide', minutes: 2 }] });
+    const all = rule({ when: { type: 'startup' }, then: [{ type: 'say', group: 'greet' }, { type: 'sound', file: 'x.ogg' }, { type: 'show', seconds: 5, place: 'usual' }, { type: 'hide', minutes: 2 }] });
     runActions({ character: withLines, rule: all, slots: {} }, d);
     expect(d.said).toEqual([]);
     expect(d.sounds).toEqual([]);

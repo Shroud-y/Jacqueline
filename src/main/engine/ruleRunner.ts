@@ -280,5 +280,7 @@ function describe(event: RuleEvent): string {
       return 'the track changed';
     case 'every':
       return 'its turn came round';
+    case 'signal':
+      return `signal ${event.name}`;
   }
 }

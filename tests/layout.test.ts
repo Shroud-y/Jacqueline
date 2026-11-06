@@ -9,6 +9,7 @@ import {
   layoutAnchor,
   layoutFrame,
   placeWindow,
+  randomAnchorPosition,
   type Rect
 } from '@shared/layout';
 
@@ -101,5 +102,36 @@ describe('clampAnchor', () => {
 describe('defaultAnchorPosition', () => {
   it('is the bottom-right corner, with a margin', () => {
     expect(defaultAnchorPosition(anchor, screen)).toEqual({ x: 1656, y: 776 });
+  });
+});
+
+describe('randomAnchorPosition', () => {
+  const frame: Rect = { x: -1, y: -1, width: 502, height: 242 };
+  const anchor: Rect = { x: 260, y: 0, width: 240, height: 240 };
+  const second: Rect = { x: 1920, y: 0, width: 1280, height: 1000 };
+
+  it('keeps the whole frame, text and all, inside the work area', () => {
+    for (const roll of [0, 0.5, 0.999]) {
+      const position = randomAnchorPosition(frame, anchor, second, () => roll);
+      const window = placeWindow(frame, anchor, position);
+      expect(window.x).toBeGreaterThanOrEqual(second.x);
+      expect(window.y).toBeGreaterThanOrEqual(second.y);
+      expect(window.x + window.width).toBeLessThanOrEqual(second.x + second.width);
+      expect(window.y + window.height).toBeLessThanOrEqual(second.y + second.height);
+    }
+  });
+
+  it('lands in different places for different rolls', () => {
+    const low = randomAnchorPosition(frame, anchor, second, () => 0);
+    const high = randomAnchorPosition(frame, anchor, second, () => 0.99);
+    expect(low).not.toEqual(high);
+    expect(low).toEqual({ x: second.x + 261, y: 1 });
+  });
+
+  it('keeps at least the character on screen when the layout is bigger than it', () => {
+    const huge: Rect = { x: 0, y: 0, width: 3000, height: 300 };
+    const position = randomAnchorPosition(huge, anchor, screen, () => 0.999);
+    expect(position.x + anchor.width).toBeLessThanOrEqual(screen.x + screen.width);
+    expect(position.x).toBeGreaterThanOrEqual(screen.x);
   });
 });

@@ -22,6 +22,7 @@ let suggested: string[];
 let revealed: string[];
 let zipPath: string | null;
 let opened2: string[];
+let copied: string[];
 let blocked: Set<string>;
 let restarted: string[];
 
@@ -40,6 +41,8 @@ const handlers = (): ReturnType<typeof editorHandlers> =>
     runNow: (fired) => ran.push({ id: fired.character.id, rule: fired.rule.id, slots: fired.slots }),
     runningPrograms: async () => ['code.exe', 'dota2.exe'],
     openRoot: async () => ({ ok: true }),
+    executable: () => ['C:/Program Files/Jacqueline/Jacqueline.exe'],
+    copyText: (text) => copied.push(text),
     pickZip: async () => zipPath,
     pickSavePath: async (name) => {
       suggested.push(name);
@@ -76,6 +79,7 @@ beforeEach(() => {
   revealed = [];
   zipPath = null;
   opened2 = [];
+  copied = [];
   blocked = new Set();
   restarted = [];
 });
@@ -235,10 +239,10 @@ describe('editor requests', () => {
 
   it('runs a rule now, whatever its trigger, for a character that is on', async () => {
     const created = await make();
-    const rule = { id: 'r1', name: '', enabled: true, when: { type: 'startup' as const }, if: [], then: [{ type: 'show' as const, seconds: 5 }], cooldownSec: 60 };
+    const rule = { id: 'r1', name: '', enabled: true, when: { type: 'startup' as const }, if: [], then: [{ type: 'show' as const, seconds: 5, place: 'usual' as const }], cooldownSec: 60 };
     await handlers().save({ ...created, rules: [rule] });
     expect(await handlers().testRule({ id: created.id, rule: 'r1' })).toEqual({ ok: true });
-    expect(ran).toEqual([{ id: created.id, rule: 'r1', slots: { name: 'Miku', time: '09:05', program: 'notepad.exe', minutes: 15, track: 'Some Song', artist: 'Someone' } }]);
+    expect(ran).toEqual([{ id: created.id, rule: 'r1', slots: { name: 'Miku', time: '09:05', program: 'notepad.exe', minutes: 15, track: 'Some Song', artist: 'Someone', text: 'something from outside' } }]);
     expect((await handlers().testRule({ id: created.id, rule: 'nope' })).ok).toBe(false);
     expect((await handlers().testRule({ id: 'nobody', rule: 'r1' })).ok).toBe(false);
     expect((await handlers().testRule({ id: created.id })).ok).toBe(false);
@@ -359,6 +363,16 @@ describe('editor requests', () => {
 
   it('says what is running', async () => {
     expect(await handlers().runningPrograms()).toEqual(['code.exe', 'dota2.exe']);
+  });
+
+  it('copies the command that sends a signal, quoted, and refuses a name that is not one', async () => {
+    const result = await handlers().copySignalCommand({ name: 'build-ok' });
+    const command = '"C:/Program Files/Jacqueline/Jacqueline.exe" --signal build-ok';
+    expect(result).toEqual({ ok: true, command });
+    expect(copied).toEqual([command]);
+    expect((await handlers().copySignalCommand({ name: 'two words' })).ok).toBe(false);
+    expect((await handlers().copySignalCommand({})).ok).toBe(false);
+    expect(copied).toHaveLength(1);
   });
 
   it('does not say anything for a character that is off', async () => {

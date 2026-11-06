@@ -46,11 +46,16 @@ describe('rule sentences', () => {
       then: [
         { type: 'say', group: 'poke' },
         { type: 'sound', file: 'hi.ogg' },
-        { type: 'show', seconds: 90 },
+        { type: 'show', seconds: 90, place: 'usual' },
         { type: 'hide', minutes: 30 }
       ]
     };
     expect(text(many)).toBe('When it is clicked → say a line from **poke**, play **hi.ogg**, come out for **2 min** and hide for **30 min**');
+  });
+
+  it('says which signal it waits for, and when it comes out somewhere random', () => {
+    const signal: Rule = { ...base, when: { type: 'signal', name: 'build-ok' }, then: [{ type: 'show', seconds: 10, place: 'random' }] };
+    expect(text(signal)).toBe('When signal **build-ok** comes → come out somewhere random for **10 s**');
   });
 
   it('puts conditions and the wait in the quiet line', () => {
@@ -116,7 +121,7 @@ describe('starting values', () => {
     expect(defaultAction('say', character)).toEqual({ type: 'say', group: 'greet' });
     expect(defaultAction('say', miku())).toBeNull();
     expect(defaultAction('sound', character)).toBeNull();
-    expect(defaultAction('show', character)).toEqual({ type: 'show', seconds: 10 });
+    expect(defaultAction('show', character)).toEqual({ type: 'show', seconds: 10, place: 'usual' });
     expect(defaultAction('hide', character)).toEqual({ type: 'hide', minutes: 30 });
   });
 
@@ -132,7 +137,7 @@ describe('starting values', () => {
     const withLines = newRule(miku({ lines: { greet: [], poke: [] } }));
     expect(withLines).toMatchObject({ when: { type: 'clicked' }, then: [{ type: 'say', group: 'greet' }], enabled: true });
     expect(ruleSchema.safeParse(withLines).success).toBe(true);
-    expect(newRule(miku()).then).toEqual([{ type: 'show', seconds: 10 }]);
+    expect(newRule(miku()).then).toEqual([{ type: 'show', seconds: 10, place: 'usual' }]);
     expect(freeRuleId([{ ...base, id: 'rule-2' }])).toBe('rule-3');
   });
 });

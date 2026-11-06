@@ -145,6 +145,8 @@ export interface EditorApi {
   runningPrograms(): Promise<string[]>;
   /** Opens the folder every character lives in. */
   openRoot(): Promise<EditorResult>;
+  /** Puts `Jacqueline.exe --signal <name>`, with this install's full path, on the clipboard, and answers with it. */
+  copySignalCommand(payload: { name: string }): Promise<EditorResult<{ command: string }>>;
   /** Writes a starter stylesheet among the character's assets and answers with its file name. Not yet used by the character. */
   newStylesheet(payload: { id: string }): Promise<EditorResult<{ file: string }>>;
   /** Writes a starter script among the character's assets and answers with its file name. Not yet used by the character. */

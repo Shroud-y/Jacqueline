@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { assetUrl } from '@shared/assetUrl';
 import { customStates, type Character, type Visual } from '@shared/character';
-import { showSecondsFor, type Rule, type RuleAction, type RuleCondition, type Trigger } from '@shared/rules';
+import { SIGNAL_NAME } from '@shared/signal';
+import { showSecondsFor, type Rule, type ShowPlace, type RuleAction, type RuleCondition, type Trigger } from '@shared/rules';
 import {
   ACTION_LABELS,
   CONDITION_LABELS,
@@ -25,6 +26,7 @@ const MAX_CONDITIONS = 16;
 const MAX_ACTIONS = 16;
 
 const programProblem = (text: string): string | null => (text.trim() === '' ? "A program's file name, like dota2.exe." : null);
+const signalProblem = (text: string): string | null => (SIGNAL_NAME.test(text.trim()) ? null : 'Letters, digits, - _ and . — like build-ok.');
 
 /** What the character does, and when: a list of rules, one open at a time. */
 export default function BehaviourTab({ character, characters }: { character: Character; characters: Characters }): JSX.Element {
@@ -270,7 +272,7 @@ function RuleEditor({ character, characters, rule, setRule, onAssetsChanged }: R
           <button
             type="button"
             className="button quiet rule-more"
-            onClick={() => withRule({ then: [...rule.then, sayDefault ?? { type: 'show', seconds: 10 }] })}
+            onClick={() => withRule({ then: [...rule.then, sayDefault ?? { type: 'show', seconds: 10, place: 'usual' }] })}
           >
             + Add an action
           </button>
@@ -352,6 +354,37 @@ function ProgramInput({ value, onChange, autoFocus }: { value: string; onChange:
   );
 }
 
+/** A signal's name, and the command that sends it — ready to paste into a build script or a task. */
+function SignalInput({ name, onChange, autoFocus }: { name: string; onChange: (name: string) => void; autoFocus?: boolean }): JSX.Element {
+  const [copied, setCopied] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  useEffect(() => {
+    if (copied === null) return;
+    const timer = setTimeout(() => setCopied(null), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  const copy = async (): Promise<void> => {
+    const result = await window.jacquelineEditor?.copySignalCommand({ name });
+    if (!result) return;
+    if (result.ok) {
+      setProblem(null);
+      setCopied(result.command);
+    } else setProblem(result.error);
+  };
+  return (
+    <>
+      <span className="rule-word">named</span>
+      <span className="rule-program">
+        <TextInput label="Signal" value={name} maxLength={64} placeholder="build-ok" validate={signalProblem} autoFocus={autoFocus} onCommit={(text) => onChange(text.trim())} />
+      </span>
+      <button type="button" className="button quiet" title={copied ?? 'Copies the command that sends this signal, with --text "…" to add if you want one'} onClick={() => void copy()}>
+        {copied ? 'Copied' : 'Copy command'}
+      </button>
+      {problem ? <span className="rule-problem">{problem}</span> : null}
+    </>
+  );
+}
+
 const TRIGGER_OPTIONS = (Object.keys(TRIGGER_LABELS) as Trigger['type'][]).map((value) => ({ value, label: TRIGGER_LABELS[value] }));
 
 function TriggerEditor({ character, trigger, onChange }: { character: Character; trigger: Trigger; onChange: (trigger: Trigger) => void }): JSX.Element {
@@ -396,6 +429,8 @@ function TriggerEditor({ character, trigger, onChange }: { character: Character;
             />
           </span>
         </>
+      ) : trigger.type === 'signal' ? (
+        <SignalInput name={trigger.name} autoFocus={picked} onChange={(name) => onChange({ ...trigger, name })} />
       ) : trigger.type === 'returned' ? (
         <>
           <span className="rule-word">after at least</span>
@@ -511,6 +546,15 @@ function ActionEditor({ character, action, look, busy, onChange, onChooseSound }
           {look?.type === 'video' ? (
             <VideoLengthButton key={look.src} url={assetUrl(character.id, look.src)} onLength={(seconds) => onChange({ ...action, seconds })} />
           ) : null}
+          <Segmented<ShowPlace>
+            label="Where"
+            value={action.place}
+            options={[
+              { value: 'usual', label: 'where it usually is' },
+              { value: 'random', label: 'somewhere random' }
+            ]}
+            onChange={(place) => onChange({ ...action, place })}
+          />
         </>
       ) : action.type === 'hide' ? (
         <>

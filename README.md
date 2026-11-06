@@ -58,12 +58,14 @@ away; there is no Save button.
   - **When**: a program starts, closes or comes to the front; every day at a
     time; every so often (somewhere between N and M minutes); you come back
     after being away; Jacqueline starts; the character is clicked; music
-    starts or stops; the track changes.
+    starts or stops; the track changes; a signal comes from outside (see
+    below).
   - **Only if**: by chance (a percentage), between two times of day, a
     program is or is not running, music is or is not playing. "Music" is
     anything a player reports to Windows, so a video in a browser counts.
   - **Then**: say a line from a group, play a sound, come out for a while
-    (even if it would not be on screen otherwise), hide for a while, change
+    (even if it would not be on screen otherwise — where it usually is, or
+    somewhere random on the screen the mouse is on, for that while only), hide for a while, change
     look to one of its own states, for a while or until changed.
   - **Wait at least** … before it can happen again.
   - **Test now** does what the rule does, right away.
@@ -79,11 +81,44 @@ away; there is no Save button.
   twice in a row. A line can mention what happened with a slot: `{name}`
   (the character's), `{time}`, `{program}` (for rules about a program) and
   `{minutes}` (how long you were away), `{track}` and `{artist}` (what is
-  playing). A line whose slot cannot be filled
+  playing), `{text}` (what came with a signal). A line whose slot cannot be filled
   is skipped, never shown with a hole in it. **Test** says it on your desktop.
 - **Audio** — volume, a video's own sound (on unless you turn it off), an
   ambient sound that loops while the character is on screen, and sounds for
   coming on screen and leaving.
+
+### Signals from outside
+
+Anything that can start a program can poke a character: a build script, a
+VS Code task, a scheduled job.
+
+```bat
+"%LOCALAPPDATA%\Programs\Jacqueline\Jacqueline.exe" --signal build-ok
+"%LOCALAPPDATA%\Programs\Jacqueline\Jacqueline.exe" --signal build-failed --text "3 errors"
+```
+
+(That is where the installer puts it unless you chose another folder.)
+
+A rule *When signal **build-ok** comes* fires on the first; a line on the
+second can say `Broke again: {text}`. **Copy command** next to the signal's
+name puts the exact command for your install on the clipboard. In PowerShell,
+put `&` in front of it. A name is letters, digits, `-`, `_` and `.`; the text
+is up to 200 characters.
+
+The command hands the signal to Jacqueline and is gone at once; it never opens
+the editor. If Jacqueline is not running, nothing happens — a build script
+never starts it for you. A behaviour script hears the same with
+`on('signal', 'build-ok', (e) => …)`.
+
+A VS Code task (PowerShell is its shell on Windows) that reports how a build went:
+
+```json
+{
+  "label": "build",
+  "type": "shell",
+  "command": "npm run build; $ok = $?; $j = \"$env:LOCALAPPDATA/Programs/Jacqueline/Jacqueline.exe\"; if ($ok) { & $j --signal build-ok } else { & $j --signal build-failed }"
+}
+```
 
 On the desktop: **drag** a character anywhere (other monitors too), **click**
 it to set off its "clicked" rules, click while it is talking to dismiss the

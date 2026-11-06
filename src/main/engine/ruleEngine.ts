@@ -20,6 +20,8 @@ export type RuleEvent =
   | { type: 'startup' }
   | { type: 'clicked'; characterId: string }
   | { type: MusicEventType; track: string; artist: string; app: string }
+  /** From outside, `--signal <name>`, with the `--text` that came with it. */
+  | { type: 'signal'; name: string; text: string | null }
   /** An `every` rule's turn has come round. Made by the engine itself. */
   | { type: 'every'; characterId: string; ruleId: string };
 
@@ -97,6 +99,8 @@ export function triggerMatches(trigger: Trigger, event: RuleEvent, character: Ch
     case 'musicStopped':
     case 'trackChanged':
       return event.type === trigger.type;
+    case 'signal':
+      return event.type === 'signal' && event.name === trigger.name;
   }
 }
 
@@ -139,6 +143,7 @@ function slotsFor(event: RuleEvent, character: Character, now: number, music: Mu
   const slots: Record<string, string | number> = { name: character.name, time: clock(now), ...musicSlots('track' in event ? event : playing) };
   if ('program' in event) slots.program = event.program;
   if (event.type === 'returned') slots.minutes = Math.round(event.awayMinutes);
+  if (event.type === 'signal' && event.text !== null) slots.text = event.text;
   return slots;
 }
 
@@ -147,7 +152,7 @@ function slotsFor(event: RuleEvent, character: Character, now: number, music: Mu
  * gives, and a likely value for what only an event could.
  */
 export function sampleSlots(character: Character, now: number): Record<string, string | number> {
-  return { name: character.name, time: clock(now), program: character.presence.apps[0] ?? 'notepad.exe', minutes: 15, track: 'Some Song', artist: 'Someone' };
+  return { name: character.name, time: clock(now), program: character.presence.apps[0] ?? 'notepad.exe', minutes: 15, track: 'Some Song', artist: 'Someone', text: 'something from outside' };
 }
 
 interface Planned {

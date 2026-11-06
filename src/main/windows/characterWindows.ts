@@ -9,6 +9,7 @@ import {
 import { statSync, watch, type FSWatcher } from 'node:fs';
 import { currentLook, isCustomState, type Character } from '@shared/character';
 import { IPC } from '@shared/ipc';
+import type { ShowPlace } from '@shared/rules';
 import {
   anchorInWindow,
   anchorOnScreen,
@@ -18,6 +19,7 @@ import {
   layoutFrame,
   placeWindow,
   pointInRect,
+  randomAnchorPosition,
   type Point,
   type Rect
 } from '@shared/layout';
@@ -149,6 +151,8 @@ export class CharacterWindows {
   private drag: Drag | null = null;
   private previewId: string | null = null;
   private readonly shownFor = new Map<string, { until: number; timer: NodeJS.Timeout }>();
+  /** Where a character brought out "somewhere random" is for that while, by id. Never saved. */
+  private readonly placedFor = new Map<string, Point>();
   /** Sounds asked for before their character's window was up. */
   private readonly pendingSounds = new Map<string, StageSound[]>();
   private readonly entrySounds = new EntrySounds();
@@ -213,6 +217,7 @@ export class CharacterWindows {
     ipcMain.removeAllListeners(IPC.stageClick);
     for (const timer of this.shownFor.values()) clearTimeout(timer.timer);
     this.shownFor.clear();
+    this.placedFor.clear();
     this.activeStates.stop();
     for (const live of [...this.live.values()]) this.close(live);
     this.destroyHost();
@@ -278,6 +283,18 @@ export class CharacterWindows {
   /* Which windows exist                                                 */
   /* ------------------------------------------------------------------ */
 
+  /** Sets or clears where it is for now; true when that changed anything. */
+  private place(id: string, place: ShowPlace): boolean {
+    if (place === 'usual') return this.placedFor.delete(id);
+    const character = this.store.get(id);
+    if (!character) return false;
+    const frame = layoutFrame(character.layout.elements);
+    const anchor = layoutAnchor(character.layout.elements);
+    const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+    this.placedFor.set(id, randomAnchorPosition(frame, anchor, workArea));
+    return true;
+  }
+
   /** Brings the windows in line with the characters: opens, updates and closes as needed. */
   private sync(): void {
     if (this.stopping) return;
@@ -307,15 +324,22 @@ export class CharacterWindows {
 
   /**
    * On screen for a while whatever its presence rules say — a rule asked it
-   * to come out. Longer if it was already out for longer.
+   * to come out. Longer if it was already out for longer. `random` puts it
+   * somewhere random on the screen the cursor is on, and back where it usually
+   * is once the while is over; `usual` takes it back there at once.
    */
-  showFor(id: string, ms: number): void {
+  showFor(id: string, ms: number, place: ShowPlace = 'usual'): void {
+    const moved = this.place(id, place);
     const until = Date.now() + ms;
     const current = this.shownFor.get(id);
-    if (current && current.until >= until) return;
+    if (current && current.until >= until) {
+      if (moved) this.sync();
+      return;
+    }
     if (current) clearTimeout(current.timer);
     const timer = setTimeout(() => {
       this.shownFor.delete(id);
+      this.placedFor.delete(id);
       this.sync();
     }, ms);
     timer.unref?.();
@@ -690,7 +714,7 @@ export class CharacterWindows {
   private geometry(character: Character): Geometry {
     const frame = layoutFrame(character.layout.elements);
     const anchor = layoutAnchor(character.layout.elements);
-    const stored = character.presence.position;
+    const stored = this.placedFor.get(character.id) ?? character.presence.position;
     // The display the character is on — or, if that display has gone, the
     // nearest one, which is what makes an unplugged monitor a clamp and not a
     // character stranded off screen.
@@ -878,6 +902,8 @@ export class CharacterWindows {
 
     const bounds = live.win.getBounds();
     const position = anchorOnScreen(live.geometry.frame, live.geometry.anchor, bounds);
+    // Put down by hand: wherever it was brought out to, this is its place now.
+    this.placedFor.delete(live.id);
     // Saving goes back round through `sync`, which clamps it to the display
     // it was dropped on and moves the window there.
     const result = this.store.save({ ...character, presence: { ...character.presence, position } });

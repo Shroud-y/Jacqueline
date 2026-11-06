@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { signalNameSchema } from './signal';
 
 const clockSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'must be a time like 23:00');
 /** A program by its file name, 'dota2.exe'; matched without case or extension. */
@@ -48,7 +49,9 @@ export const triggerSchema = z.discriminatedUnion('type', [
   /** Nothing is playing any more. */
   z.object({ type: z.literal('musicStopped') }),
   /** The next track has come on. */
-  z.object({ type: z.literal('trackChanged') })
+  z.object({ type: z.literal('trackChanged') }),
+  /** `Jacqueline.exe --signal <name>` was run: a build script, a task, anything outside. */
+  z.object({ type: z.literal('signal'), name: signalNameSchema })
 ]);
 
 /* ------------------------------------------------------------------ */
@@ -71,14 +74,20 @@ export const conditionSchema = z.discriminatedUnion('type', [
 /* ------------------------------------------------------------------ */
 
 const MAX_SHOW_SECONDS = 3600;
+export const showPlaceSchema = z.enum(['usual', 'random']);
+export type ShowPlace = z.infer<typeof showPlaceSchema>;
 
 export const actionSchema = z.discriminatedUnion('type', [
   /** Say a line picked from a group. */
   z.object({ type: z.literal('say'), group: groupSchema }),
   /** Play one of the character's sounds. */
   z.object({ type: z.literal('sound'), file: fileSchema }),
-  /** Come on screen for a while, whatever its presence rules say. */
-  z.object({ type: z.literal('show'), seconds: z.number().min(1).max(MAX_SHOW_SECONDS) }),
+  /**
+   * Come on screen for a while, whatever its presence rules say: where it
+   * usually is, or somewhere random on the screen the cursor is on — for that
+   * while only; where it usually is stays as it was.
+   */
+  z.object({ type: z.literal('show'), seconds: z.number().min(1).max(MAX_SHOW_SECONDS), place: showPlaceSchema.default('usual') }),
   /** Get out of sight for a while. */
   z.object({ type: z.literal('hide'), minutes: z.number().min(1).max(1440) }),
   /** Wear one of its own states, for a while or until told otherwise. Null goes back to its usual look. */

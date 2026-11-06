@@ -230,6 +230,8 @@ function translate(event: RuleEvent): ScriptEvent | null {
     case 'musicStopped':
     case 'trackChanged':
       return { name: event.type, detail: { track: event.track, artist: event.artist, app: event.app } };
+    case 'signal':
+      return { name: 'signal', signal: event.name, detail: event.text === null ? { name: event.name } : { name: event.name, text: event.text } };
     case 'every':
       return null;
   }

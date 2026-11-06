@@ -31,7 +31,8 @@ export const TRIGGER_LABELS: Record<Trigger['type'], string> = {
   clicked: 'The character is clicked',
   musicStarted: 'Music starts playing',
   musicStopped: 'Music stops',
-  trackChanged: 'The track changes'
+  trackChanged: 'The track changes',
+  signal: 'A signal comes from outside'
 };
 
 export const CONDITION_LABELS: Record<RuleCondition['type'], string> = {
@@ -87,6 +88,8 @@ function triggerParts(trigger: Trigger): Part[] {
       return [plain('When music stops')];
     case 'trackChanged':
       return [plain('When the track changes')];
+    case 'signal':
+      return [plain('When signal '), strong(trigger.name), plain(' comes')];
   }
 }
 
@@ -97,7 +100,9 @@ function actionParts(action: RuleAction, character?: Character): Part[] {
     case 'sound':
       return [plain('play '), strong(action.file)];
     case 'show':
-      return [plain('come out for '), strong(formatDuration(action.seconds))];
+      return action.place === 'random'
+        ? [plain('come out somewhere random for '), strong(formatDuration(action.seconds))]
+        : [plain('come out for '), strong(formatDuration(action.seconds))];
     case 'hide':
       return [plain('hide for '), strong(formatDuration(action.minutes * 60))];
     case 'setState': {
@@ -193,6 +198,8 @@ export function defaultTrigger(type: Trigger['type'], character: Character): Tri
     case 'musicStopped':
     case 'trackChanged':
       return { type };
+    case 'signal':
+      return { type, name: 'build-ok' };
   }
 }
 
@@ -223,7 +230,7 @@ export function defaultAction(type: RuleAction['type'], character: Character): R
     case 'sound':
       return null;
     case 'show':
-      return { type, seconds: 10 };
+      return { type, seconds: 10, place: 'usual' };
     case 'hide':
       return { type, minutes: 30 };
     case 'setState': {
@@ -246,7 +253,7 @@ export function newRule(character: Character): Rule {
     enabled: true,
     when: { type: 'clicked' },
     if: [],
-    then: [defaultAction('say', character) ?? { type: 'show', seconds: 10 }],
+    then: [defaultAction('say', character) ?? { type: 'show', seconds: 10, place: 'usual' }],
     cooldownSec: 0
   };
 }

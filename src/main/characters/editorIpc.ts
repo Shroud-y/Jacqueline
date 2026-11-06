@@ -5,6 +5,7 @@ import { ASSET_EXTENSIONS, assetKindOf, assetNameSchema, characterIdSchema, refe
 import { IPC } from '@shared/ipc';
 import { unknownSlots } from '@shared/lines';
 import { BEHAVIOUR_NAME, BEHAVIOUR_STARTER, SCRIPT_NAME, SCRIPT_STARTER } from '@shared/scriptTemplate';
+import { signalCommand, signalNameSchema } from '@shared/signal';
 import { STYLE_STARTER, STYLESHEET_NAME } from '@shared/stylesheet';
 import type { EditorApi, EditorResult, ScriptStatus, Settings, SettingsResult, SettingsView } from '@shared/types';
 import { sampleSlots, type Fired } from '../engine/ruleEngine';
@@ -25,6 +26,9 @@ export interface EditorIpcDeps {
   runNow: (fired: Fired) => void;
   runningPrograms: () => Promise<string[]>;
   openRoot: () => Promise<EditorResult>;
+  /** What starts this app on a command line: the exe, and in a development run the project too. */
+  executable: () => string[];
+  copyText: (text: string) => void;
   /** A zip to import; null when the user backs out. */
   pickZip: () => Promise<string | null>;
   /** Where to save an export; null when the user backs out. */
@@ -172,6 +176,14 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
 
     openRoot: () => deps.openRoot(),
 
+    copySignalCommand: (payload) => {
+      const parsed = z.object({ name: signalNameSchema }).safeParse(payload);
+      if (!parsed.success) return { ok: false, error: 'A signal name is letters, digits, - _ and . — like build-ok.' };
+      const command = signalCommand(deps.executable(), parsed.data.name);
+      deps.copyText(command);
+      return { ok: true, command };
+    },
+
     newStylesheet: (payload) => {
       const parsed = idPayload.safeParse(payload);
       if (!parsed.success) return refused;
@@ -297,6 +309,7 @@ const CHANNELS: { [K in keyof EditorHandlers]: string } = {
   testRule: IPC.editorTestRule,
   runningPrograms: IPC.editorRunningPrograms,
   openRoot: IPC.editorOpenRoot,
+  copySignalCommand: IPC.editorCopySignalCommand,
   newStylesheet: IPC.editorNewStylesheet,
   newScript: IPC.editorNewScript,
   scriptAllowed: IPC.editorScriptAllowed,

@@ -24,7 +24,8 @@ export const SLOTS: readonly { name: string; hint: string }[] = [
   { name: 'program', hint: 'the program a rule is about' },
   { name: 'minutes', hint: 'how many minutes you were away' },
   { name: 'track', hint: 'the track playing right now' },
-  { name: 'artist', hint: 'who it is by' }
+  { name: 'artist', hint: 'who it is by' },
+  { name: 'text', hint: 'what came with a signal (--text)' }
 ];
 
 const KNOWN_SLOTS = new Set(SLOTS.map((slot) => slot.name));
