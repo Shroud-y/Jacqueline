@@ -209,8 +209,8 @@ right-click the tray icon and hit **Quit** if you actually want it gone.
 You'll need [Node.js](https://nodejs.org) and [pnpm](https://pnpm.io).
 
 ```sh
-git clone https://github.com/Shroud-y/codex.git
-cd codex
+git clone https://github.com/Shroud-y/jacqueline.git
+cd jacqueline
 pnpm install
 pnpm build
 ```
