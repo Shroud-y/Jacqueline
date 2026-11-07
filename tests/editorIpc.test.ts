@@ -23,6 +23,7 @@ let revealed: string[];
 let zipPath: string | null;
 let opened2: string[];
 let copied: string[];
+let watched: (string | null)[];
 let updateLooks: number;
 let updateUrl: string | null;
 let externals: string[];
@@ -43,6 +44,11 @@ const handlers = (): ReturnType<typeof editorHandlers> =>
     sayNow: (character, text, line) => said.push({ id: character.id, text, line: line.id }),
     runNow: (fired) => ran.push({ id: fired.character.id, rule: fired.rule.id, slots: fired.slots }),
     runningPrograms: async () => ['code.exe', 'dota2.exe'],
+    activity: (id) => ({ entries: [{ id: 1, at: 0, characterId: id, ruleId: null, event: null, outcome: 'note', text: 'hi' }], rules: {} }),
+    watchActivity: (id) => {
+      watched.push(id);
+    },
+    checkRule: (_character, ruleId) => (ruleId === 'r1' ? [{ ok: true, text: 'fine' }] : null),
     openRoot: async () => ({ ok: true }),
     executable: () => ['C:/Program Files/Jacqueline/Jacqueline.exe'],
     copyText: (text) => copied.push(text),
@@ -93,6 +99,7 @@ beforeEach(() => {
   zipPath = null;
   opened2 = [];
   copied = [];
+  watched = [];
   updateLooks = 0;
   updateUrl = null;
   externals = [];
@@ -375,6 +382,19 @@ describe('editor requests', () => {
     expect(await h.scriptStatus({ id: 'ran' })).toEqual({ running: true, error: null });
     expect(await h.scriptStatus({ id: created.id })).toBeNull();
     expect((await h.newScript({ id: created.id, kind: 'other' })).ok).toBe(false);
+  });
+
+  it('hands over activity, who to watch, and what would stop a rule', async () => {
+    const h = handlers();
+    expect((await h.activity({ id: 'a' })).entries[0]?.text).toBe('hi');
+    expect(await h.activity({ id: '../x' })).toEqual({ entries: [], rules: {} });
+    expect(await h.watchActivity({ id: 'a' })).toEqual({ ok: true });
+    expect(await h.watchActivity({ id: null })).toEqual({ ok: true });
+    expect(watched).toEqual(['a', null]);
+    const created = await make();
+    expect(await h.checkRule({ id: created.id, rule: 'r1' })).toEqual({ ok: true, items: [{ ok: true, text: 'fine' }] });
+    expect((await h.checkRule({ id: created.id, rule: 'gone' })).ok).toBe(false);
+    expect((await h.checkRule({ id: 'nobody', rule: 'r1' })).ok).toBe(false);
   });
 
   it('says what is running', async () => {

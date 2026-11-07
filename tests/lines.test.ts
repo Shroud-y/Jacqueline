@@ -12,7 +12,8 @@ import {
   rulesUsing,
   splitSlots,
   unknownSlots,
-  updateLine
+  updateLine,
+  usesMusic
 } from '@shared/lines';
 import type { Rule } from '@shared/rules';
 
@@ -110,5 +111,14 @@ describe('lines', () => {
   it('removes one line, and leaves an unknown group alone', () => {
     expect(removeLine(miku(), 'greet', 'line-1').lines.greet).toEqual([]);
     expect(removeLine(miku(), 'nope', 'line-1')).toEqual(miku());
+  });
+});
+
+describe('usesMusic and text written into a rule', () => {
+  it('listens for music when a rule says {track} itself', () => {
+    const base = defaultCharacter('c', 'C');
+    const rule = { id: 'r', name: '', enabled: true, when: { type: 'clicked' as const }, if: [], then: [{ type: 'sayText' as const, text: 'Nice, {track}.' }], cooldownSec: 0 };
+    expect(usesMusic({ ...base, rules: [rule] })).toBe(true);
+    expect(usesMusic({ ...base, rules: [{ ...rule, enabled: false }] })).toBe(false);
   });
 });

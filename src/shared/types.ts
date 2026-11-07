@@ -178,6 +178,13 @@ export interface EditorApi {
   testLine(payload: { id: string; group: string; line: string }): Promise<EditorResult>;
   /** Does what a rule does now — whatever its trigger, conditions and wait — with slots filled as for a line tried. */
   testRule(payload: { id: string; rule: string }): Promise<EditorResult>;
+  /** Recent activity for one character, and when each of its rules fired. */
+  activity(payload: { id: string }): Promise<ActivityView>;
+  /** Which character's new activity to be told about as it happens; null for none. */
+  watchActivity(payload: { id: string | null }): Promise<EditorResult>;
+  onActivity(handler: (entry: ActivityEntry) => void): () => void;
+  /** What would stop a rule from firing right now, without doing anything. */
+  checkRule(payload: { id: string; rule: string }): Promise<EditorResult<{ items: CheckItem[] }>>;
   /** File names of the programs running now, 'dota2.exe', sorted. Asked once, not watched. */
   runningPrograms(): Promise<string[]>;
   /** Opens the folder every character lives in. */
@@ -220,6 +227,34 @@ export interface EditorApi {
   /** Where on disk a file dropped on the window is. Not IPC — answered by the preload itself. */
   pathForFile(file: File): string;
   openFolder(payload: { id: string }): Promise<EditorResult>;
+}
+
+/** One line of the Activity log. */
+export interface ActivityEntry {
+  id: number;
+  at: number;
+  /** null: about nobody in particular, like a signal no rule waits for. */
+  characterId: string | null;
+  ruleId: string | null;
+  /** What happened, in a few words — 'dota2 started' — when the entry is about an event. */
+  event: string | null;
+  /** fired: a rule fired. skipped: it matched and did not, `text` says why. note: what came of it. problem: something went wrong. */
+  outcome: 'fired' | 'skipped' | 'note' | 'problem';
+  text: string;
+}
+
+/** One thing that would or would not let a rule through right now. */
+export interface CheckItem {
+  /** null: cannot be told before it fires, like a chance. */
+  ok: boolean | null;
+  text: string;
+}
+
+/** What the Activity tab opens on. */
+export interface ActivityView {
+  entries: ActivityEntry[];
+  /** By rule id: when it last fired since Jacqueline started, and an `every` rule's next turn. */
+  rules: Record<string, { lastFired: number | null; next: number | null }>;
 }
 
 /** A behaviour script as the editor shows it. */

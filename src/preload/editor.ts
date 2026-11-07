@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { CharacterEntry } from '@shared/character';
-import type { EditorApi, GameStatus, ScriptStatus, SettingsView } from '@shared/types';
+import type { ActivityEntry, EditorApi, GameStatus, ScriptStatus, SettingsView } from '@shared/types';
 
 /**
  * The editor window's entire surface. Channel names are written out
@@ -21,6 +21,10 @@ const CHANNEL = {
   editorPreview: 'editor:preview',
   editorTestLine: 'editor:testLine',
   editorTestRule: 'editor:testRule',
+  editorActivity: 'editor:activity',
+  editorWatchActivity: 'editor:watchActivity',
+  editorActivityAdded: 'editor:activityAdded',
+  editorCheckRule: 'editor:checkRule',
   editorRunningPrograms: 'editor:runningPrograms',
   editorOpenRoot: 'editor:openRoot',
   editorCopySignalCommand: 'editor:copySignalCommand',
@@ -62,6 +66,16 @@ const api: EditorApi = {
   preview: (payload) => ipcRenderer.invoke(CHANNEL.editorPreview, payload),
   testLine: (payload) => ipcRenderer.invoke(CHANNEL.editorTestLine, payload),
   testRule: (payload) => ipcRenderer.invoke(CHANNEL.editorTestRule, payload),
+  activity: (payload) => ipcRenderer.invoke(CHANNEL.editorActivity, payload),
+  watchActivity: (payload) => ipcRenderer.invoke(CHANNEL.editorWatchActivity, payload),
+
+  onActivity(handler) {
+    const listener = (_event: unknown, entry: ActivityEntry): void => handler(entry);
+    ipcRenderer.on(CHANNEL.editorActivityAdded, listener);
+    return () => ipcRenderer.off(CHANNEL.editorActivityAdded, listener);
+  },
+
+  checkRule: (payload) => ipcRenderer.invoke(CHANNEL.editorCheckRule, payload),
   runningPrograms: () => ipcRenderer.invoke(CHANNEL.editorRunningPrograms),
   openRoot: () => ipcRenderer.invoke(CHANNEL.editorOpenRoot),
   copySignalCommand: (payload) => ipcRenderer.invoke(CHANNEL.editorCopySignalCommand, payload),

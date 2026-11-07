@@ -7,7 +7,7 @@
 
 import { z } from 'zod';
 import { DEFAULT_STREAK, gameEventSchema, STREAK_MAX, STREAK_MIN } from './game';
-import { signalNameSchema } from './signal';
+import { SIGNAL_TEXT_MAX, signalNameSchema } from './signal';
 
 const clockSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'must be a time like 23:00');
 /** A program by its file name, 'dota2.exe'; matched without case or extension. */
@@ -72,14 +72,50 @@ export const conditionSchema = z.discriminatedUnion('type', [
   /** Only while a program is (or is not) running. */
   z.object({ type: z.literal('programRunning'), program: programSchema, running: z.boolean() }),
   /** Only while something is (or is not) playing. */
-  z.object({ type: z.literal('musicPlaying'), playing: z.boolean() })
+  z.object({ type: z.literal('musicPlaying'), playing: z.boolean() }),
+  /** Only on these days of the week: 0 is Sunday, as `Date.getDay()` has it. */
+  z.object({
+    type: z.literal('days'),
+    days: z
+      .array(z.number().int().min(0).max(6))
+      .min(1, 'pick at least one day')
+      .max(7)
+      .refine((days) => new Set(days).size === days.length, 'each day once')
+  })
 ]);
+
+/** Monday first, as a week is read; the numbers are `Date.getDay()`'s. */
+export const WEEK: readonly { day: number; short: string }[] = [
+  { day: 1, short: 'Mon' },
+  { day: 2, short: 'Tue' },
+  { day: 3, short: 'Wed' },
+  { day: 4, short: 'Thu' },
+  { day: 5, short: 'Fri' },
+  { day: 6, short: 'Sat' },
+  { day: 0, short: 'Sun' }
+];
+
+/** "weekdays", "weekends", "every day", or the days themselves: "Mon, Wed, Fri". */
+export function daysText(days: readonly number[]): string {
+  const set = new Set(days);
+  if (set.size === 7) return 'every day';
+  if (set.size === 5 && [1, 2, 3, 4, 5].every((day) => set.has(day))) return 'on weekdays';
+  if (set.size === 2 && set.has(0) && set.has(6)) return 'at weekends';
+  return `on ${WEEK.filter((entry) => set.has(entry.day))
+    .map((entry) => entry.short)
+    .join(', ')}`;
+}
 
 /* ------------------------------------------------------------------ */
 /* Then                                                                */
 /* ------------------------------------------------------------------ */
 
 const MAX_SHOW_SECONDS = 3600;
+export const MAX_WAIT_SECONDS = 600;
+/** What a stylesheet reads from `[data-mood]`: lowercase letters, digits and dashes. */
+export const MOOD_NAME = /^[a-z][a-z0-9-]{0,31}$/;
+const moodSchema = z.string().regex(MOOD_NAME, 'a mood is lowercase letters, digits and dashes, like sleepy');
+
 export const showPlaceSchema = z.enum(['usual', 'random']);
 export type ShowPlace = z.infer<typeof showPlaceSchema>;
 
@@ -97,7 +133,20 @@ export const actionSchema = z.discriminatedUnion('type', [
   /** Get out of sight for a while. */
   z.object({ type: z.literal('hide'), minutes: z.number().min(1).max(1440) }),
   /** Wear one of its own states, for a while or until told otherwise. Null goes back to its usual look. */
-  z.object({ type: z.literal('setState'), state: stateNameSchema.nullable(), seconds: z.number().min(1).max(MAX_SHOW_SECONDS).nullable() })
+  z.object({ type: z.literal('setState'), state: stateNameSchema.nullable(), seconds: z.number().min(1).max(MAX_SHOW_SECONDS).nullable() }),
+  /** Say this, as written here — `{slots}` and all — without a group of lines for it. */
+  z.object({ type: z.literal('sayText'), text: z.string().trim().min(1, 'something to say is needed').max(2000) }),
+  /**
+   * Send a signal, as `--signal` would: rules of any character — this one too —
+   * that wait for it fire. How characters answer each other.
+   */
+  z.object({ type: z.literal('sendSignal'), name: signalNameSchema, text: z.string().max(SIGNAL_TEXT_MAX).optional() }),
+  /** Stop saying whatever it is saying, and drop what waits to be said. */
+  z.object({ type: z.literal('dismiss') }),
+  /** Hold on this long before the actions after it: "say this, 3 s later change look, then hide". */
+  z.object({ type: z.literal('wait'), seconds: z.number().min(0.5).max(MAX_WAIT_SECONDS) }),
+  /** Hand its stylesheet a mood, as `[data-mood]`; null clears it. The same as a script's `setMood()`. */
+  z.object({ type: z.literal('mood'), mood: moodSchema.nullable() })
 ]);
 
 /** The whole seconds a character stays out to play a video through, within what `show` allows. */
@@ -113,7 +162,13 @@ export const ruleSchema = z.object({
   if: z.array(conditionSchema).max(16),
   then: z.array(actionSchema).min(1, 'a rule has to do something').max(16),
   /** How long before this rule may fire again. 0 is no limit. */
-  cooldownSec: z.number().min(0).max(7 * 24 * 3600)
+  cooldownSec: z.number().min(0).max(7 * 24 * 3600),
+  /**
+   * Once this one fires, the character's rules below it that match the same
+   * moment do not: the order of the list becomes the order of who goes first,
+   * and two rules on one trigger become "this one, or else that one".
+   */
+  stop: z.boolean().optional()
 });
 
 export type Trigger = z.infer<typeof triggerSchema>;

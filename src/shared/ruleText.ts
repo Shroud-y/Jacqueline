@@ -6,7 +6,7 @@
 
 import { isCustomState, type Character, type Visual } from './character';
 import { DEFAULT_STREAK, type GameEventName } from './game';
-import type { Rule, RuleAction, RuleCondition, Trigger } from './rules';
+import { daysText, type Rule, type RuleAction, type RuleCondition, type Trigger } from './rules';
 
 /** A run of a sentence; `strong` runs are what the user filled in. */
 export interface Part {
@@ -50,7 +50,8 @@ export const CONDITION_LABELS: Record<RuleCondition['type'], string> = {
   chance: 'By chance',
   timeBetween: 'Between two times',
   programRunning: 'A program',
-  musicPlaying: 'Music'
+  musicPlaying: 'Music',
+  days: 'On some days'
 };
 
 export const ACTION_LABELS: Record<RuleAction['type'], string> = {
@@ -58,7 +59,12 @@ export const ACTION_LABELS: Record<RuleAction['type'], string> = {
   sound: 'Play a sound',
   show: 'Come out for a while',
   hide: 'Hide for a while',
-  setState: 'Change look'
+  setState: 'Change look',
+  sayText: 'Say this',
+  wait: 'Wait',
+  sendSignal: 'Send a signal',
+  dismiss: 'Stop talking',
+  mood: 'Set its mood'
 };
 
 /** "45 s", "10 min", "2 h", "1 h 30 min". */
@@ -129,6 +135,16 @@ function actionParts(action: RuleAction, character?: Character): Part[] {
         : [plain('come out for '), strong(formatDuration(action.seconds))];
     case 'hide':
       return [plain('hide for '), strong(formatDuration(action.minutes * 60))];
+    case 'wait':
+      return [plain('wait '), strong(formatDuration(action.seconds))];
+    case 'sendSignal':
+      return [plain('send signal '), strong(action.name)];
+    case 'dismiss':
+      return [plain('stop talking')];
+    case 'sayText':
+      return [plain('say '), strong(`“${action.text.length > 40 ? `${action.text.slice(0, 39)}…` : action.text}”`)];
+    case 'mood':
+      return action.mood === null ? [plain('clear its mood')] : [plain('set its mood to '), strong(action.mood)];
     case 'setState': {
       if (action.state === null) return [plain('go back to its usual look')];
       const parts = [plain('change look to '), strong(character?.appearance.states[action.state]?.name ?? action.state)];
@@ -157,6 +173,8 @@ function conditionText(condition: RuleCondition): string {
       return condition.running ? `while ${condition.program} runs` : `unless ${condition.program} runs`;
     case 'musicPlaying':
       return condition.playing ? 'while music plays' : 'unless music plays';
+    case 'days':
+      return daysText(condition.days);
   }
 }
 
@@ -164,6 +182,7 @@ function conditionText(condition: RuleCondition): string {
 export function ruleDetail(rule: Rule): string {
   const bits = rule.if.map(conditionText);
   if (rule.cooldownSec > 0) bits.push(`at most every ${formatDuration(rule.cooldownSec)}`);
+  if (rule.stop) bits.push('stops the rest');
   return bits.join(' · ');
 }
 
@@ -239,6 +258,8 @@ export function defaultCondition(type: RuleCondition['type'], character: Charact
       return { type, program: likelyProgram(character), running: true };
     case 'musicPlaying':
       return { type, playing: true };
+    case 'days':
+      return { type, days: [1, 2, 3, 4, 5] };
   }
 }
 
@@ -263,7 +284,53 @@ export function defaultAction(type: RuleAction['type'], character: Character): R
       const state = Object.keys(character.appearance.states).find(isCustomState);
       return state === undefined ? null : { type, state, seconds: 10 };
     }
+    case 'sayText':
+      return { type, text: 'Hello, {name}.' };
+    case 'wait':
+      return { type, seconds: 3 };
+    case 'sendSignal':
+      return { type, name: 'hello' };
+    case 'dismiss':
+      return { type };
+    case 'mood':
+      return { type, mood: 'happy' };
   }
+}
+
+/** A copy of the rule, right after it, under a free id; on, so it can be tried at once. */
+export function duplicateRule(rules: readonly Rule[], id: string): { rules: Rule[]; copy: Rule } | null {
+  const index = rules.findIndex((rule) => rule.id === id);
+  const original = rules[index];
+  if (!original) return null;
+  const name = original.name.trim() ? `${original.name.trim()} (copy)`.slice(0, 80) : '';
+  const copy: Rule = { ...structuredClone(original), id: freeRuleId(rules), name };
+  return { rules: [...rules.slice(0, index + 1), copy, ...rules.slice(index + 1)], copy };
+}
+
+/**
+ * The rule as another character gets it: under an id free there, with what
+ * it leans on that the other character may not have — its groups of lines,
+ * its states and its files — named, so the editor can say so.
+ */
+export function copyRuleTo(rule: Rule, target: Character): { rules: Rule[]; missing: string[] } {
+  const copy: Rule = { ...structuredClone(rule), id: freeRuleId(target.rules) };
+  const missing: string[] = [];
+  for (const action of copy.then) {
+    if (action.type === 'say' && !target.lines[action.group]) missing.push(`the group "${action.group}"`);
+    if (action.type === 'sound') missing.push(action.file);
+    if (action.type === 'setState' && action.state !== null && !target.appearance.states[action.state]) missing.push(`its state "${action.state}"`);
+  }
+  return { rules: [...target.rules, copy], missing: [...new Set(missing)] };
+}
+
+/** The rules with this one moved one place up (-1) or down (+1); the same list when it is already at that end. */
+export function moveRule(rules: readonly Rule[], id: string, by: -1 | 1): Rule[] {
+  const index = rules.findIndex((rule) => rule.id === id);
+  const target = index + by;
+  if (index < 0 || target < 0 || target >= rules.length) return [...rules];
+  const next = [...rules];
+  [next[index], next[target]] = [next[target] as Rule, next[index] as Rule];
+  return next;
 }
 
 export function freeRuleId(rules: readonly Rule[]): string {

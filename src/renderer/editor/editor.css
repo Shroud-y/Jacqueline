@@ -1748,3 +1748,176 @@ input {
 .game-written code {
   word-break: break-all;
 }
+
+/* ---- Behaviour: Check now --------------------------------------------- */
+
+.rule-check {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.rule-check li {
+  display: flex;
+  gap: 8px;
+}
+
+.rule-check li[data-ok='false'] {
+  color: var(--text);
+}
+
+.rule-check-mark {
+  flex: none;
+  width: 14px;
+  text-align: center;
+}
+
+.rule-check li[data-ok='false'] .rule-check-mark {
+  color: var(--danger);
+}
+
+/* ---- Activity --------------------------------------------------------- */
+
+.activity {
+  max-width: 760px;
+}
+
+.activity-intro {
+  margin: 0 0 16px;
+  color: var(--text-2);
+}
+
+.activity-blank {
+  padding: 32px 0;
+}
+
+.activity-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity-row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.activity-time {
+  flex: none;
+  width: 60px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-mark {
+  flex: none;
+  width: 12px;
+  text-align: center;
+}
+
+.activity-row[data-outcome='fired'] .activity-mark {
+  color: var(--accent);
+}
+
+.activity-row[data-outcome='problem'] .activity-mark,
+.activity-row[data-outcome='skipped'] .activity-mark {
+  color: var(--danger);
+}
+
+.activity-text {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  min-width: 0;
+}
+
+.activity-event {
+  color: var(--text-3);
+}
+
+.activity-rule {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.activity-row[data-outcome='problem'] .activity-why {
+  color: var(--text);
+}
+
+/* ---- Behaviour: days of the week -------------------------------------- */
+
+.days {
+  display: flex;
+  gap: 2px;
+}
+
+.day {
+  min-width: 40px;
+  height: var(--field-h);
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  cursor: pointer;
+  transition: background-color var(--ease);
+}
+
+.day:hover {
+  background: var(--hover);
+}
+
+.day[aria-pressed='true'] {
+  background: var(--raised);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+.day:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Trying a rule on the left, rearranging and removing it on the right. */
+.rule-foot {
+  flex-wrap: wrap;
+}
+
+.rule-foot-gap {
+  flex: 1;
+}
+
+/* Text written into a rule: as wide as the row lets it be. */
+.rule-say-text {
+  flex: 1;
+  min-width: 240px;
+}
+
+.rule-say-text input {
+  width: 100%;
+}
+
+/* Copy to another character: the picker, while choosing. */
+.rule-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.rule-copied {
+  margin: 0;
+  color: var(--text-2);
+}

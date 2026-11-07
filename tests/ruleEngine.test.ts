@@ -232,6 +232,7 @@ function deps(over: Partial<ActionDeps> = {}): ActionDeps & { said: string[]; so
     show: (_character, ms) => shown.push(ms),
     hide: (_character, ms) => hidden.push(ms),
     setState: () => true,
+    setMood: () => undefined,
     log: (message) => logs.push(message),
     history: new RecentHistory(),
     rng: () => 0,
@@ -277,6 +278,95 @@ describe('actions', () => {
     runActions({ character: withLines, rule: rule({ when: { type: 'startup' }, then: [{ type: 'say', group: 'missing' }] }), slots: {} }, d);
     expect(d.said).toEqual([]);
     expect(d.logs[0]).toMatch(/nothing to say/);
+  });
+
+  it('says text written into the rule, slots filled, and nothing when a slot cannot be', () => {
+    const d = deps();
+    const reports: string[] = [];
+    d.report = (_character, _rule, outcome, text) => reports.push(`${outcome}: ${text}`);
+    const then = [
+      { type: 'sayText' as const, text: 'Hi, {name}.' },
+      { type: 'sayText' as const, text: 'Playing {track}.' }
+    ];
+    runActions({ character: withLines, rule: rule({ when: { type: 'startup' }, then }), slots: { name: 'Teto' } }, d);
+    expect(d.said).toEqual(['Hi, Teto.']);
+    expect(reports).toEqual(['note: said “Hi, Teto.”', 'problem: nothing said: “Playing {track}.” has a {slot} this event cannot fill']);
+  });
+
+  it('waits between actions, and goes no further once the character is gone by then', () => {
+    const timers: { ms: number; fn: () => void }[] = [];
+    let acting = true;
+    const d = deps({ later: (ms, fn) => void timers.push({ ms, fn }), isActing: () => acting });
+    const then = [
+      { type: 'sayText' as const, text: 'One.' },
+      { type: 'wait' as const, seconds: 3 },
+      { type: 'sayText' as const, text: 'Two.' },
+      { type: 'wait' as const, seconds: 1.5 },
+      { type: 'sayText' as const, text: 'Three.' }
+    ];
+    runActions({ character: withLines, rule: rule({ when: { type: 'startup' }, then }), slots: {} }, d);
+    expect(d.said).toEqual(['One.']);
+    expect(timers.map((timer) => timer.ms)).toEqual([3000]);
+    timers.shift()?.fn();
+    expect(d.said).toEqual(['One.', 'Two.']);
+    expect(timers.map((timer) => timer.ms)).toEqual([1500]);
+    acting = false;
+    timers.shift()?.fn();
+    expect(d.said).toEqual(['One.', 'Two.']);
+    expect(d.logs.at(-1)).toMatch(/stopped after a wait/);
+  });
+
+  it('sends a signal with its text filled, one deeper than the signal that set it off', () => {
+    const sent: unknown[] = [];
+    const reports: string[] = [];
+    const d = deps({ signal: (_character, name, text, hops) => sent.push([name, text, hops]) > 0 && hops < 4 });
+    d.report = (_character, _rule, outcome, text) => reports.push(`${outcome}: ${text}`);
+    const then = [
+      { type: 'sendSignal' as const, name: 'hello', text: 'from {name}' },
+      { type: 'sendSignal' as const, name: 'bare' },
+      { type: 'sendSignal' as const, name: 'broken', text: '{track}' }
+    ];
+    runActions({ character: withLines, rule: rule({ when: { type: 'startup' }, then }), slots: { name: 'Teto' }, hops: 2 }, d);
+    expect(sent).toEqual([
+      ['hello', 'from Teto', 2],
+      ['bare', null, 2]
+    ]);
+    expect(reports).toEqual(['note: sent signal hello', 'note: sent signal bare', 'problem: signal broken not sent: its text has a {slot} this event cannot fill']);
+  });
+
+  it('says so when a signal goes round too many times', () => {
+    const reports: string[] = [];
+    const d = deps({ signal: () => false });
+    d.report = (_character, _rule, outcome, text) => reports.push(`${outcome}: ${text}`);
+    runActions({ character: withLines, rule: rule({ when: { type: 'startup' }, then: [{ type: 'sendSignal', name: 'loop' }] }), slots: {} }, d);
+    expect(reports[0]).toMatch(/^problem: signal loop not sent: signals went round too many times/);
+  });
+
+  it('stops talking when told to', () => {
+    const stopped: string[] = [];
+    const d = deps({ dismiss: (character) => void stopped.push(character.id) });
+    runActions({ character: withLines, rule: rule({ when: { type: 'startup' }, then: [{ type: 'dismiss' }] }), slots: {} }, d);
+    expect(stopped).toEqual([withLines.id]);
+  });
+
+  it('hands a fired rule how deep the signal that set it off was', () => {
+    const engine = new RuleEngine();
+    engine.setCharacters([character([rule({ when: { type: 'signal', name: 'hello' } })])], 0);
+    expect(engine.handle({ type: 'signal', name: 'hello', text: null, hops: 3 }, ctx(0))[0]?.hops).toBe(3);
+    expect(engine.handle({ type: 'signal', name: 'hello', text: null }, ctx(0))[0]?.hops).toBe(0);
+  });
+
+  it('sets and clears its mood', () => {
+    const moods: (string | null)[] = [];
+    const d = deps({ setMood: (_character, mood) => void moods.push(mood) });
+    const then = [
+      { type: 'mood' as const, mood: 'sleepy' },
+      { type: 'mood' as const, mood: null }
+    ];
+    runActions({ character: withLines, rule: rule({ when: { type: 'startup' }, then }), slots: {} }, d);
+    expect(moods).toEqual(['sleepy', null]);
+    expect(ruleSchema.safeParse({ ...rule({ when: { type: 'startup' } }), then: [{ type: 'mood', mood: 'Not A Mood' }] }).success).toBe(false);
+    expect(ruleSchema.safeParse({ ...rule({ when: { type: 'startup' } }), then: [{ type: 'sayText', text: '   ' }] }).success).toBe(false);
   });
 
   it('changes look, in milliseconds, and says so in the log when the state is gone', () => {

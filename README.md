@@ -20,7 +20,9 @@ percent of one CPU core, and nothing at all while it is off screen.
 
 Right-click the tray icon → **Options…** opens the editor. Every change is
 saved as you make it and shows on the character on your desktop straight
-away; there is no Save button.
+away; there is no Save button. **Ctrl+Z** takes the last change back and
+**Ctrl+Y** puts it back again (outside a text field, where they undo typing);
+**···** has them too.
 
 - **General** — when it is on screen: always, while a program is running,
   while a program is the window you are working in, or only when it has
@@ -60,15 +62,30 @@ away; there is no Save button.
     after being away; Jacqueline starts; the character is clicked; music
     starts or stops; the track changes; a signal comes from outside (see
     below); something happens in Dota 2 (see below).
-  - **Only if**: by chance (a percentage), between two times of day, a
-    program is or is not running, music is or is not playing. "Music" is
-    anything a player reports to Windows, so a video in a browser counts.
-  - **Then**: say a line from a group, play a sound, come out for a while
+  - **Only if**: by chance (a percentage), between two times of day, on some
+    days of the week (weekdays, weekends, or any you pick), a program is or is
+    not running, music is or is not playing. "Music" is anything a player
+    reports to Windows, so a video in a browser counts.
+  - **Then**: say a line from a group, or say text written right into the
+    rule (slots and all), play a sound, set its mood for its stylesheet, come out for a while
     (even if it would not be on screen otherwise — where it usually is, or
     somewhere random on the screen the mouse is on, for that while only), hide for a while, change
-    look to one of its own states, for a while or until changed.
+    look to one of its own states, for a while or until changed, stop talking,
+    **send a signal** that other characters' rules (and its own) answer — how
+    two characters hold a conversation — and **wait**
+    a few seconds between any of these: *say this, wait 3 s, change look,
+    hide*.
   - **Wait at least** … before it can happen again.
-  - **Test now** does what the rule does, right away.
+  - **Test now** does what the rule does, right away. **Check now** does
+    nothing and says what would stop it from firing right now: its wait,
+    each condition, mute or quiet hours, the character being off or hidden.
+  - Under each rule: when it last fired, and an *every so often* rule's next turn.
+  - **Duplicate**, **Move up**, **Move down** and **Copy to…** another
+    character under an open rule. A copy says what the other character lacks
+    for it: a group of lines, a state, a sound file.
+  - **Stop here when this one fires**: the rules below it that the same
+    moment sets off do not fire. With the order, that makes *this one, or
+    else that one* — a 30 % rule first and a plain one under it.
 - **Behaviour → Script** — when rules are not enough: a `behaviour.js` with
   logic of its own. It hears programs starting, clicks, the minute, you coming
   back and its own lines ending; it says, plays, shows, hides, sets a mood,
@@ -87,6 +104,12 @@ away; there is no Save button.
 - **Audio** — volume, a video's own sound (on unless you turn it off), an
   ambient sound that loops while the character is on screen, and sounds for
   coming on screen and leaving.
+- **Activity** — what set its rules off since Jacqueline started, newest
+  first, and why a rule that matched did not fire: *"clicked — Poke — it
+  waits 42 s more"*, *"signal build-ok — Build — it is not between 09:00 and 18:00"*, a line it had
+  nothing to say for, a sound it could not play, a script's errors. A signal no
+  rule waits for shows here too, which is how a typo in its name gives itself
+  away. Kept in memory only, for the last few hundred things.
 
 ### Signals from outside
 

@@ -2,7 +2,8 @@ import type { Character } from '@shared/character';
 import { createLogger } from '../app/logger';
 import type { DesktopSensors } from '../sensors/win32';
 import { MusicTracker, type MediaSession, type MusicNow } from './musicTracker';
-import { RuleEngine, type Fired, type RuleEvent, type RuleNeeds } from './ruleEngine';
+import type { CheckItem } from '@shared/types';
+import { checkRule, RuleEngine, type Fired, type RuleContext, type RuleEvent, type RuleNeeds, type Skipped } from './ruleEngine';
 import type { Rng } from './selector';
 
 const log = createLogger('rules');
@@ -18,7 +19,11 @@ export interface RuleRunnerDeps {
   watchMedia?: (onSessions: (sessions: MediaSession[]) => void) => () => void;
   /** Seconds since the last keyboard or mouse input anywhere. */
   idleSeconds: () => number;
-  onFired: (fired: Fired) => void;
+  onFired: (fired: Fired, event: RuleEvent) => void;
+  /** A rule that matched and did not fire, and why — for the Activity log. */
+  onSkipped?: (skipped: Skipped, event: RuleEvent) => void;
+  /** Something no rule anywhere waits for — told for signals and game events only, where that is usually a typo. */
+  onUnheard?: (event: RuleEvent) => void;
   /** Whether something is playing may have changed. */
   onMusic?: () => void;
   /** Starts listening for game events; what it returns stops that. */
@@ -67,6 +72,29 @@ export class RuleRunner {
     this.mergeNeeds();
   }
 
+  /** Characters about but not acting — off or hidden — with why. Watched for nothing; only named when one of their rules matches. */
+  setDormant(dormant: readonly { character: Character; why: string }[]): void {
+    this.engine.setDormant(dormant);
+  }
+
+  lastFiredAt(characterId: string, ruleId: string): number | undefined {
+    return this.engine.lastFiredAt(characterId, ruleId);
+  }
+
+  plannedAt(characterId: string, ruleId: string): number | undefined {
+    return this.engine.plannedAt(characterId, ruleId);
+  }
+
+  /** What stands between a rule and firing right now. */
+  check(character: Character, ruleId: string): CheckItem[] | null {
+    const rule = character.rules.find((entry) => entry.id === ruleId);
+    return rule ? checkRule(rule, this.context(), this.engine.lastFiredAt(character.id, rule.id)) : null;
+  }
+
+  private context(): RuleContext {
+    return { now: this.now(), isRunning: (program) => this.running.get(program) ?? null, music: () => this.musicNow() };
+  }
+
   /** What behaviour scripts subscribed to: watched exactly as if a rule had asked. */
   setExtraNeeds(extra: Omit<RuleNeeds, 'every'>): void {
     this.extra = extra;
@@ -102,11 +130,16 @@ export class RuleRunner {
   event(event: RuleEvent): void {
     if (this.stopped) return;
     if (event.type !== 'every') this.deps.onEvent?.(event);
-    const fired = this.engine.handle(event, { now: this.now(), isRunning: (program) => this.running.get(program) ?? null, music: () => this.musicNow() });
+    let heard = false;
+    const fired = this.engine.handle(event, this.context(), (skipped) => {
+      heard = true;
+      this.deps.onSkipped?.(skipped, event);
+    });
     for (const one of fired) {
-      log.info(`"${one.character.name}" / ${one.rule.name || one.rule.id}: ${describe(event)}`);
-      this.deps.onFired(one);
+      log.info(`"${one.character.name}" / ${one.rule.name || one.rule.id}: ${describeEvent(event)}`);
+      this.deps.onFired(one, event);
     }
+    if (fired.length === 0 && !heard && (event.type === 'signal' || event.type === 'game')) this.deps.onUnheard?.(event);
   }
 
   /** How game events are heard has changed (switched on or off, another port): listen again from scratch. */
@@ -275,7 +308,8 @@ export class RuleRunner {
   }
 }
 
-function describe(event: RuleEvent): string {
+/** What happened, in a few words: 'dota2 started', 'signal build-ok'. */
+export function describeEvent(event: RuleEvent): string {
   switch (event.type) {
     case 'programStarted':
       return `${event.program} started`;

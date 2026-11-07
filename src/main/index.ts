@@ -5,8 +5,9 @@ import { newQuickJSWASMModuleFromVariant, type QuickJSSyncVariant } from 'quickj
 
 import { ASSET_EXTENSIONS, type Character } from '@shared/character';
 import { IPC } from '@shared/ipc';
+import { ruleTitle } from '@shared/ruleText';
 import { parseSignalArgs, signalFromData } from '@shared/signal';
-import type { GameStatus, Settings, SettingsView } from '@shared/types';
+import type { ActivityView, CheckItem, GameStatus, Settings, SettingsView } from '@shared/types';
 
 import { configureLogger, createLogger } from './app/logger';
 import { characterMenu, trayMenu, trayTooltip, type MenuAction, type MenuState } from './app/menus';
@@ -26,7 +27,8 @@ import { BehaviourScripts } from './engine/behaviourScripts';
 import { clock, musicSlots } from './engine/ruleEngine';
 import { fillSlots } from './engine/slots';
 import { SpeechDirector } from './engine/director';
-import { RuleRunner } from './engine/ruleRunner';
+import { describeEvent, RuleRunner } from './engine/ruleRunner';
+import { Activity } from './engine/activity';
 import { RecentHistory } from './engine/selector';
 import { CharacterStore } from './characters/store';
 import { Visibility } from './characters/visibility';
@@ -157,8 +159,13 @@ async function bootstrap(): Promise<void> {
 
   // Behaviour: rules fire, their actions run, lines go to the director.
   const history = new RecentHistory();
+  /** Signals rules send each other go this many deep at most: a circle of them stops rather than runs forever. */
+  const SIGNAL_HOPS_MAX = 4;
+  // What happened and what came of it, for the editor's Activity tab.
+  const activity = new Activity();
   const actionDeps: ActionDeps = {
     isSilenced,
+    report: (character, rule, outcome, text) => activity.add({ characterId: character.id, ruleId: rule.id, event: null, outcome, text }),
     say: (character, text) => {
       log.info(`"${character.name}" says: ${text}`);
       director.say(character.id, text);
@@ -167,6 +174,18 @@ async function bootstrap(): Promise<void> {
     show: (character, ms, place) => windows.showFor(character.id, ms, place),
     hide: (character, ms) => visibility.hideFor(character.id, ms),
     setState: (character, state, ms) => windows.setState(character.id, state, ms),
+    setMood: (character, mood) => windows.setMood(character.id, mood),
+    isActing: (character) => acting().some((entry) => entry.id === character.id),
+    dismiss: (character) => director.dismiss(character.id),
+    // A rule's signal goes round like one from outside, a beat later — never inside the rule that sent it.
+    signal: (character, name, text, hops) => {
+      if (hops >= SIGNAL_HOPS_MAX) return false;
+      setTimeout(() => {
+        log.info(`"${character.name}" sends signal ${name}`);
+        rules.event({ type: 'signal', name, text, hops: hops + 1 });
+      }, 0);
+      return true;
+    },
     log: (message) => log.info(message),
     history,
     rng: Math.random
@@ -180,10 +199,17 @@ async function bootstrap(): Promise<void> {
     watchGame: (onEvent) => game.watch(onEvent),
     onMusic: () => windows.refresh(),
     idleSeconds: () => powerMonitor.getSystemIdleTime(),
-    onFired: (fired) => runActions(fired, actionDeps),
+    onFired: (fired, event) => {
+      activity.add({ characterId: fired.character.id, ruleId: fired.rule.id, event: describeEvent(event), outcome: 'fired', text: ruleTitle(fired.rule) });
+      runActions(fired, actionDeps);
+    },
+    onSkipped: ({ character, rule, why }, event) =>
+      activity.add({ characterId: character.id, ruleId: rule.id, event: describeEvent(event), outcome: 'skipped', text: why }),
+    onUnheard: (event) => activity.add({ characterId: null, ruleId: null, event: describeEvent(event), outcome: 'note', text: 'no rule waits for it' }),
     onEvent: (event) => scripts.event(event)
   });
 
+  const scriptErrors = new Map<string, string>();
   // Behaviour scripts: what they do goes the way a rule's actions do, mute and quiet hours included.
   const scripts = new BehaviourScripts({
     // Required, not imported: a plain require works the same from the dev folder and from inside the
@@ -219,10 +245,17 @@ async function bootstrap(): Promise<void> {
         show: (seconds, place) => windows.showFor(id, seconds * 1000, place),
         hide: (minutes) => visibility.hideFor(id, minutes * 60_000),
         setMood: (mood) => windows.setMood(id, mood),
+        signal: (name, text) => {
+          const character = current();
+          if (character) actionDeps.signal?.(character, name, text, 0);
+        },
         setState: (state, seconds) => {
           if (!windows.setState(id, state, seconds === null ? null : seconds * 1000)) log.info(`"${current()?.name ?? id}" script: it has no state "${state}"`);
         },
-        log: (message) => log.info(`"${current()?.name ?? id}" script: ${message}`),
+        log: (message) => {
+          log.info(`"${current()?.name ?? id}" script: ${message}`);
+          activity.add({ characterId: id, ruleId: null, event: null, outcome: 'note', text: `script: ${message}` });
+        },
         isRunning: (stem) => rules.isRunning(stem),
         music: () => rules.musicNow(),
         now: () => Date.now()
@@ -230,12 +263,31 @@ async function bootstrap(): Promise<void> {
     },
     onNeeds: (needs) =>
       rules.setExtraNeeds({ startStop: needs.startStop, running: needs.running, focus: needs.focus, time: needs.minute, returned: needs.returned, music: needs.music, game: needs.game }),
-    onStatus: (id, status) => editor.send(IPC.editorScriptStatus, { id, status })
+    onStatus: (id, status) => {
+      // A new error is news in the Activity log too; the same one again is not.
+      const error = status?.error ?? null;
+      if (error && scriptErrors.get(id) !== error) activity.add({ characterId: id, ruleId: null, event: null, outcome: 'problem', text: `script: ${error}` });
+      if (error) scriptErrors.set(id, error);
+      else scriptErrors.delete(id);
+      editor.send(IPC.editorScriptStatus, { id, status });
+    }
   });
   // Someone hidden for now does nothing either.
   const acting = (): Character[] =>
     characters.list().flatMap((entry) => (entry.ok && entry.character.enabled && !visibility.isHidden(entry.id) ? [entry.character] : []));
+  // Off or hidden: their rules wait, and a rule of theirs that matches says so in the Activity log.
+  const dormant = (): { character: Character; why: string }[] =>
+    characters.list().flatMap((entry) =>
+      !entry.ok
+        ? []
+        : !entry.character.enabled
+          ? [{ character: entry.character, why: 'the character is off' }]
+          : visibility.isHidden(entry.id)
+            ? [{ character: entry.character, why: 'the character is hidden for now' }]
+            : []
+    );
   rules.setCharacters(acting());
+  rules.setDormant(dormant());
   scripts.setCharacters(acting());
   presence.onChange(() => windows.refresh());
   presence.setCharacters(watched());
@@ -244,6 +296,10 @@ async function bootstrap(): Promise<void> {
   reconcileAutostart(settings.current.startWithSystem);
   settings.onChange((next) => reconcileAutostart(next.startWithSystem));
 
+  let watchedActivity: string | null = null;
+  activity.onAdd((entry) => {
+    if (watchedActivity !== null && (entry.characterId === watchedActivity || entry.characterId === null)) editor.send(IPC.editorActivityAdded, entry);
+  });
   const editor = new EditorWindow(join(__dirname, '../preload/editor.js'), join(paths.iconsDir(), 'app.ico'));
   sendGameStatus = (status) => editor.send(IPC.editorGameStatus, status);
   registerEditorIpc(characters, {
@@ -320,13 +376,38 @@ async function bootstrap(): Promise<void> {
         }
       }),
     gameStatus: () => game.status,
+    activity: (id) => {
+      const character = characters.get(id);
+      const times: ActivityView['rules'] = {};
+      for (const rule of character?.rules ?? []) {
+        times[rule.id] = { lastFired: rules.lastFiredAt(id, rule.id) ?? null, next: rules.plannedAt(id, rule.id) ?? null };
+      }
+      return { entries: activity.for(id), rules: times };
+    },
+    watchActivity: (id) => {
+      watchedActivity = id;
+    },
+    checkRule: (character, ruleId) => {
+      const items = rules.check(character, ruleId);
+      if (!items) return null;
+      // What holds back every rule of the character, before what holds back this one.
+      const blockers: CheckItem[] = [];
+      if (!character.enabled) blockers.push({ ok: false, text: 'The character is off.' });
+      else if (visibility.isHidden(character.id)) blockers.push({ ok: false, text: 'The character is hidden for now.' });
+      if (isSilenced()) blockers.push({ ok: false, text: 'It is quiet (mute or quiet hours): it would not say or play anything.' });
+      const result = [...blockers, ...items];
+      return result.length > 0 ? result : [{ ok: true, text: 'Nothing would stop it: it fires the next time its trigger happens.' }];
+    },
     runningPrograms: async () => {
       const sensors = await loadDesktopSensors();
       if (!sensors) return [];
       return [...sensors.runningApps()].map((stem) => `${stem}.exe`).sort((a, b) => a.localeCompare(b));
     }
   });
-  editor.onClosed = () => windows.setPreview(null);
+  editor.onClosed = () => {
+    windows.setPreview(null);
+    watchedActivity = null;
+  };
 
   const menuState = (): MenuState => ({
     everyoneHidden: visibility.everyoneHidden,
@@ -386,6 +467,7 @@ async function bootstrap(): Promise<void> {
     presence.setCharacters(watched());
     const active = acting();
     rules.setCharacters(active);
+    rules.setDormant(dormant());
     scripts.setCharacters(active);
     // Whoever is off, gone or hidden stops mid-sentence.
     const activeIds = new Set(active.map((character) => character.id));

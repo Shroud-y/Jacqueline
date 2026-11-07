@@ -7,7 +7,7 @@ import { unknownSlots } from '@shared/lines';
 import { BEHAVIOUR_NAME, BEHAVIOUR_STARTER, SCRIPT_NAME, SCRIPT_STARTER } from '@shared/scriptTemplate';
 import { signalCommand, signalNameSchema } from '@shared/signal';
 import { STYLE_STARTER, STYLESHEET_NAME } from '@shared/stylesheet';
-import type { EditorApi, EditorResult, GameStatus, ScriptStatus, Settings, SettingsResult, SettingsView } from '@shared/types';
+import type { ActivityView, CheckItem, EditorApi, EditorResult, GameStatus, ScriptStatus, Settings, SettingsResult, SettingsView } from '@shared/types';
 import { sampleSlots, type Fired } from '../engine/ruleEngine';
 import { fillSlots } from '../engine/slots';
 import type { CharacterStore } from './store';
@@ -25,6 +25,10 @@ export interface EditorIpcDeps {
   /** Carries out a rule's actions now, as if it had fired. */
   runNow: (fired: Fired) => void;
   runningPrograms: () => Promise<string[]>;
+  activity: (id: string) => ActivityView;
+  /** Which character's activity the editor wants as it happens; null for none. */
+  watchActivity: (id: string | null) => void;
+  checkRule: (character: Character, ruleId: string) => CheckItem[] | null;
   openRoot: () => Promise<EditorResult>;
   /** What starts this app on a command line: the exe, and in a development run the project too. */
   executable: () => string[];
@@ -182,6 +186,27 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
 
     runningPrograms: () => deps.runningPrograms(),
 
+    activity: (payload) => {
+      const parsed = idPayload.safeParse(payload);
+      return parsed.success ? deps.activity(parsed.data.id) : { entries: [], rules: {} };
+    },
+
+    watchActivity: (payload) => {
+      const parsed = previewPayload.safeParse(payload);
+      if (!parsed.success) return refused;
+      deps.watchActivity(parsed.data.id);
+      return { ok: true };
+    },
+
+    checkRule: (payload) => {
+      const parsed = testRulePayload.safeParse(payload);
+      if (!parsed.success) return refused;
+      const character = store.get(parsed.data.id);
+      if (!character) return { ok: false, error: 'Unknown character.' };
+      const items = deps.checkRule(character, parsed.data.rule);
+      return items ? { ok: true, items } : { ok: false, error: 'That rule is not there any more.' };
+    },
+
     openRoot: () => deps.openRoot(),
 
     copySignalCommand: (payload) => {
@@ -317,7 +342,7 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
 
 /** The handlers take what came over the wire, not what the editor's types promise it sent. */
 type EditorHandlers = {
-  [K in Exclude<keyof EditorApi, 'onChanged' | 'onSettings' | 'onScriptStatus' | 'onGameStatus' | 'pathForFile'>]: (payload?: unknown) => ReturnType<EditorApi[K]> | Awaited<ReturnType<EditorApi[K]>>;
+  [K in Exclude<keyof EditorApi, 'onChanged' | 'onSettings' | 'onScriptStatus' | 'onGameStatus' | 'onActivity' | 'pathForFile'>]: (payload?: unknown) => ReturnType<EditorApi[K]> | Awaited<ReturnType<EditorApi[K]>>;
 };
 
 const CHANNELS: { [K in keyof EditorHandlers]: string } = {
@@ -334,6 +359,9 @@ const CHANNELS: { [K in keyof EditorHandlers]: string } = {
   testLine: IPC.editorTestLine,
   testRule: IPC.editorTestRule,
   runningPrograms: IPC.editorRunningPrograms,
+  activity: IPC.editorActivity,
+  watchActivity: IPC.editorWatchActivity,
+  checkRule: IPC.editorCheckRule,
   openRoot: IPC.editorOpenRoot,
   copySignalCommand: IPC.editorCopySignalCommand,
   setUpDota: IPC.editorSetUpDota,

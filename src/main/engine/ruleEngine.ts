@@ -7,7 +7,8 @@
 import type { Character } from '@shared/character';
 import { heroName, type GameHappening } from '@shared/game';
 import { usesMusic } from '@shared/lines';
-import type { Rule, RuleCondition, Trigger } from '@shared/rules';
+import { daysText, type Rule, type RuleCondition, type Trigger } from '@shared/rules';
+import type { CheckItem } from '@shared/types';
 import { appStem } from '../characters/presence';
 import type { MusicEventType, MusicNow } from './musicTracker';
 import { isWithinClockWindow, minutesOfDay } from './timeOfDay';
@@ -22,7 +23,13 @@ export type RuleEvent =
   | { type: 'clicked'; characterId: string }
   | { type: MusicEventType; track: string; artist: string; app: string }
   /** From outside, `--signal <name>`, with the `--text` that came with it. */
-  | { type: 'signal'; name: string; text: string | null }
+  | {
+      type: 'signal';
+      name: string;
+      text: string | null;
+      /** Sent by a rule rather than from outside: how many signals deep this one is, so a loop runs out. */
+      hops?: number;
+    }
   /** In the Dota 2 match being played. `streakBefore` is the kill streak before this update. */
   | { type: 'game'; event: GameHappening; hero: string | null; kills: number; deaths: number; streak: number; streakBefore: number }
   /** An `every` rule's turn has come round. Made by the engine itself. */
@@ -33,6 +40,8 @@ export interface Fired {
   character: Character;
   rule: Rule;
   slots: Record<string, string | number>;
+  /** For a signal one rule sent another: how many deep it is. */
+  hops?: number;
 }
 
 /** What has to be watched for the current rules — nothing else is. */
@@ -115,6 +124,78 @@ export function triggerMatches(trigger: Trigger, event: RuleEvent, character: Ch
   }
 }
 
+/** Why a condition held the rule back, in words; for the Activity log. */
+export function conditionFailure(condition: RuleCondition, ctx: RuleContext): string {
+  switch (condition.type) {
+    case 'chance':
+      return `its ${condition.percent} % chance did not come up`;
+    case 'timeBetween':
+      return `it is not between ${condition.from} and ${condition.to}`;
+    case 'programRunning': {
+      const running = ctx.isRunning(appStem(condition.program));
+      if (running === null) return `it is not known yet whether ${condition.program} runs`;
+      return running ? `${condition.program} runs` : `${condition.program} does not run`;
+    }
+    case 'musicPlaying': {
+      const music = ctx.music?.() ?? null;
+      if (music === null) return 'it is not known yet whether music plays';
+      return music.playing ? 'music plays' : 'no music plays';
+    }
+    case 'days': {
+      const said = daysText(condition.days);
+      if (said === 'on weekdays') return 'today is not a weekday';
+      if (said === 'at weekends') return 'today is not a weekend day';
+      return `today is not one of its days (${said.replace(/^on /, '')})`;
+    }
+  }
+}
+
+
+/** What stands between the rule and firing right now — its wait and each condition — without rolling any dice. */
+export function checkRule(rule: Rule, ctx: RuleContext, lastFired: number | undefined): CheckItem[] {
+  const items: CheckItem[] = [];
+  if (rule.cooldownSec > 0) {
+    const left = lastFired === undefined ? 0 : rule.cooldownSec * 1000 - (ctx.now - lastFired);
+    items.push(
+      left > 0
+        ? { ok: false, text: `Waits ${Math.ceil(left / 1000)} s more before it may fire again.` }
+        : { ok: true, text: 'Its wait is over.' }
+    );
+  }
+  for (const condition of rule.if) {
+    if (condition.type === 'chance') {
+      items.push({ ok: null, text: `${condition.percent} % chance — rolled when it fires.` });
+      continue;
+    }
+    // A dice-free condition, so passing it no rng is safe.
+    const ok = conditionPasses(condition, ctx, () => 0);
+    items.push({ ok, text: ok ? passText(condition) : `${capital(conditionFailure(condition, ctx))}.` });
+  }
+  return items;
+}
+
+function passText(condition: Exclude<RuleCondition, { type: 'chance' }>): string {
+  switch (condition.type) {
+    case 'timeBetween':
+      return `It is between ${condition.from} and ${condition.to}.`;
+    case 'programRunning':
+      return condition.running ? `${condition.program} runs.` : `${condition.program} does not run.`;
+    case 'musicPlaying':
+      return condition.playing ? 'Music plays.' : 'No music plays.';
+    case 'days':
+      return `Today is one of its days (${daysText(condition.days)}).`;
+  }
+}
+
+const capital = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** A rule that matched what happened and still did not fire, and why. */
+export interface Skipped {
+  character: Character;
+  rule: Rule;
+  why: string;
+}
+
 export function conditionPasses(condition: RuleCondition, ctx: RuleContext, rng: Rng): boolean {
   switch (condition.type) {
     case 'chance':
@@ -130,6 +211,8 @@ export function conditionPasses(condition: RuleCondition, ctx: RuleContext, rng:
       const music = ctx.music?.() ?? null;
       return music !== null && music.playing === condition.playing;
     }
+    case 'days':
+      return condition.days.includes(new Date(ctx.now).getDay());
   }
 }
 
@@ -182,6 +265,8 @@ interface Planned {
 
 export class RuleEngine {
   private characters: Character[] = [];
+  /** Characters whose rules do not run now — off or hidden — with why, so a matching rule can say so. */
+  private dormant: { character: Character; why: string }[] = [];
   private readonly lastFired = new Map<string, number>();
   private readonly planned = new Map<string, Planned>();
 
@@ -204,23 +289,59 @@ export class RuleEngine {
     for (const key of [...this.planned.keys()]) if (!keep.has(key)) this.planned.delete(key);
   }
 
+  /** Characters that are about, but whose rules wait: only ever named in `onSkip`, never fired. */
+  setDormant(dormant: readonly { character: Character; why: string }[]): void {
+    this.dormant = [...dormant];
+  }
+
+  /** When the rule last fired since Jacqueline started; undefined if it has not. */
+  lastFiredAt(characterId: string, ruleId: string): number | undefined {
+    return this.lastFired.get(`${characterId}:${ruleId}`);
+  }
+
+  /** When an `every` rule's next turn is; undefined for any other rule. */
+  plannedAt(characterId: string, ruleId: string): number | undefined {
+    return this.planned.get(`${characterId}:${ruleId}`)?.at;
+  }
+
   get needs(): RuleNeeds {
     return ruleNeeds(this.characters);
   }
 
   /** The rules this event sets off, in character order. Each one that fires starts its cooldown. */
-  handle(event: RuleEvent, ctx: RuleContext): Fired[] {
+  handle(event: RuleEvent, ctx: RuleContext, onSkip?: (skipped: Skipped) => void): Fired[] {
     const fired: Fired[] = [];
     for (const character of this.characters) {
+      // A rule that fired and stops the rest, for this character and this moment.
+      let stoppedBy: Rule | null = null;
       for (const rule of activeRules(character)) {
         if (!triggerMatches(rule.when, event, character, rule)) continue;
+        if (stoppedBy) {
+          onSkip?.({ character, rule, why: `${stoppedBy.name.trim() ? `“${stoppedBy.name.trim()}”` : 'a rule above it'} fired first and stops the rest` });
+          continue;
+        }
         const key = this.key(character, rule);
         const last = this.lastFired.get(key);
-        if (last !== undefined && rule.cooldownSec > 0 && ctx.now - last < rule.cooldownSec * 1000) continue;
-        // Every condition is checked — the dice too — before anything is spent.
-        if (!rule.if.every((condition) => conditionPasses(condition, ctx, this.rng))) continue;
+        if (last !== undefined && rule.cooldownSec > 0 && ctx.now - last < rule.cooldownSec * 1000) {
+          const left = Math.ceil((rule.cooldownSec * 1000 - (ctx.now - last)) / 1000);
+          onSkip?.({ character, rule, why: `it waits ${left} s more before it may fire again` });
+          continue;
+        }
+        // Every condition is checked — the dice too — before anything is spent; the first that fails is the reason.
+        const failed = rule.if.find((condition) => !conditionPasses(condition, ctx, this.rng));
+        if (failed) {
+          onSkip?.({ character, rule, why: conditionFailure(failed, ctx) });
+          continue;
+        }
         this.lastFired.set(key, ctx.now);
-        fired.push({ character, rule, slots: slotsFor(event, character, ctx.now, ctx.music?.() ?? null) });
+        fired.push({ character, rule, slots: slotsFor(event, character, ctx.now, ctx.music?.() ?? null), hops: event.type === 'signal' ? (event.hops ?? 0) : 0 });
+        if (rule.stop) stoppedBy = rule;
+      }
+    }
+    if (onSkip) {
+      for (const { character, why } of this.dormant) {
+        // Switched off or hidden: its rules are not running at all, which is the one thing worth saying.
+        for (const rule of character.rules) if (rule.enabled && triggerMatches(rule.when, event, character, rule)) onSkip({ character, rule, why });
       }
     }
     return fired;

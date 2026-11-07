@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-import type { Character, CharacterEntry } from '@shared/character';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { referencedAssets, type Character, type CharacterEntry } from '@shared/character';
+import { EditHistory } from '@shared/editHistory';
 import type { EditorResult } from '@shared/types';
 
 export interface Characters {
@@ -23,6 +24,9 @@ export interface Characters {
   exportCharacter(id: string): void;
   /** From a dropped zip's path, or one the user picks. */
   importCharacter(path?: string): Promise<Character | null>;
+  /** Puts the character back as it was before the last change, or forward again; false when there is no step. */
+  undo(id: string): Promise<boolean>;
+  redo(id: string): Promise<boolean>;
 }
 
 /**
@@ -58,8 +62,22 @@ export function useCharacters(): Characters {
     return result.ok;
   }, []);
 
+  const history = useRef(new EditHistory());
+  // What main last had for each character: what an edit replaces, and so what undo goes back to.
+  const latest = useRef(new Map<string, Character>());
+  useEffect(() => {
+    latest.current = new Map((entries ?? []).flatMap((entry) => (entry.ok ? [[entry.id, entry.character] as const] : [])));
+  }, [entries]);
+
+  const remember = (character: Character): void => {
+    const before = latest.current.get(character.id);
+    if (before && before !== character) history.current.record(before, Date.now());
+    latest.current.set(character.id, character);
+  };
+
   const update = useCallback(
     (character: Character): void => {
+      remember(character);
       // Shown at once, so typing does not wait on the disk; main's answer follows and wins.
       setEntries((current) =>
         current ? current.map((entry) => (entry.id === character.id ? { id: character.id, ok: true, character } : entry)) : current
@@ -76,6 +94,7 @@ export function useCharacters(): Characters {
 
   const save = useCallback(
     async (character: Character): Promise<boolean> => {
+      remember(character);
       const result = await window.jacquelineEditor?.save(character);
       return result ? settle(result) : false;
     },
@@ -128,6 +147,36 @@ export function useCharacters(): Characters {
     [settle]
   );
 
+  const step = useCallback(
+    async (id: string, direction: 'undo' | 'redo'): Promise<boolean> => {
+      const api = window.jacquelineEditor;
+      const current = latest.current.get(id);
+      const target = direction === 'undo' ? history.current.peekUndo(id) : history.current.peekRedo(id);
+      if (!api || !current || !target) return false;
+      // A file let go of since is gone from the folder: going back to it would show nothing.
+      const files = new Set((await api.assets({ id })).map((asset) => asset.file));
+      const missing = [...referencedAssets(target)].filter((file) => !files.has(file));
+      if (missing.length > 0) {
+        setError(`It used ${missing.join(', ')}, which has since been removed from its folder.`);
+        setErrorLead(direction === 'undo' ? 'Cannot undo.' : 'Cannot redo.');
+        history.current.forget(id);
+        return false;
+      }
+      if (direction === 'undo') history.current.undo(current);
+      else history.current.redo(current, Date.now());
+      // Where it sits on the desktop is not an edit made here: dragging it is not undone.
+      const next = { ...target, presence: { ...target.presence, position: current.presence.position } };
+      latest.current.set(id, next);
+      setEntries((list) => (list ? list.map((entry) => (entry.id === id ? { id, ok: true, character: next } : entry)) : list));
+      const result = await api.save(next);
+      return settle(result);
+    },
+    [settle]
+  );
+
+  const undo = useCallback((id: string) => step(id, 'undo'), [step]);
+  const redo = useCallback((id: string) => step(id, 'redo'), [step]);
+
   const report = useCallback((message: string): void => {
     setError(message);
     setErrorLead('Not saved.');
@@ -146,6 +195,8 @@ export function useCharacters(): Characters {
     remove,
     openFolder,
     exportCharacter,
-    importCharacter
+    importCharacter,
+    undo,
+    redo
   };
 }

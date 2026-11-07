@@ -32,6 +32,7 @@ export const LIMITS = {
   timers: 50,
   afterMinMs: 250,
   everyMinMs: 1_000,
+  signalMinMs: 1_000,
   stateBytes: 64 * 1024,
   /** Running into a limit this many times in a row stops the script. */
   strikes: 3
@@ -44,6 +45,8 @@ export interface ScriptActions {
   show(seconds: number, place: ShowPlace): void;
   hide(minutes: number): void;
   setMood(mood: string | null): void;
+  /** A signal for every character's rules and scripts, this one's too. */
+  signal(name: string, text: string | null): void;
   /** One of its own states, or null for its usual look; `seconds` null lasts until it is changed. */
   setState(state: string | null, seconds: number | null): void;
   log(message: string): void;
@@ -282,6 +285,17 @@ export class BehaviourScript {
     define('hide', (minutes) => {
       const value = number(minutes);
       this.actions.hide(Math.min(1440, Math.max(1, Number.isFinite(value) ? value : 30)));
+    });
+    // At most one a second: two scripts answering each other's signals must not spin.
+    let lastSignal = -Infinity;
+    define('signal', (nameHandle, textHandle) => {
+      const name = text(nameHandle);
+      if (!SIGNAL_NAME.test(name)) fail(`signal(name): "${name}" is not a signal name`);
+      const now = this.actions.now();
+      if (now - lastSignal < LIMITS.signalMinMs) fail('signal(): once a second at most');
+      lastSignal = now;
+      const said = text(textHandle).trim();
+      this.actions.signal(name, said === '' ? null : said.slice(0, 200));
     });
     define('setMood', (mood) => {
       const raw: unknown = mood ? ctx.dump(mood) : null;

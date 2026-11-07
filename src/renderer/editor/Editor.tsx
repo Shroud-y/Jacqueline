@@ -1,5 +1,6 @@
-import { useState, type DragEvent } from 'react';
+import { useEffect, useState, type DragEvent } from 'react';
 import type { Character, CharacterEntry } from '@shared/character';
+import ActivityTab from './ActivityTab';
 import AppearanceTab from './AppearanceTab';
 import AudioTab from './AudioTab';
 import BehaviourTab from './BehaviourTab';
@@ -17,7 +18,8 @@ const TABS = [
   { id: 'layout', label: 'Layout' },
   { id: 'behaviour', label: 'Behaviour' },
   { id: 'lines', label: 'Lines' },
-  { id: 'audio', label: 'Audio' }
+  { id: 'audio', label: 'Audio' },
+  { id: 'activity', label: 'Activity' }
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -140,6 +142,24 @@ interface CharacterPaneProps {
 
 function CharacterPane({ character, characters, onSelect }: CharacterPaneProps): JSX.Element {
   const [tab, setTab] = useState<TabId>('general');
+
+  // Ctrl+Z / Ctrl+Y (and Ctrl+Shift+Z) undo and redo the last change to this character — except in a text
+  // field, where they undo typing, as they do everywhere else.
+  const { undo, redo } = characters;
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (!event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
+      const key = event.key.toLowerCase();
+      if (key === 'z' && !event.shiftKey) void undo(character.id);
+      else if (key === 'y' || (key === 'z' && event.shiftKey)) void redo(character.id);
+      else return;
+      event.preventDefault();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [character.id, undo, redo]);
   const [confirming, setConfirming] = useState(false);
   const [nameProblem, setNameProblem] = useState<string | null>(null);
 
@@ -178,7 +198,9 @@ function CharacterPane({ character, characters, onSelect }: CharacterPaneProps):
             <MoreMenu
               label="More"
               items={[
-                { label: 'Open folder', onSelect: () => characters.openFolder(character.id) },
+                { label: 'Undo  Ctrl+Z', onSelect: () => void characters.undo(character.id) },
+                { label: 'Redo  Ctrl+Y', onSelect: () => void characters.redo(character.id) },
+                { label: 'Open folder', onSelect: () => characters.openFolder(character.id), divided: true },
                 { label: 'Duplicate', onSelect: () => void duplicate() },
                 { label: 'Export…', onSelect: () => characters.exportCharacter(character.id) },
                 { label: 'Delete…', onSelect: () => setConfirming(true), danger: true, divided: true }
@@ -214,8 +236,10 @@ function CharacterPane({ character, characters, onSelect }: CharacterPaneProps):
           <BehaviourTab character={character} characters={characters} />
         ) : tab === 'lines' ? (
           <LinesTab character={character} characters={characters} />
-        ) : (
+        ) : tab === 'audio' ? (
           <AudioTab character={character} characters={characters} />
+        ) : (
+          <ActivityTab character={character} />
         )}
       </div>
     </>

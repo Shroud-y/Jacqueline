@@ -40,7 +40,10 @@ export function usesMusic(character: Character): boolean {
   const asks = character.rules.some(
     (rule) => rule.enabled && (rule.when.type === 'musicStarted' || rule.when.type === 'musicStopped' || rule.when.type === 'trackChanged' || rule.if.some((condition) => condition.type === 'musicPlaying'))
   );
-  return asks || Object.values(character.lines).some((lines) => lines.some((line) => /\{(track|artist)\}/.test(line.text)));
+  const asksIn = (text: string): boolean => /\{(track|artist)\}/.test(text);
+  // Text written into a rule counts as much as a line in a group.
+  const said = character.rules.some((rule) => rule.enabled && rule.then.some((action) => action.type === 'sayText' && asksIn(action.text)));
+  return asks || said || Object.values(character.lines).some((lines) => lines.some((line) => asksIn(line.text)));
 }
 
 export type TextPart = { text: string; slot: null } | { text: string; slot: string; known: boolean };

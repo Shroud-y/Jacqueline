@@ -5,10 +5,13 @@ import { ruleSchema } from '@shared/rules';
 import {
   defaultAction,
   defaultCondition,
+  copyRuleTo,
   defaultTrigger,
+  duplicateRule,
   formatDuration,
   freeRuleId,
   likelyProgram,
+  moveRule,
   newRule,
   ruleDetail,
   ruleProblems,
@@ -148,5 +151,64 @@ describe('starting values', () => {
     expect(ruleSchema.safeParse(withLines).success).toBe(true);
     expect(newRule(miku()).then).toEqual([{ type: 'show', seconds: 10, place: 'usual' }]);
     expect(freeRuleId([{ ...base, id: 'rule-2' }])).toBe('rule-3');
+  });
+});
+
+describe('duplicating and moving rules', () => {
+  const r = (id: string, name = ''): Rule => ({ id, name, enabled: true, when: { type: 'clicked' }, if: [], then: [{ type: 'say', group: 'g' }], cooldownSec: 0 });
+
+  it('puts a copy right after the original, under a free id, deep enough that changing one leaves the other', () => {
+    const rules = [r('rule-1', 'Poke'), r('rule-2')];
+    const made = duplicateRule(rules, 'rule-1');
+    expect(made?.rules.map((rule) => rule.id)).toEqual(['rule-1', made?.copy.id, 'rule-2']);
+    expect(made?.copy.name).toBe('Poke (copy)');
+    expect(made?.copy.id).not.toBe('rule-1');
+    expect(made?.copy.then).not.toBe(rules[0]?.then);
+    expect(duplicateRule(rules, 'gone')).toBeNull();
+  });
+
+  it('moves a rule one place, and leaves the list alone at either end', () => {
+    const rules = [r('a'), r('b'), r('c')];
+    expect(moveRule(rules, 'b', -1).map((rule) => rule.id)).toEqual(['b', 'a', 'c']);
+    expect(moveRule(rules, 'b', 1).map((rule) => rule.id)).toEqual(['a', 'c', 'b']);
+    expect(moveRule(rules, 'a', -1).map((rule) => rule.id)).toEqual(['a', 'b', 'c']);
+    expect(moveRule(rules, 'c', 1).map((rule) => rule.id)).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('waits and stops in words', () => {
+  it('reads a wait in the sentence and a stop in the quiet line', () => {
+    const r: Rule = {
+      id: 'r',
+      name: '',
+      enabled: true,
+      when: { type: 'clicked' },
+      if: [],
+      then: [{ type: 'sayText', text: 'Hi.' }, { type: 'wait', seconds: 3 }, { type: 'hide', minutes: 5 }],
+      cooldownSec: 0,
+      stop: true
+    };
+    expect(text(r)).toBe('When it is clicked → say **“Hi.”**, wait **3 s** and hide for **5 min**');
+    expect(ruleDetail(r)).toBe('stops the rest');
+  });
+});
+
+describe('copyRuleTo', () => {
+  it('gives the copy a free id there, and names what the other character lacks', () => {
+    const source: Rule = {
+      id: 'rule-1',
+      name: 'Greet',
+      enabled: true,
+      when: { type: 'clicked' },
+      if: [],
+      then: [{ type: 'say', group: 'greet' }, { type: 'sound', file: 'hi.ogg' }, { type: 'setState', state: 'wave', seconds: 3 }],
+      cooldownSec: 0
+    };
+    const target = { ...defaultCharacter('b', 'Rin'), rules: [{ ...source, id: 'rule-1' }], lines: { greet: [] } };
+    const { rules, missing } = copyRuleTo(source, target);
+    expect(rules).toHaveLength(2);
+    expect(rules[1]?.id).not.toBe('rule-1');
+    expect(rules[1]?.name).toBe('Greet');
+    expect(missing).toEqual(['hi.ogg', 'its state "wave"']);
   });
 });

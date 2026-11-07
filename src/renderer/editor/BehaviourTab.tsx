@@ -3,13 +3,17 @@ import { assetUrl } from '@shared/assetUrl';
 import { customStates, type Character, type Visual } from '@shared/character';
 import { GAME_EVENTS, STREAK_MAX, STREAK_MIN } from '@shared/game';
 import { SIGNAL_NAME } from '@shared/signal';
-import { showSecondsFor, type Rule, type ShowPlace, type RuleAction, type RuleCondition, type Trigger } from '@shared/rules';
+import type { ActivityView, CheckItem } from '@shared/types';
+import { MAX_WAIT_SECONDS, MOOD_NAME, showSecondsFor, WEEK, type Rule, type ShowPlace, type RuleAction, type RuleCondition, type Trigger } from '@shared/rules';
 import {
   ACTION_LABELS,
   CONDITION_LABELS,
   defaultAction,
   defaultCondition,
   defaultTrigger,
+  copyRuleTo,
+  duplicateRule,
+  moveRule,
   GAME_EVENT_LABELS,
   newRule,
   ruleDetail,
@@ -18,7 +22,7 @@ import {
   ruleSentence,
   TRIGGER_LABELS
 } from '@shared/ruleText';
-import { ClockInput, Field, Notice, NumberInput, Segmented, Select, TextInput } from './fields';
+import { Checkbox, ClockInput, Field, Notice, NumberInput, Segmented, Select, TextInput } from './fields';
 import BehaviourScriptSection from './BehaviourScriptSection';
 import { probeVideoLength } from './media';
 import type { Characters } from './useCharacters';
@@ -36,6 +40,29 @@ export default function BehaviourTab({ character, characters }: { character: Cha
   const [openId, setOpenId] = useState<string | null>(null);
   const [assets, setAssets] = useState<Set<string> | undefined>(undefined);
   const [programs, setPrograms] = useState<string[] | null>(null);
+
+  // When each rule last fired, and an `every` rule's next turn: asked on opening, and again as anything happens to it.
+  const [times, setTimes] = useState<ActivityView['rules']>({});
+  useEffect(() => {
+    const api = window.jacquelineEditor;
+    if (!api) return;
+    let cancelled = false;
+    const load = (): void => {
+      void api.activity({ id }).then((view) => {
+        if (!cancelled) setTimes(view.rules);
+      });
+    };
+    load();
+    void api.watchActivity({ id });
+    const off = api.onActivity((entry) => {
+      if (entry.characterId === id) load();
+    });
+    return () => {
+      cancelled = true;
+      off();
+      void api.watchActivity({ id: null });
+    };
+  }, [id]);
 
   const loadAssets = useCallback((): void => {
     void window.jacquelineEditor?.assets({ id }).then((list) => setAssets(new Set(list.map((entry) => entry.file))));
@@ -84,7 +111,9 @@ export default function BehaviourTab({ character, characters }: { character: Cha
             characters={characters}
             rule={rule}
             assets={assets}
+            timing={times[rule.id]}
             open={rule.id === openId}
+            onOpen={setOpenId}
             onToggle={() => setOpenId(rule.id === openId ? null : rule.id)}
             onAssetsChanged={loadAssets}
           />
@@ -105,15 +134,17 @@ interface RuleItemProps {
   characters: Characters;
   rule: Rule;
   assets: Set<string> | undefined;
+  timing: ActivityView['rules'][string] | undefined;
   open: boolean;
+  onOpen: (ruleId: string) => void;
   onToggle: () => void;
   onAssetsChanged: () => void;
 }
 
-function RuleItem({ character, characters, rule, assets, open, onToggle, onAssetsChanged }: RuleItemProps): JSX.Element {
+function RuleItem({ character, characters, rule, assets, timing, open, onOpen, onToggle, onAssetsChanged }: RuleItemProps): JSX.Element {
   const checkId = useId();
   const problems = ruleProblems(character, rule, assets);
-  const detail = ruleDetail(rule);
+  const detail = [ruleDetail(rule), timingText(timing)].filter(Boolean).join(' · ');
 
   const setRule = (next: Rule): void => characters.update({ ...character, rules: character.rules.map((entry) => (entry.id === rule.id ? next : entry)) });
 
@@ -142,7 +173,7 @@ function RuleItem({ character, characters, rule, assets, open, onToggle, onAsset
           {detail ? <span className="rule-detail">{detail}</span> : null}
         </button>
       </div>
-      {open ? <RuleEditor character={character} characters={characters} rule={rule} setRule={setRule} onAssetsChanged={onAssetsChanged} /> : null}
+      {open ? <RuleEditor character={character} characters={characters} rule={rule} setRule={setRule} onOpen={onOpen} onAssetsChanged={onAssetsChanged} /> : null}
     </div>
   );
 }
@@ -152,10 +183,12 @@ interface RuleEditorProps {
   characters: Characters;
   rule: Rule;
   setRule: (rule: Rule) => void;
+  /** Opens another rule in place of this one: the copy just made. */
+  onOpen: (ruleId: string) => void;
   onAssetsChanged: () => void;
 }
 
-function RuleEditor({ character, characters, rule, setRule, onAssetsChanged }: RuleEditorProps): JSX.Element {
+function RuleEditor({ character, characters, rule, setRule, onOpen, onAssetsChanged }: RuleEditorProps): JSX.Element {
   const { id } = character;
   const [confirming, setConfirming] = useState(false);
   const [testProblem, setTestProblem] = useState<string | null>(null);
@@ -208,6 +241,43 @@ function RuleEditor({ character, characters, rule, setRule, onAssetsChanged }: R
   const test = async (): Promise<void> => {
     const result = await window.jacquelineEditor?.testRule({ id, rule: rule.id });
     setTestProblem(result && !result.ok ? result.error : null);
+  };
+
+  const duplicate = (): void => {
+    const made = duplicateRule(character.rules, rule.id);
+    if (!made) return;
+    characters.update({ ...character, rules: made.rules });
+    onOpen(made.copy.id);
+  };
+  const move = (by: -1 | 1): void => characters.update({ ...character, rules: moveRule(character.rules, rule.id, by) });
+
+  // Copy to another character: picked from a list that shows only while choosing.
+  const others = (characters.entries ?? []).flatMap((entry) => (entry.ok && entry.id !== id ? [entry.character] : []));
+  const [copyTarget, setCopyTarget] = useState<string | null>(null);
+  const [copied, setCopied] = useState<{ text: string; missing: boolean } | null>(null);
+  const copyTo = async (): Promise<void> => {
+    const target = others.find((other) => other.id === copyTarget);
+    if (!target) return;
+    const made = copyRuleTo(rule, target);
+    if (!(await characters.save({ ...target, rules: made.rules }))) return;
+    setCopyTarget(null);
+    setCopied(
+      made.missing.length > 0
+        ? { text: `Copied to ${target.name}. It does not have ${made.missing.join(', ')} — add them there, or the copy has nothing to work with.`, missing: true }
+        : { text: `Copied to ${target.name}.`, missing: false }
+    );
+  };
+  const place = character.rules.findIndex((entry) => entry.id === rule.id);
+
+  // What would stop it right now, without doing anything: the answer to "why does it not fire?".
+  const [check, setCheck] = useState<CheckItem[] | null>(null);
+  const checkNow = async (): Promise<void> => {
+    const result = await window.jacquelineEditor?.checkRule({ id, rule: rule.id });
+    if (!result) return;
+    if (result.ok) {
+      setTestProblem(null);
+      setCheck(result.items);
+    } else setTestProblem(result.error);
   };
 
   const setCondition = (index: number, condition: RuleCondition): void => withRule({ if: rule.if.map((entry, i) => (i === index ? condition : entry)) });
@@ -285,10 +355,55 @@ function RuleEditor({ character, characters, rule, setRule, onAssetsChanged }: R
         <CooldownEditor seconds={rule.cooldownSec} onChange={(cooldownSec) => withRule({ cooldownSec })} />
       </Block>
 
+      <Block title="Rules below it">
+        <Checkbox
+          label="Stop here when this one fires"
+          hint="The rules below it that the same moment sets off do not fire. Put the likeliest-to-be-wanted first: Move up and Move down set the order."
+          checked={rule.stop === true}
+          onChange={(stop) => withRule({ stop: stop || undefined })}
+        />
+      </Block>
+
       {testProblem ? (
         <Notice kind="bad" lead="Not done." onDismiss={() => setTestProblem(null)}>
           {testProblem}
         </Notice>
+      ) : null}
+
+      {copied ? (
+        copied.missing ? (
+          <Notice kind="warn" onDismiss={() => setCopied(null)}>
+            {copied.text}
+          </Notice>
+        ) : (
+          <p className="prose rule-copied">{copied.text}</p>
+        )
+      ) : null}
+
+      {copyTarget !== null ? (
+        <div className="rule-copy">
+          <span className="rule-word">Copy this rule to</span>
+          <Select label="Character to copy to" value={copyTarget} options={others.map((other) => ({ value: other.id, label: other.name }))} onChange={setCopyTarget} />
+          <button type="button" className="button" onClick={() => void copyTo()}>
+            Copy
+          </button>
+          <button type="button" className="button quiet" onClick={() => setCopyTarget(null)}>
+            Cancel
+          </button>
+        </div>
+      ) : null}
+
+      {check ? (
+        <ul className="rule-check" aria-label="What would stop it right now">
+          {check.map((item, index) => (
+            <li key={index} data-ok={item.ok === null ? 'maybe' : item.ok}>
+              <span className="rule-check-mark" aria-hidden="true">
+                {item.ok === null ? '?' : item.ok ? '✓' : '✗'}
+              </span>
+              {item.text}
+            </li>
+          ))}
+        </ul>
       ) : null}
 
       <div className="rule-foot">
@@ -303,9 +418,27 @@ function RuleEditor({ character, characters, rule, setRule, onAssetsChanged }: R
           </>
         ) : (
           <>
-            <button type="button" className="button" onClick={() => void test()}>
+            <button type="button" className="button" title="Does what the rule does, now — whatever its trigger, conditions and wait" onClick={() => void test()}>
               Test now
             </button>
+            <button type="button" className="button quiet" title="Says what would stop it from firing right now, and does nothing" onClick={() => void checkNow()}>
+              Check now
+            </button>
+            <span className="rule-foot-gap" />
+            <button type="button" className="button quiet" disabled={place <= 0} onClick={() => move(-1)}>
+              Move up
+            </button>
+            <button type="button" className="button quiet" disabled={place < 0 || place >= character.rules.length - 1} onClick={() => move(1)}>
+              Move down
+            </button>
+            <button type="button" className="button quiet" onClick={duplicate}>
+              Duplicate
+            </button>
+            {others.length > 0 ? (
+              <button type="button" className="button quiet" onClick={() => setCopyTarget(others[0]?.id ?? null)}>
+                Copy to…
+              </button>
+            ) : null}
             <button type="button" className="button danger" onClick={() => setConfirming(true)}>
               Delete rule…
             </button>
@@ -493,6 +626,8 @@ function ConditionEditor({ character, condition, onChange }: { character: Charac
           <span className="rule-word">to</span>
           <ClockInput label="To" value={condition.to} onChange={(to) => onChange({ ...condition, to })} />
         </>
+      ) : condition.type === 'days' ? (
+        <DaysPicker days={condition.days} onChange={(days) => onChange({ ...condition, days })} />
       ) : condition.type === 'musicPlaying' ? (
         <Segmented<'yes' | 'no'>
           label="Playing"
@@ -588,6 +723,57 @@ function ActionEditor({ character, action, look, busy, onChange, onChooseSound }
             ]}
             onChange={(place) => onChange({ ...action, place })}
           />
+        </>
+      ) : action.type === 'sendSignal' ? (
+        <>
+          <span className="rule-word">named</span>
+          <span className="rule-program">
+            <TextInput label="Signal" value={action.name} maxLength={64} placeholder="hello" validate={signalProblem} onCommit={(name) => onChange({ ...action, name: name.trim() })} />
+          </span>
+          <span className="rule-word">with</span>
+          <span className="rule-say-text">
+            <TextInput
+              label="Its text"
+              value={action.text ?? ''}
+              maxLength={200}
+              placeholder="optional — its {text}"
+              onCommit={(text) => onChange({ ...action, text: text.trim() === '' ? undefined : text.trim() })}
+            />
+          </span>
+        </>
+      ) : action.type === 'dismiss' ? (
+        <span className="rule-word">what it is saying, and what waits to be said</span>
+      ) : action.type === 'wait' ? (
+        <>
+          <span className="rule-number">
+            <NumberInput label="Seconds to wait" value={action.seconds} min={0.5} max={MAX_WAIT_SECONDS} unit="s" onCommit={(seconds) => onChange({ ...action, seconds })} />
+          </span>
+          <span className="rule-word">before the actions after it</span>
+        </>
+      ) : action.type === 'sayText' ? (
+        <span className="rule-say-text">
+          <TextInput
+            label="What to say"
+            value={action.text}
+            maxLength={2000}
+            placeholder="Hello, {name}."
+            validate={(text) => (text.trim() === '' ? 'Something to say.' : null)}
+            onCommit={(text) => onChange({ ...action, text: text.trim() })}
+          />
+        </span>
+      ) : action.type === 'mood' ? (
+        <>
+          <span className="rule-word">to</span>
+          <span className="rule-program">
+            <TextInput
+              label="Mood"
+              value={action.mood ?? ''}
+              maxLength={32}
+              placeholder="none — clears it"
+              validate={(text) => (text.trim() === '' || MOOD_NAME.test(text.trim()) ? null : 'Lowercase letters, digits and dashes, like sleepy.')}
+              onCommit={(text) => onChange({ ...action, mood: text.trim() === '' ? null : text.trim() })}
+            />
+          </span>
         </>
       ) : action.type === 'hide' ? (
         <>
@@ -709,6 +895,37 @@ function CooldownEditor({ seconds, onChange }: { seconds: number; onChange: (sec
         }}
       />
       <span className="rule-word">before it can happen again. 0 lets it happen every time.</span>
+    </div>
+  );
+}
+
+const clockOf = (at: number): string => {
+  const date = new Date(at);
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+
+/** "fired at 16:42 · next at ~17:05", as far as this run of Jacqueline knows. */
+function timingText(timing: ActivityView['rules'][string] | undefined): string {
+  if (!timing) return '';
+  const bits: string[] = [];
+  if (timing.lastFired !== null) bits.push(`fired at ${clockOf(timing.lastFired)}`);
+  if (timing.next !== null) bits.push(`next at ~${clockOf(timing.next)}`);
+  return bits.join(' · ');
+}
+
+/** The days a rule may fire on: a toggle each, Monday first. At least one stays on. */
+function DaysPicker({ days, onChange }: { days: number[]; onChange: (days: number[]) => void }): JSX.Element {
+  const toggle = (day: number): void => {
+    const next = days.includes(day) ? days.filter((entry) => entry !== day) : [...days, day];
+    if (next.length > 0) onChange(next.sort((a, b) => a - b));
+  };
+  return (
+    <div className="days" role="group" aria-label="Days of the week">
+      {WEEK.map(({ day, short }) => (
+        <button key={day} type="button" className="day" aria-pressed={days.includes(day)} onClick={() => toggle(day)}>
+          {short}
+        </button>
+      ))}
     </div>
   );
 }

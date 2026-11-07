@@ -35,6 +35,12 @@ export const IPC = {
   editorTestLine: 'editor:testLine',
   /** editor → main: do what a rule does, now. */
   editorTestRule: 'editor:testRule',
+  /** editor → main, invoke: a character's recent activity; which one to be told about; main → editor: a new entry. */
+  editorActivity: 'editor:activity',
+  editorWatchActivity: 'editor:watchActivity',
+  editorActivityAdded: 'editor:activityAdded',
+  /** editor → main: what would stop a rule right now. */
+  editorCheckRule: 'editor:checkRule',
   /** editor → main, invoke: the programs running right now, for suggestions. */
   editorRunningPrograms: 'editor:runningPrograms',
   /** Opens the folder every character lives in. */

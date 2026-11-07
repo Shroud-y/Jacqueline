@@ -32,6 +32,7 @@ const actions: ScriptActions = {
   show: (s, place) => done.push(place === 'random' ? `show ${s} random` : `show ${s}`),
   hide: (m) => done.push(`hide ${m}`),
   setMood: (mood) => done.push(`mood ${mood}`),
+  signal: (name, text) => done.push(`signal ${name} ${text}`),
   setState: (state, seconds) => done.push(`state ${state} ${seconds}`),
   log: (message) => done.push(`log ${message}`),
   isRunning: (stem) => running.get(stem) ?? null,
@@ -119,6 +120,14 @@ describe('behaviour scripts', () => {
     script.dispatch({ name: 'game', game: 'death', detail: { event: 'death' } });
     expect(done).toEqual(['log won Pudge 7', 'log any won', 'log any death']);
     expect(load(`on('game', 'rampage', () => {});`).error).toContain('not one of won, lost, kill, death');
+  });
+
+  it('sends signals, once a second at most', () => {
+    const script = load(`signal('hello', 'there'); signal('again');`);
+    expect(done[0]).toBe('signal hello there');
+    expect(done.filter((entry) => entry.startsWith('signal'))).toHaveLength(1);
+    expect(script.error).toContain('once a second');
+    expect(load(`signal('two words');`).error).toContain('not a signal name');
   });
 
   it('changes state, within bounds', () => {
