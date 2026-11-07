@@ -44,7 +44,8 @@ registerAssetScheme();
 // with nobody running, there is nobody it is for, and a build script must not
 // start the app behind the user's back.
 const signalArgs = parseSignalArgs(process.argv);
-const carried = signalArgs.kind === 'signal' ? { signal: signalArgs.signal } : {};
+const carried =
+  signalArgs.kind === 'signal' ? { signal: signalArgs.signal } : signalArgs.kind === 'invalid' ? { signalRefused: signalArgs.error } : {};
 if (!app.requestSingleInstanceLock(carried) || signalArgs.kind !== 'none') {
   app.exit(0);
 } else {
@@ -385,10 +386,11 @@ async function bootstrap(): Promise<void> {
       rules.event({ type: 'signal', name: signal.name, text: signal.text });
       return;
     }
-    // A signal that did not make it through the lock is still not a reason to open the editor.
-    const asked = parseSignalArgs(argv);
-    if (asked.kind === 'invalid') return void log.warn(`signal refused: ${asked.error}`);
-    if (asked.kind !== 'none') return;
+    // A broken signal is still not a reason to open the editor. Its reason comes through the lock: by
+    // the time Chromium hands argv over here, it has moved the arguments about.
+    const refused = (data as { signalRefused?: unknown } | null)?.signalRefused;
+    if (typeof refused === 'string') return void log.warn(`signal refused: ${refused.slice(0, 300)}`);
+    if (parseSignalArgs(argv).kind !== 'none') return;
     editor.open();
   });
   if (process.argv.includes('--editor')) editor.open();
