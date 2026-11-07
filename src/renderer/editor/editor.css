@@ -300,6 +300,19 @@ input {
   margin: 6px 0 0 -8px;
 }
 
+/* What the last look for a new version found: under its checkbox, in line with the checkbox's own hint. */
+.update-status {
+  margin: 8px 0 0 26px;
+}
+
+/* A quiet button's text sits 8 px in from its edge; this lines the text up with the prose above. */
+.update-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0 -8px;
+}
+
 /* ---- controls --------------------------------------------------------- */
 
 .input {

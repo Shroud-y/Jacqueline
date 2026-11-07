@@ -12,14 +12,16 @@ const settingsSchema = z.object({
   version: z.literal(1),
   startWithSystem: z.boolean(),
   muted: z.boolean(),
-  quietHours: z.object({ enabled: z.boolean(), from: clockSchema, to: clockSchema })
+  quietHours: z.object({ enabled: z.boolean(), from: clockSchema, to: clockSchema }),
+  checkForUpdates: z.boolean()
 });
 
 export const DEFAULT_SETTINGS: Settings = {
   version: 1,
   startWithSystem: true,
   muted: false,
-  quietHours: { enabled: false, from: '23:00', to: '08:00' }
+  quietHours: { enabled: false, from: '23:00', to: '08:00' },
+  checkForUpdates: true
 };
 
 type Raw = Record<string, unknown>;

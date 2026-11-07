@@ -17,6 +17,23 @@ export interface Settings {
   /** Nothing is said by anyone. Characters stay where they are. */
   muted: boolean;
   quietHours: QuietHours;
+  /** Asks GitHub once a day whether a newer Jacqueline is out. Never downloads anything. */
+  checkForUpdates: boolean;
+}
+
+/** Whether a newer Jacqueline is out, as far as the last look says. */
+export interface UpdateView {
+  /** This build's version. */
+  current: string;
+  /** False in a development run: there is no installed version to compare. */
+  supported: boolean;
+  checking: boolean;
+  /** When GitHub last answered; null before it ever has. */
+  checkedAt: number | null;
+  /** Why the last look did not get an answer, in words; null when it did. */
+  error: string | null;
+  /** The newer release, with its page; null when this one is the latest. */
+  newer: { version: string; url: string } | null;
 }
 
 /** The settings as the editor shows them, with what this build can do about them. */
@@ -24,6 +41,7 @@ export interface SettingsView {
   settings: Settings;
   /** False in a development run: starting with Windows needs the installed app. */
   autostartAvailable: boolean;
+  updates: UpdateView;
 }
 
 /** What a settings change answers with: the settings as they now stand, and why not if it was refused. */
@@ -167,6 +185,10 @@ export interface EditorApi {
   importCharacter(payload: { path?: string }): Promise<EditorResult<{ character: Character }>>;
   settings(): Promise<SettingsView>;
   updateSettings(patch: Partial<Omit<Settings, 'version'>>): Promise<SettingsResult>;
+  /** Looks for a newer release now, whatever the day's look said; the answer comes with `onSettings`. */
+  checkForUpdates(): Promise<EditorResult>;
+  /** Opens the newer release's page in the browser. */
+  openUpdate(): Promise<EditorResult>;
   onSettings(handler: (view: SettingsView) => void): () => void;
   /** Where on disk a file dropped on the window is. Not IPC — answered by the preload itself. */
   pathForFile(file: File): string;

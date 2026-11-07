@@ -15,6 +15,7 @@ export type MenuAction =
   | { type: 'setMuted'; muted: boolean }
   | { type: 'openEditor' }
   | { type: 'openCharactersFolder' }
+  | { type: 'openUpdate' }
   | { type: 'quit' };
 
 export type MenuEntry =
@@ -27,10 +28,15 @@ export interface MenuState {
   everyoneHidden: boolean;
   muted: boolean;
   isSnoozed: (id: string) => boolean;
+  /** A newer release to point at; null when there is none, or looking is off. */
+  update?: { version: string } | null;
 }
 
 export function trayMenu(entries: readonly CharacterEntry[], state: MenuState): MenuEntry[] {
-  const menu: MenuEntry[] = [{ kind: 'label', label: 'Jacqueline' }, { kind: 'separator' }];
+  const menu: MenuEntry[] = [{ kind: 'label', label: 'Jacqueline' }];
+  // Where the eye lands first, and quiet: nothing pops up to say it.
+  if (state.update) menu.push({ kind: 'action', label: `Update available — ${state.update.version}…`, action: { type: 'openUpdate' } });
+  menu.push({ kind: 'separator' });
 
   if (entries.length === 0) menu.push({ kind: 'label', label: 'No characters yet' });
   for (const entry of entries) {

@@ -100,6 +100,12 @@ const find = (menu: MenuEntry[], label: string): MenuEntry | undefined =>
   menu.find((entry) => entry.kind !== 'separator' && entry.label === label);
 
 describe('trayMenu', () => {
+  it('points at a newer version first thing, and says nothing of one when there is none', () => {
+    const menu = trayMenu([], state({ update: { version: '0.4.0' } }));
+    expect(menu[1]).toEqual({ kind: 'action', label: 'Update available — 0.4.0…', action: { type: 'openUpdate' } });
+    expect(trayMenu([], state()).some((entry) => entry.kind === 'action' && entry.action.type === 'openUpdate')).toBe(false);
+  });
+
   it('says so when there is nobody', () => {
     expect(find(trayMenu([], state()), 'No characters yet')).toEqual({ kind: 'label', label: 'No characters yet' });
   });

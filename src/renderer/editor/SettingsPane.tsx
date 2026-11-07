@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Settings, SettingsView } from '@shared/types';
+import type { Settings, SettingsView, UpdateView } from '@shared/types';
 import { Checkbox, ClockInput, Group, Notice } from './fields';
 
 /** What applies to the whole app rather than to one character. */
@@ -82,6 +82,19 @@ export default function SettingsPane(): JSX.Element | null {
             </div>
           </Group>
 
+          <Group title="Updates">
+            <div>
+              <Checkbox
+                label="Look for new versions"
+                hint="Once a day Jacqueline asks GitHub whether a newer version is out, and says so here and in the tray. It never downloads anything, and asks nothing else."
+                checked={settings.checkForUpdates}
+                disabled={!view.updates.supported}
+                onChange={(checkForUpdates) => update({ checkForUpdates })}
+              />
+              <UpdateStatus updates={view.updates} on={settings.checkForUpdates} />
+            </div>
+          </Group>
+
           <Group title="Files">
             <div>
               <div className="prose">Every character is a folder of its own: character.json and its files.</div>
@@ -93,5 +106,54 @@ export default function SettingsPane(): JSX.Element | null {
         </div>
       </div>
     </>
+  );
+}
+
+/** "14:05, 7 Nov", in the user's own clock. */
+function when(at: number): string {
+  const date = new Date(at);
+  const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return `${time}, ${date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
+}
+
+/** What the last look found, and a way to look again. */
+function UpdateStatus({ updates, on }: { updates: UpdateView; on: boolean }): JSX.Element {
+  const [failed, setFailed] = useState<string | null>(null);
+  if (!updates.supported) return <div className="prose update-status">Works in the installed app only, not in a development run. This is {updates.current}.</div>;
+  if (!on) return <div className="prose update-status">This is {updates.current}.</div>;
+
+  const checkNow = (): void => {
+    void window.jacquelineEditor?.checkForUpdates().then((result) => setFailed(result.ok ? null : result.error));
+  };
+  const open = (): void => {
+    void window.jacquelineEditor?.openUpdate().then((result) => setFailed(result.ok ? null : result.error));
+  };
+
+  const said = updates.checking
+    ? 'Looking…'
+    : updates.newer
+      ? `${updates.newer.version} is out. This is ${updates.current}.`
+      : updates.error
+        ? `${updates.error} It will try again tomorrow.`
+        : updates.checkedAt !== null
+          ? `Up to date: this is ${updates.current}, the latest. Last looked at ${when(updates.checkedAt)}.`
+          : `This is ${updates.current}. It has not looked yet.`;
+
+  return (
+    <div className="update-status">
+      <div className="prose" aria-live="polite">
+        {failed ?? said}
+      </div>
+      <div className="update-actions">
+        {updates.newer ? (
+          <button type="button" className="button primary" onClick={open}>
+            Open the release page
+          </button>
+        ) : null}
+        <button type="button" className="button quiet" disabled={updates.checking} onClick={checkNow}>
+          Look now
+        </button>
+      </div>
+    </div>
   );
 }

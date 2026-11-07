@@ -126,7 +126,8 @@ line, **right-click** to hide it for a while or turn it off.
 
 **Settings** at the bottom of the editor's list: start with Windows, mute
 everyone, quiet hours (nobody says anything between two times; characters stay
-where they are).
+where they are), and looking for new versions — once a day, and when there is
+one it says so in the tray and in Settings; it never downloads anything itself.
 
 ## Sharing a character
 
@@ -175,8 +176,13 @@ need it:
   moving while nobody is watching and "you come back" rules know when you did.
 
 No window titles, no screenshots, no page content, no keystrokes. Nothing is
-written to disk except your characters and settings, and Jacqueline makes no
-network requests at all.
+written to disk except your characters and settings.
+
+Jacqueline makes one network request: once a day it asks GitHub for the
+latest release's description (`api.github.com/repos/Shroud-y/Jacqueline/releases/latest`),
+to tell you when a newer version is out. It sends nothing about you, and
+downloads nothing. **Settings → Look for new versions** turns it off, and then
+it makes no requests at all.
 
 </details>
 
@@ -199,7 +205,7 @@ far less than the first. A character that is off screen has no window at all.
 
 ## Download
 
-Grab the latest build from the [Releases page](https://github.com/Shroud-y/codex/releases),
+Grab the latest build from the [Releases page](https://github.com/Shroud-y/Jacqueline/releases),
 download the setup `.exe` and run it. It installs, starts with Windows, and
 lives in your tray from then on. Closing the editor doesn't quit it —
 right-click the tray icon and hit **Quit** if you actually want it gone.

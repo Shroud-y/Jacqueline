@@ -28,6 +28,12 @@ describe('reconcile', () => {
     expect(settings.quietHours).toEqual(DEFAULT_SETTINGS.quietHours);
   });
 
+  it('looks for updates with a settings file from before there was a choice', () => {
+    const { settings } = reconcile({ version: 1, startWithSystem: false, muted: false, quietHours: DEFAULT_SETTINGS.quietHours }, DEFAULT_SETTINGS);
+    expect(settings.checkForUpdates).toBe(true);
+    expect(settings.startWithSystem).toBe(false);
+  });
+
   it('falls back whole when the file is not an object at all', () => {
     expect(reconcile('nonsense', DEFAULT_SETTINGS).settings).toEqual(DEFAULT_SETTINGS);
     expect(reconcile(null, DEFAULT_SETTINGS).settings).toEqual(DEFAULT_SETTINGS);

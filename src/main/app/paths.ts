@@ -13,6 +13,7 @@ export const paths = {
   iconsDir: (): string => join(resourceRoot(), 'icons'),
   settingsFile: (): string => join(app.getPath('userData'), 'settings.json'),
   scriptTrustFile: (): string => join(app.getPath('userData'), 'script-trust.json'),
+  updateStateFile: (): string => join(app.getPath('userData'), 'update-state.json'),
   scriptStateDir: (): string => join(app.getPath('userData'), 'script-state'),
   characterDir: (id: string): string => join(app.getPath('userData'), 'characters', id),
   charactersRoot: (): string => join(app.getPath('userData'), 'characters'),

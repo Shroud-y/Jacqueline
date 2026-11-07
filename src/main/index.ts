@@ -1,4 +1,4 @@
-import { app, clipboard, dialog, powerMonitor, screen, shell } from 'electron';
+import { app, clipboard, dialog, net, powerMonitor, screen, shell } from 'electron';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { newQuickJSWASMModuleFromVariant, type QuickJSSyncVariant } from 'quickjs-emscripten-core';
@@ -14,6 +14,7 @@ import { LEGACY_LOGIN_ITEM, migrateFromShard } from './app/migrate';
 import { paths } from './app/paths';
 import { SettingsStore } from './app/settings';
 import { AppTray } from './app/tray';
+import { UpdateChecker } from './app/updates';
 import { handleAssetProtocol, registerAssetScheme } from './characters/assetProtocol';
 import { registerEditorIpc } from './characters/editorIpc';
 import { handleScriptHost } from './characters/scriptHost';
@@ -70,7 +71,22 @@ async function bootstrap(): Promise<void> {
   app.setAppUserModelId('dev.jacqueline.app');
 
   const settings = new SettingsStore(paths.settingsFile());
-  const settingsView = (): SettingsView => settingsViewOf(settings.current);
+  // A development run has no installed version to compare; `--pretend-version=0.2.0` gives it one, to try this out.
+  const pretend = app.isPackaged ? undefined : process.argv.find((arg) => arg.startsWith('--pretend-version='))?.slice('--pretend-version='.length);
+  let onUpdates = (): void => {};
+  const updates = new UpdateChecker({
+    current: pretend ?? app.getVersion(),
+    supported: app.isPackaged || pretend !== undefined,
+    isEnabled: () => settings.current.checkForUpdates,
+    fetchText: async (url, init) => {
+      const response = await net.fetch(url, init);
+      if (!response.ok) throw new Error(`GitHub answered ${response.status}`);
+      return response.text();
+    },
+    stateFile: paths.updateStateFile(),
+    onChange: () => onUpdates()
+  });
+  const settingsView = (): SettingsView => ({ ...settingsViewOf(settings.current), updates: updates.view });
   const characters = new CharacterStore(paths.charactersRoot());
   handleAssetProtocol(characters);
   const scriptTrust = new ScriptTrust(paths.scriptTrustFile());
@@ -278,6 +294,9 @@ async function bootstrap(): Promise<void> {
     settings: settingsView,
     updateSettings: (patch) => settings.update(patch),
     // A development run is electron.exe with the project beside it; the installed app is its own exe.
+    checkForUpdates: () => updates.check(),
+    updateUrl: () => updates.available?.url ?? null,
+    openExternal: (url) => shell.openExternal(url),
     executable: () => (app.isPackaged ? [process.execPath] : [process.execPath, app.getAppPath()]),
     copyText: (text) => clipboard.writeText(text),
     runningPrograms: async () => {
@@ -291,7 +310,8 @@ async function bootstrap(): Promise<void> {
   const menuState = (): MenuState => ({
     everyoneHidden: visibility.everyoneHidden,
     muted: settings.current.muted,
-    isSnoozed: (id) => visibility.isSnoozed(id)
+    isSnoozed: (id) => visibility.isSnoozed(id),
+    update: updates.available
   });
 
   const dispatch = (action: MenuAction): void => {
@@ -321,6 +341,11 @@ async function bootstrap(): Promise<void> {
           if (failure) log.warn(`cannot open the characters folder: ${failure}`);
         });
         return;
+      case 'openUpdate': {
+        const url = updates.available?.url;
+        if (url) void shell.openExternal(url);
+        return;
+      }
       case 'quit':
         return app.quit();
     }
@@ -368,7 +393,16 @@ async function bootstrap(): Promise<void> {
   };
   armQuietHours();
 
+  // What the last look found shows in the tray and in Settings; switching looking on or off re-arms it.
+  onUpdates = () => {
+    tray.refresh();
+    editor.send(IPC.editorSettingsChanged, settingsView());
+  };
+  updates.arm();
+  powerMonitor.on('resume', () => updates.arm());
+
   settings.onChange((next) => {
+    updates.arm();
     if (next.muted) director.silenceAll();
     tray.refresh();
     windows.refresh();
@@ -402,6 +436,7 @@ async function bootstrap(): Promise<void> {
 
   app.on('before-quit', () => {
     editor.destroy();
+    updates.stop();
     rules.stop();
     scripts.stop();
     director.silenceAll();
@@ -418,7 +453,7 @@ async function bootstrap(): Promise<void> {
 }
 
 /** Settings as the editor shows them. */
-function settingsViewOf(settings: Settings): SettingsView {
+function settingsViewOf(settings: Settings): Omit<SettingsView, 'updates'> {
   return { settings, autostartAvailable: app.isPackaged };
 }
 

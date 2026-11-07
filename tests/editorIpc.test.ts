@@ -23,6 +23,9 @@ let revealed: string[];
 let zipPath: string | null;
 let opened2: string[];
 let copied: string[];
+let updateLooks: number;
+let updateUrl: string | null;
+let externals: string[];
 let blocked: Set<string>;
 let restarted: string[];
 
@@ -58,8 +61,16 @@ const handlers = (): ReturnType<typeof editorHandlers> =>
     allowScript: (id) => blocked.delete(id),
     scriptStatus: (id) => (id === 'ran' ? { running: true, error: null } : null),
     restartScript: (id) => restarted.push(id),
-    settings: () => ({ settings: settings.current, autostartAvailable: false }),
+    settings: () => ({ settings: settings.current, autostartAvailable: false, updates: { current: '0.3.0', supported: false, checking: false, checkedAt: null, error: null, newer: null } }),
     updateSettings: (patch) => settings.update(patch),
+    checkForUpdates: async () => {
+      updateLooks += 1;
+      return settings.current.checkForUpdates;
+    },
+    updateUrl: () => updateUrl,
+    openExternal: async (url) => {
+      externals.push(url);
+    },
     now: () => new Date(2026, 0, 1, 9, 5).getTime()
   });
 
@@ -80,6 +91,9 @@ beforeEach(() => {
   zipPath = null;
   opened2 = [];
   copied = [];
+  updateLooks = 0;
+  updateUrl = null;
+  externals = [];
   blocked = new Set();
   restarted = [];
 });
@@ -254,7 +268,7 @@ describe('editor requests', () => {
 
   it('changes settings through the store, which refuses what it cannot use', async () => {
     const h = handlers();
-    expect(await h.settings()).toEqual({ settings: DEFAULT_SETTINGS, autostartAvailable: false });
+    expect(await h.settings()).toEqual({ settings: DEFAULT_SETTINGS, autostartAvailable: false, updates: expect.objectContaining({ current: '0.3.0' }) });
 
     const muted = await h.updateSettings({ muted: true, quietHours: { enabled: true, from: '22:00', to: '07:00' } });
     expect(muted).toMatchObject({ ok: true, settings: { muted: true, quietHours: { enabled: true, from: '22:00', to: '07:00' } } });
@@ -363,6 +377,17 @@ describe('editor requests', () => {
 
   it('says what is running', async () => {
     expect(await handlers().runningPrograms()).toEqual(['code.exe', 'dota2.exe']);
+  });
+
+  it('looks for updates on request, and opens only the page the last look found', async () => {
+    expect(await handlers().checkForUpdates()).toEqual({ ok: true });
+    settings.update({ checkForUpdates: false });
+    expect((await handlers().checkForUpdates()).ok).toBe(false);
+    expect(updateLooks).toBe(2);
+    expect((await handlers().openUpdate()).ok).toBe(false);
+    updateUrl = 'https://github.com/Shroud-y/Jacqueline/releases/tag/v0.4.0';
+    expect(await handlers().openUpdate({ url: 'https://evil.example' })).toEqual({ ok: true });
+    expect(externals).toEqual(['https://github.com/Shroud-y/Jacqueline/releases/tag/v0.4.0']);
   });
 
   it('copies the command that sends a signal, quoted, and refuses a name that is not one', async () => {

@@ -61,6 +61,9 @@ export const IPC = {
   /** editor → main, invoke: the app's settings, and what this build can do with them. */
   editorSettingsGet: 'settings:get',
   editorSettingsUpdate: 'settings:update',
+  /** editor → main: look for a newer release now; open its page. */
+  editorSettingsCheckUpdates: 'settings:checkUpdates',
+  editorSettingsOpenUpdate: 'settings:openUpdate',
   /** main → editor: the settings changed — from the editor, or from the tray. */
   editorSettingsChanged: 'settings:changed'
 } as const;

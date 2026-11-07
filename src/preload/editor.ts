@@ -35,6 +35,8 @@ const CHANNEL = {
   editorImport: 'editor:import',
   editorSettingsGet: 'settings:get',
   editorSettingsUpdate: 'settings:update',
+  editorSettingsCheckUpdates: 'settings:checkUpdates',
+  editorSettingsOpenUpdate: 'settings:openUpdate',
   editorSettingsChanged: 'settings:changed'
 } as const;
 
@@ -79,6 +81,8 @@ const api: EditorApi = {
   importCharacter: (payload) => ipcRenderer.invoke(CHANNEL.editorImport, payload),
   settings: () => ipcRenderer.invoke(CHANNEL.editorSettingsGet),
   updateSettings: (patch) => ipcRenderer.invoke(CHANNEL.editorSettingsUpdate, patch),
+  checkForUpdates: () => ipcRenderer.invoke(CHANNEL.editorSettingsCheckUpdates),
+  openUpdate: () => ipcRenderer.invoke(CHANNEL.editorSettingsOpenUpdate),
 
   onSettings(handler) {
     const listener = (_event: unknown, view: SettingsView): void => handler(view);

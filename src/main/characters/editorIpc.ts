@@ -46,6 +46,11 @@ export interface EditorIpcDeps {
   settings: () => SettingsView;
   /** Validated by the settings store, which refuses what it cannot use. */
   updateSettings: (patch: Partial<Settings>) => SettingsResult;
+  /** False when it cannot look: a development run, or looking is off. */
+  checkForUpdates: () => Promise<boolean>;
+  /** The newer release's page, when there is one. */
+  updateUrl: () => string | null;
+  openExternal: (url: string) => Promise<void>;
   now?: () => number;
 }
 
@@ -285,6 +290,17 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
       if (!parsed.success) return refused;
       if (!store.has(parsed.data.id)) return { ok: false, error: 'Unknown character.' };
       return deps.openFolder(parsed.data.id);
+    },
+
+    checkForUpdates: async () =>
+      (await deps.checkForUpdates()) ? { ok: true } : { ok: false, error: 'Looking for updates is off, or this is a development run.' },
+
+    openUpdate: async () => {
+      // Only ever the page the last look found — never a URL the editor hands over.
+      const url = deps.updateUrl();
+      if (!url) return { ok: false, error: 'There is no newer version to open.' };
+      await deps.openExternal(url);
+      return { ok: true };
     }
   };
 }
@@ -320,7 +336,9 @@ const CHANNELS: { [K in keyof EditorHandlers]: string } = {
   exportCharacter: IPC.editorExport,
   importCharacter: IPC.editorImport,
   settings: IPC.editorSettingsGet,
-  updateSettings: IPC.editorSettingsUpdate
+  updateSettings: IPC.editorSettingsUpdate,
+  checkForUpdates: IPC.editorSettingsCheckUpdates,
+  openUpdate: IPC.editorSettingsOpenUpdate
 };
 
 export function registerEditorIpc(store: CharacterStore, deps: EditorIpcDeps): void {
