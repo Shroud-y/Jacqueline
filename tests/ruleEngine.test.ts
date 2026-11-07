@@ -102,6 +102,29 @@ describe('RuleEngine', () => {
     expect('text' in (bare[0]?.slots ?? {})).toBe(false);
   });
 
+  it('fires a game rule for its event, a streak rule on the kill that crosses its number, with game slots', () => {
+    const engine = new RuleEngine();
+    const won = rule({ id: 'won', when: { type: 'game', event: 'won', streak: 3 } });
+    const spree = rule({ id: 'spree', when: { type: 'game', event: 'streak', streak: 3 } });
+    engine.setCharacters([character([won, spree])], 0);
+    expect(ruleNeeds([character([won])]).game).toBe(true);
+    const game = { type: 'game' as const, hero: 'npc_dota_hero_shadow_shaman', kills: 3, deaths: 1 };
+    const fired = engine.handle({ ...game, event: 'won', streak: 0, streakBefore: 0 }, ctx(0));
+    expect(fired.map((one) => one.rule.id)).toEqual(['won']);
+    expect(fired[0]?.slots).toMatchObject({ hero: 'Shadow Shaman', kills: 3, deaths: 1, streak: 0 });
+    expect(engine.handle({ ...game, event: 'kill', streak: 2, streakBefore: 1 }, ctx(0))).toEqual([]);
+    // A double kill straight from 2 to 4 still crosses 3; the next kill, at 5, does not again.
+    expect(engine.handle({ ...game, event: 'kill', streak: 4, streakBefore: 2 }, ctx(0)).map((one) => one.rule.id)).toEqual(['spree']);
+    expect(engine.handle({ ...game, event: 'kill', streak: 5, streakBefore: 4 }, ctx(0))).toEqual([]);
+    expect(engine.handle({ ...game, event: 'death', streak: 0, streakBefore: 5 }, ctx(0))).toEqual([]);
+  });
+
+  it('reads a game rule saved without a streak as 3, and refuses an event it does not know', () => {
+    expect(ruleSchema.parse(rule({ when: { type: 'game', event: 'kill' } as Rule['when'] })).when).toEqual({ type: 'game', event: 'kill', streak: 3 });
+    expect(ruleSchema.safeParse(rule({ when: { type: 'game', event: 'rampage' } as unknown as Rule['when'] })).success).toBe(false);
+    expect(ruleSchema.safeParse(rule({ when: { type: 'game', event: 'streak', streak: 1 } })).success).toBe(false);
+  });
+
   it('reads a show action saved before it had a place as coming out where it usually is', () => {
     const parsed = ruleSchema.parse({ ...rule({ when: { type: 'startup' } }), then: [{ type: 'show', seconds: 5 }] });
     expect(parsed.then[0]).toEqual({ type: 'show', seconds: 5, place: 'usual' });
@@ -182,7 +205,7 @@ describe('ruleNeeds', () => {
         rule({ id: 'r3', when: { type: 'programFocused', program: 'code' }, enabled: false })
       ])
     ]);
-    expect(needs).toEqual({ startStop: new Set(['dota2']), running: new Set(['steam']), focus: false, time: true, every: false, returned: false, music: false });
+    expect(needs).toEqual({ startStop: new Set(['dota2']), running: new Set(['steam']), focus: false, time: true, every: false, returned: false, music: false, game: false });
   });
 });
 

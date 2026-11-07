@@ -63,6 +63,9 @@ export const BEHAVIOUR_STARTER = `/*
  *   on('musicStarted', (e) => …)                  also 'musicStopped', 'trackChanged'; e.track, e.artist, e.app
  *   on('signal', 'build-ok', (e) => …)            Jacqueline.exe --signal build-ok [--text "…"]; e.name, e.text
  *                                                 on('signal', fn) hears every signal
+ *   on('game', 'won', (e) => …)                   Dota 2: also 'lost', 'kill', 'death'; on('game', fn) hears all
+ *                                                 e.event, e.hero, e.kills, e.deaths, e.streak
+ *                                                 (game events have to be on in Settings)
  *
  * Doing things:
  *   say('greet')            a line from one of its groups (Lines tab)

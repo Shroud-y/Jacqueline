@@ -46,6 +46,8 @@ const handlers = (): ReturnType<typeof editorHandlers> =>
     openRoot: async () => ({ ok: true }),
     executable: () => ['C:/Program Files/Jacqueline/Jacqueline.exe'],
     copyText: (text) => copied.push(text),
+    setUpDota: async (pick) => ({ ok: true, path: pick ? 'D:/picked.cfg' : 'C:/found.cfg' }),
+    gameStatus: () => ({ state: 'off', error: null, heardAt: null }),
     pickZip: async () => zipPath,
     pickSavePath: async (name) => {
       suggested.push(name);
@@ -256,7 +258,7 @@ describe('editor requests', () => {
     const rule = { id: 'r1', name: '', enabled: true, when: { type: 'startup' as const }, if: [], then: [{ type: 'show' as const, seconds: 5, place: 'usual' as const }], cooldownSec: 60 };
     await handlers().save({ ...created, rules: [rule] });
     expect(await handlers().testRule({ id: created.id, rule: 'r1' })).toEqual({ ok: true });
-    expect(ran).toEqual([{ id: created.id, rule: 'r1', slots: { name: 'Miku', time: '09:05', program: 'notepad.exe', minutes: 15, track: 'Some Song', artist: 'Someone', text: 'something from outside' } }]);
+    expect(ran).toEqual([{ id: created.id, rule: 'r1', slots: { name: 'Miku', time: '09:05', program: 'notepad.exe', minutes: 15, track: 'Some Song', artist: 'Someone', text: 'something from outside', hero: 'Pudge', kills: 7, deaths: 2, streak: 3 } }]);
     expect((await handlers().testRule({ id: created.id, rule: 'nope' })).ok).toBe(false);
     expect((await handlers().testRule({ id: 'nobody', rule: 'r1' })).ok).toBe(false);
     expect((await handlers().testRule({ id: created.id })).ok).toBe(false);

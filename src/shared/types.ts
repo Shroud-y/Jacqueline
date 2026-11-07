@@ -19,6 +19,7 @@ export interface Settings {
   quietHours: QuietHours;
   /** Asks GitHub once a day whether a newer Jacqueline is out. Never downloads anything. */
   checkForUpdates: boolean;
+  gameEvents: GameEventsSettings;
 }
 
 /** Whether a newer Jacqueline is out, as far as the last look says. */
@@ -34,6 +35,24 @@ export interface UpdateView {
   error: string | null;
   /** The newer release, with its page; null when this one is the latest. */
   newer: { version: string; url: string } | null;
+}
+
+/** Dota 2 telling Jacqueline about the match, over 127.0.0.1. Off until the user switches it on. */
+export interface GameEventsSettings {
+  enabled: boolean;
+  /** Where on 127.0.0.1 Dota sends to; the cfg written for Dota has the same. */
+  port: number;
+  /** What Dota has to send back with every update. Made the first time this is switched on. */
+  token: string;
+}
+
+/** Whether game events are coming in, as the Settings pane shows it. */
+export interface GameStatus {
+  /** off: switched off. idle: on, but no rule or script waits for one. listening. failed: could not open, see `error`. */
+  state: 'off' | 'idle' | 'listening' | 'failed';
+  error: string | null;
+  /** When Dota last sent anything since listening began; null when it has not. */
+  heardAt: number | null;
 }
 
 /** The settings as the editor shows them, with what this build can do about them. */
@@ -165,6 +184,14 @@ export interface EditorApi {
   openRoot(): Promise<EditorResult>;
   /** Puts `Jacqueline.exe --signal <name>`, with this install's full path, on the clipboard, and answers with it. */
   copySignalCommand(payload: { name: string }): Promise<EditorResult<{ command: string }>>;
+  /**
+   * Switches game events on and writes Dota 2's cfg for them: into the Dota
+   * found through Steam, or with `pick`, into a folder the user chooses. An
+   * empty `error` means the folder picker was closed.
+   */
+  setUpDota(payload: { pick: boolean }): Promise<EditorResult<{ path: string }>>;
+  gameStatus(): Promise<GameStatus>;
+  onGameStatus(handler: (status: GameStatus) => void): () => void;
   /** Writes a starter stylesheet among the character's assets and answers with its file name. Not yet used by the character. */
   newStylesheet(payload: { id: string }): Promise<EditorResult<{ file: string }>>;
   /** Writes a starter script among the character's assets and answers with its file name. Not yet used by the character. */

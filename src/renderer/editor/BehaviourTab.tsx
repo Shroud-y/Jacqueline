@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { assetUrl } from '@shared/assetUrl';
 import { customStates, type Character, type Visual } from '@shared/character';
+import { GAME_EVENTS, STREAK_MAX, STREAK_MIN } from '@shared/game';
 import { SIGNAL_NAME } from '@shared/signal';
 import { showSecondsFor, type Rule, type ShowPlace, type RuleAction, type RuleCondition, type Trigger } from '@shared/rules';
 import {
@@ -9,6 +10,7 @@ import {
   defaultAction,
   defaultCondition,
   defaultTrigger,
+  GAME_EVENT_LABELS,
   newRule,
   ruleDetail,
   ruleProblems,
@@ -385,6 +387,35 @@ function SignalInput({ name, onChange, autoFocus }: { name: string; onChange: (n
   );
 }
 
+const GAME_EVENT_OPTIONS = GAME_EVENTS.map((value) => ({ value, label: GAME_EVENT_LABELS[value] }));
+
+/** What in a Dota 2 match, and a word when game events are not switched on yet — without them nothing ever comes. */
+function GameEventInput({ trigger, onChange }: { trigger: Extract<Trigger, { type: 'game' }>; onChange: (trigger: Trigger) => void }): JSX.Element {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  useEffect(() => {
+    const api = window.jacquelineEditor;
+    if (!api) return;
+    let cancelled = false;
+    void api.settings().then((view) => !cancelled && setEnabled(view.settings.gameEvents.enabled));
+    const off = api.onSettings((view) => setEnabled(view.settings.gameEvents.enabled));
+    return () => {
+      cancelled = true;
+      off();
+    };
+  }, []);
+  return (
+    <>
+      <Select label="What happens" value={trigger.event} options={GAME_EVENT_OPTIONS} onChange={(event) => onChange({ ...trigger, event })} />
+      {trigger.event === 'streak' ? (
+        <span className="rule-number">
+          <NumberInput label="Kills in a row" value={trigger.streak} min={STREAK_MIN} max={STREAK_MAX} unit="kills" onCommit={(streak) => onChange({ ...trigger, streak: Math.round(streak) })} />
+        </span>
+      ) : null}
+      {enabled === false ? <span className="rule-problem">Game events are off. Switch them on in Settings → Games.</span> : null}
+    </>
+  );
+}
+
 const TRIGGER_OPTIONS = (Object.keys(TRIGGER_LABELS) as Trigger['type'][]).map((value) => ({ value, label: TRIGGER_LABELS[value] }));
 
 function TriggerEditor({ character, trigger, onChange }: { character: Character; trigger: Trigger; onChange: (trigger: Trigger) => void }): JSX.Element {
@@ -431,6 +462,8 @@ function TriggerEditor({ character, trigger, onChange }: { character: Character;
         </>
       ) : trigger.type === 'signal' ? (
         <SignalInput name={trigger.name} autoFocus={picked} onChange={(name) => onChange({ ...trigger, name })} />
+      ) : trigger.type === 'game' ? (
+        <GameEventInput trigger={trigger} onChange={onChange} />
       ) : trigger.type === 'returned' ? (
         <>
           <span className="rule-word">after at least</span>

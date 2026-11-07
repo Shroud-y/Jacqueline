@@ -25,7 +25,11 @@ export const SLOTS: readonly { name: string; hint: string }[] = [
   { name: 'minutes', hint: 'how many minutes you were away' },
   { name: 'track', hint: 'the track playing right now' },
   { name: 'artist', hint: 'who it is by' },
-  { name: 'text', hint: 'what came with a signal (--text)' }
+  { name: 'text', hint: 'what came with a signal (--text)' },
+  { name: 'hero', hint: 'your Dota 2 hero, for game events' },
+  { name: 'kills', hint: 'your kills this match' },
+  { name: 'deaths', hint: 'your deaths this match' },
+  { name: 'streak', hint: 'kills in a row' }
 ];
 
 const KNOWN_SLOTS = new Set(SLOTS.map((slot) => slot.name));

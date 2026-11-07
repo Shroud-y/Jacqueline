@@ -6,7 +6,7 @@ import { newQuickJSWASMModuleFromVariant, type QuickJSSyncVariant } from 'quickj
 import { ASSET_EXTENSIONS, type Character } from '@shared/character';
 import { IPC } from '@shared/ipc';
 import { parseSignalArgs, signalFromData } from '@shared/signal';
-import type { Settings, SettingsView } from '@shared/types';
+import type { GameStatus, Settings, SettingsView } from '@shared/types';
 
 import { configureLogger, createLogger } from './app/logger';
 import { characterMenu, trayMenu, trayTooltip, type MenuAction, type MenuState } from './app/menus';
@@ -30,6 +30,7 @@ import { RuleRunner } from './engine/ruleRunner';
 import { RecentHistory } from './engine/selector';
 import { CharacterStore } from './characters/store';
 import { Visibility } from './characters/visibility';
+import { GameEvents, newGameIdentity, setUpDota } from './sensors/gameEvents';
 import { watchMediaSessions } from './sensors/mediaSessions';
 import { PresenceWatcher } from './sensors/presenceWatcher';
 import { loadDesktopSensors } from './sensors/win32';
@@ -170,9 +171,13 @@ async function bootstrap(): Promise<void> {
     history,
     rng: Math.random
   };
+  // Dota 2's game state, over 127.0.0.1 — only when switched on in Settings and some rule or script waits for it.
+  let sendGameStatus = (_status: GameStatus): void => undefined;
+  const game = new GameEvents({ settings: () => settings.current.gameEvents, onStatus: (status) => sendGameStatus(status) });
   const rules = new RuleRunner({
     loadSensors: loadDesktopSensors,
     watchMedia: watchMediaSessions,
+    watchGame: (onEvent) => game.watch(onEvent),
     onMusic: () => windows.refresh(),
     idleSeconds: () => powerMonitor.getSystemIdleTime(),
     onFired: (fired) => runActions(fired, actionDeps),
@@ -224,7 +229,7 @@ async function bootstrap(): Promise<void> {
       };
     },
     onNeeds: (needs) =>
-      rules.setExtraNeeds({ startStop: needs.startStop, running: needs.running, focus: needs.focus, time: needs.minute, returned: needs.returned, music: needs.music }),
+      rules.setExtraNeeds({ startStop: needs.startStop, running: needs.running, focus: needs.focus, time: needs.minute, returned: needs.returned, music: needs.music, game: needs.game }),
     onStatus: (id, status) => editor.send(IPC.editorScriptStatus, { id, status })
   });
   // Someone hidden for now does nothing either.
@@ -240,6 +245,7 @@ async function bootstrap(): Promise<void> {
   settings.onChange((next) => reconcileAutostart(next.startWithSystem));
 
   const editor = new EditorWindow(join(__dirname, '../preload/editor.js'), join(paths.iconsDir(), 'app.ico'));
+  sendGameStatus = (status) => editor.send(IPC.editorGameStatus, status);
   registerEditorIpc(characters, {
     pickFile: async (kinds) => {
       const options = {
@@ -299,6 +305,21 @@ async function bootstrap(): Promise<void> {
     openExternal: (url) => shell.openExternal(url),
     executable: () => (app.isPackaged ? [process.execPath] : [process.execPath, app.getAppPath()]),
     copyText: (text) => clipboard.writeText(text),
+    setUpDota: (pick) =>
+      setUpDota(pick, {
+        current: () => settings.current.gameEvents,
+        save: (gameEvents) => {
+          const result = settings.update({ gameEvents });
+          return result.ok ? { ok: true } : result;
+        },
+        pickFolder: async () => {
+          const options = { title: 'Where is Dota 2?', properties: ['openDirectory' as const] };
+          const parent = editor.browserWindow;
+          const picked = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options);
+          return picked.canceled ? null : (picked.filePaths[0] ?? null);
+        }
+      }),
+    gameStatus: () => game.status,
     runningPrograms: async () => {
       const sensors = await loadDesktopSensors();
       if (!sensors) return [];
@@ -401,8 +422,16 @@ async function bootstrap(): Promise<void> {
   updates.arm();
   powerMonitor.on('resume', () => updates.arm());
 
+  let gameSettings = settings.current.gameEvents;
   settings.onChange((next) => {
     updates.arm();
+    // Switched on for the first time: Dota needs a token to send back, and a port of this install's own.
+    if (next.gameEvents.enabled && next.gameEvents.token === '') return void settings.update({ gameEvents: { ...next.gameEvents, ...newGameIdentity() } });
+    if (JSON.stringify(next.gameEvents) !== JSON.stringify(gameSettings)) {
+      gameSettings = next.gameEvents;
+      game.settingsChanged();
+      rules.restartGame();
+    }
     if (next.muted) director.silenceAll();
     tray.refresh();
     windows.refresh();

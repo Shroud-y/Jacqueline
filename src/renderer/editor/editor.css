@@ -1730,3 +1730,21 @@ input {
   background: var(--bg) conic-gradient(var(--surface) 25%, transparent 0 50%, var(--surface) 0 75%, transparent 0) 0 0 / 20px 20px;
   cursor: crosshair;
 }
+
+/* ---- settings: games ------------------------------------------------ */
+
+/* Under the checkbox, lined up with its label as the quiet hours are. */
+.game-events {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 12px 0 0 26px;
+}
+
+.game-events [data-state='failed'] {
+  color: var(--danger);
+}
+
+.game-written code {
+  word-break: break-all;
+}

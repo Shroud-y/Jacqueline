@@ -109,6 +109,18 @@ describe('behaviour scripts', () => {
     expect(load(`on('signal', 'two words', () => {});`).error).toContain('not a signal name');
   });
 
+  it('hears game events: one by what happened, or all of them', () => {
+    const script = load(`
+      on('game', 'won', (e) => log('won', e.hero, e.kills));
+      on('game', (e) => log('any', e.event));
+    `);
+    expect(script.needs.game).toBe(true);
+    script.dispatch({ name: 'game', game: 'won', detail: { event: 'won', hero: 'Pudge', kills: 7 } });
+    script.dispatch({ name: 'game', game: 'death', detail: { event: 'death' } });
+    expect(done).toEqual(['log won Pudge 7', 'log any won', 'log any death']);
+    expect(load(`on('game', 'rampage', () => {});`).error).toContain('not one of won, lost, kill, death');
+  });
+
   it('changes state, within bounds', () => {
     load(`setState('nap', 99999); setState('nap', 0); setState('nap'); setState(null);`);
     expect(done).toEqual(['state nap 3600', 'state nap 1', 'state nap null', 'state null null']);

@@ -21,6 +21,8 @@ export interface RuleRunnerDeps {
   onFired: (fired: Fired) => void;
   /** Whether something is playing may have changed. */
   onMusic?: () => void;
+  /** Starts listening for game events; what it returns stops that. */
+  watchGame?: (onEvent: (event: Extract<RuleEvent, { type: 'game' }>) => void) => () => void;
   /** Every event as it happens, before the rules see it — for behaviour scripts. Never `every`, which is the rules' own. */
   onEvent?: (event: RuleEvent) => void;
   rng?: Rng;
@@ -35,9 +37,9 @@ export interface RuleRunnerDeps {
 export class RuleRunner {
   private readonly engine: RuleEngine;
   private readonly now: () => number;
-  private needs: RuleNeeds = { startStop: new Set(), running: new Set(), focus: false, time: false, every: false, returned: false, music: false };
+  private needs: RuleNeeds = { startStop: new Set(), running: new Set(), focus: false, time: false, every: false, returned: false, music: false, game: false };
   /** What behaviour scripts want watched, on top of what the rules do. */
-  private extra: Omit<RuleNeeds, 'every'> = { startStop: new Set(), running: new Set(), focus: false, time: false, returned: false, music: false };
+  private extra: Omit<RuleNeeds, 'every'> = { startStop: new Set(), running: new Set(), focus: false, time: false, returned: false, music: false, game: false };
 
   private sensors: DesktopSensors | null = null;
   private sensorsLoading: Promise<void> | null = null;
@@ -46,6 +48,7 @@ export class RuleRunner {
   private everyTimer: NodeJS.Timeout | null = null;
   private unhookFocus: (() => void) | null = null;
   private music: { tracker: MusicTracker; stop: () => void } | null = null;
+  private stopGame: (() => void) | null = null;
 
   /** The programs being watched and whether each was running at the last look. */
   private running = new Map<string, boolean>();
@@ -89,7 +92,8 @@ export class RuleRunner {
       time: rules.time || this.extra.time,
       every: rules.every,
       returned: rules.returned || this.extra.returned,
-      music: rules.music || this.extra.music
+      music: rules.music || this.extra.music,
+      game: rules.game || this.extra.game
     };
     void this.reconfigure();
   }
@@ -105,6 +109,12 @@ export class RuleRunner {
     }
   }
 
+  /** How game events are heard has changed (switched on or off, another port): listen again from scratch. */
+  restartGame(): void {
+    this.stopGameEvents();
+    void this.reconfigure();
+  }
+
   stop(): void {
     this.stopped = true;
     for (const timer of [this.pollTimer, this.everyTimer]) if (timer) clearInterval(timer);
@@ -113,6 +123,7 @@ export class RuleRunner {
     this.unhookFocus?.();
     this.unhookFocus = null;
     this.stopMusic();
+    this.stopGameEvents();
   }
 
   /* ------------------------------------------------------------------ */
@@ -156,6 +167,9 @@ export class RuleRunner {
     if (this.needs.music && !this.music) this.startMusic();
     else if (!this.needs.music) this.stopMusic();
 
+    if (this.needs.game && !this.stopGame && this.deps.watchGame) this.stopGame = this.deps.watchGame((event) => this.event(event));
+    else if (!this.needs.game) this.stopGameEvents();
+
     this.armEvery();
   }
 
@@ -177,6 +191,11 @@ export class RuleRunner {
     this.music.tracker.stop();
     this.music = null;
     this.deps.onMusic?.();
+  }
+
+  private stopGameEvents(): void {
+    this.stopGame?.();
+    this.stopGame = null;
   }
 
   private loadSensors(): Promise<void> {
@@ -282,5 +301,7 @@ function describe(event: RuleEvent): string {
       return 'its turn came round';
     case 'signal':
       return `signal ${event.name}`;
+    case 'game':
+      return `Dota 2: ${event.event}`;
   }
 }

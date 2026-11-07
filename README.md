@@ -59,7 +59,7 @@ away; there is no Save button.
     time; every so often (somewhere between N and M minutes); you come back
     after being away; Jacqueline starts; the character is clicked; music
     starts or stops; the track changes; a signal comes from outside (see
-    below).
+    below); something happens in Dota 2 (see below).
   - **Only if**: by chance (a percentage), between two times of day, a
     program is or is not running, music is or is not playing. "Music" is
     anything a player reports to Windows, so a video in a browser counts.
@@ -81,7 +81,8 @@ away; there is no Save button.
   twice in a row. A line can mention what happened with a slot: `{name}`
   (the character's), `{time}`, `{program}` (for rules about a program) and
   `{minutes}` (how long you were away), `{track}` and `{artist}` (what is
-  playing), `{text}` (what came with a signal). A line whose slot cannot be filled
+  playing), `{text}` (what came with a signal), `{hero}`, `{kills}`, `{deaths}`
+  and `{streak}` (in a Dota 2 match). A line whose slot cannot be filled
   is skipped, never shown with a hole in it. **Test** says it on your desktop.
 - **Audio** — volume, a video's own sound (on unless you turn it off), an
   ambient sound that loops while the character is on screen, and sounds for
@@ -120,14 +121,42 @@ A VS Code task (PowerShell is its shell on Windows) that reports how a build wen
 }
 ```
 
+### Dota 2
+
+A character can react to your Dota 2 matches: come out clapping when you win,
+sulk when you lose, cheer a kill streak. Dota itself tells Jacqueline what is
+going on, through Valve's own Game State Integration — nothing reads the
+game's memory or the screen.
+
+1. **Settings** → **Games** → switch on **Dota 2 game events**.
+2. **Set up Dota 2** writes `gamestate_integration_jacqueline.cfg` into Dota's
+   `game\dota\cfg\gamestate_integration\` folder (found through Steam; if it is
+   not, **Choose Dota's folder…** and pick `dota 2 beta`). It shows where it wrote it.
+3. **Restart Dota 2** — it reads the file only when it starts.
+4. A rule: *When* **Something happens in Dota 2** → you win the match, you lose
+   it, you get a kill, you die, or your kill streak reaches a number. A line can
+   say `GG with {hero}: {kills} kills, {deaths} deaths.`
+
+A win or a loss is told once per match, however long you sit on the results
+screen, and not at all if Jacqueline starts while the match is already over.
+Matches you watch rather than play do not count. A behaviour script hears the
+same with `on('game', 'won', (e) => …)` (also `'lost'`, `'kill'`, `'death'`,
+or `on('game', fn)` for all; `e.hero`, `e.kills`, `e.deaths`, `e.streak`).
+
+Dota sends to `127.0.0.1` only, with a token of its own that Jacqueline checks
+on every update. Jacqueline listens only while game events are on **and** some
+rule or script waits for one; otherwise the port is closed. If another program
+has the port, change it under **Port** and set up Dota 2 again.
+
 On the desktop: **drag** a character anywhere (other monitors too), **click**
 it to set off its "clicked" rules, click while it is talking to dismiss the
 line, **right-click** to hide it for a while or turn it off.
 
 **Settings** at the bottom of the editor's list: start with Windows, mute
 everyone, quiet hours (nobody says anything between two times; characters stay
-where they are), and looking for new versions — once a day, and when there is
-one it says so in the tray and in Settings; it never downloads anything itself.
+where they are), looking for new versions — once a day, and when there is
+one it says so in the tray and in Settings; it never downloads anything itself —
+and Dota 2 game events.
 
 ## Sharing a character
 
@@ -176,13 +205,20 @@ need it:
   moving while nobody is watching and "you come back" rules know when you did.
 
 No window titles, no screenshots, no page content, no keystrokes. Nothing is
-written to disk except your characters and settings.
+written to disk except your characters and settings (and, when you ask for it,
+the one cfg file in Dota's folder).
 
 Jacqueline makes one network request: once a day it asks GitHub for the
 latest release's description (`api.github.com/repos/Shroud-y/Jacqueline/releases/latest`),
 to tell you when a newer version is out. It sends nothing about you, and
 downloads nothing. **Settings → Look for new versions** turns it off, and then
 it makes no requests at all.
+
+One more thing you can switch on: **Dota 2 game events** (off unless you
+turn it on). Then Jacqueline opens a port on `127.0.0.1` — this computer only,
+never the network — for Dota to post its match state to, and only while a rule
+or script waits for a game event. It keeps nothing of what Dota sends beyond
+the last kills, deaths and streak of the match being played.
 
 </details>
 

@@ -10,11 +10,15 @@
 
 import { shouldInterruptAfterDeadline, type QuickJSContext, type QuickJSHandle, type QuickJSRuntime, type QuickJSWASMModule } from 'quickjs-emscripten-core';
 import { STATE_NAME, type ShowPlace } from '@shared/rules';
+import { GAME_HAPPENINGS, type GameHappening } from '@shared/game';
 import { SIGNAL_NAME } from '@shared/signal';
 import { appStem } from '../characters/presence';
 
-/** What a script can subscribe to. Program events take a program as the second argument; `signal` may take a name. */
-export const SCRIPT_EVENTS = ['programStarted', 'programStopped', 'programFocused', 'clicked', 'startup', 'returned', 'speechEnd', 'minute', 'musicStarted', 'musicStopped', 'trackChanged', 'signal'] as const;
+/**
+ * What a script can subscribe to. Program events take a program as the second
+ * argument; `signal` may take a name, `game` one of won, lost, kill, death.
+ */
+export const SCRIPT_EVENTS = ['programStarted', 'programStopped', 'programFocused', 'clicked', 'startup', 'returned', 'speechEnd', 'minute', 'musicStarted', 'musicStopped', 'trackChanged', 'signal', 'game'] as const;
 export type ScriptEventName = (typeof SCRIPT_EVENTS)[number];
 const PROGRAM_EVENTS = new Set<ScriptEventName>(['programStarted', 'programStopped', 'programFocused']);
 const MUSIC_EVENTS = new Set<ScriptEventName>(['musicStarted', 'musicStopped', 'trackChanged']);
@@ -57,6 +61,7 @@ export interface ScriptNeeds {
   minute: boolean;
   returned: boolean;
   music: boolean;
+  game: boolean;
 }
 
 export interface ScriptEvent {
@@ -65,6 +70,8 @@ export interface ScriptEvent {
   program?: string;
   /** `signal`: its name. */
   signal?: string;
+  /** `game`: what happened, 'won'. */
+  game?: GameHappening;
   /** Anything else the handler is given. */
   detail?: Record<string, string | number>;
 }
@@ -72,8 +79,8 @@ export interface ScriptEvent {
 interface Handler {
   name: ScriptEventName;
   program: string | null;
-  /** `signal` handlers for one name only; null hears every signal. */
-  signal: string | null;
+  /** `signal` or `game` handlers for one name only; null hears every one. */
+  only: string | null;
   fn: QuickJSHandle;
 }
 
@@ -94,7 +101,7 @@ export class BehaviourScript {
   private strikes = 0;
   private lastState: string;
   private disposed = false;
-  readonly needs: ScriptNeeds = { startStop: new Set(), running: new Set(), focus: false, minute: false, returned: false, music: false };
+  readonly needs: ScriptNeeds = { startStop: new Set(), running: new Set(), focus: false, minute: false, returned: false, music: false, game: false };
   /** The last thing that went wrong, in words, with the line where it did. */
   error: string | null = null;
   /** False once it has been stopped for running into its limits. */
@@ -124,7 +131,7 @@ export class BehaviourScript {
     for (const handler of [...this.handlers]) {
       if (handler.name !== event.name) continue;
       if (handler.program !== null && handler.program !== event.program) continue;
-      if (handler.signal !== null && handler.signal !== event.signal) continue;
+      if (handler.only !== null && handler.only !== (event.signal ?? event.game)) continue;
       this.call(handler.fn, event);
       if (!this.running) return;
     }
@@ -174,14 +181,19 @@ export class BehaviourScript {
       const named = name === 'signal' && second !== undefined && ctx.typeof(second) === 'string';
       const signal = named ? text(second) : null;
       if (signal !== null && !SIGNAL_NAME.test(signal)) fail(`on('signal', name, fn): "${signal}" is not a signal name`);
-      const fn = isProgram || named ? third : second;
+      // And so is what happened in a game: on('game', fn) hears all of it.
+      const gameNamed = name === 'game' && second !== undefined && ctx.typeof(second) === 'string';
+      const game = gameNamed ? text(second) : null;
+      if (game !== null && !(GAME_HAPPENINGS as readonly string[]).includes(game)) fail(`on('game', what, fn): "${game}" is not one of ${GAME_HAPPENINGS.join(', ')}`);
+      const fn = isProgram || named || gameNamed ? third : second;
       if (!fn || ctx.typeof(fn) !== 'function') fail(`on('${name}'): the last argument has to be a function`);
-      this.handlers.push({ name, program, signal, fn: (fn as QuickJSHandle).dup() });
+      this.handlers.push({ name, program, only: signal ?? game, fn: (fn as QuickJSHandle).dup() });
       if (name === 'programStarted' || name === 'programStopped') this.needs.startStop.add(program as string);
       if (name === 'programFocused') this.needs.focus = true;
       if (name === 'minute') this.needs.minute = true;
       if (name === 'returned') this.needs.returned = true;
       if (MUSIC_EVENTS.has(name)) this.needs.music = true;
+      if (name === 'game') this.needs.game = true;
       this.onChange({ needs: true });
     });
 

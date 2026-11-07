@@ -5,6 +5,7 @@
  */
 
 import type { Character } from '@shared/character';
+import { heroName, type GameHappening } from '@shared/game';
 import { usesMusic } from '@shared/lines';
 import type { Rule, RuleCondition, Trigger } from '@shared/rules';
 import { appStem } from '../characters/presence';
@@ -22,6 +23,8 @@ export type RuleEvent =
   | { type: MusicEventType; track: string; artist: string; app: string }
   /** From outside, `--signal <name>`, with the `--text` that came with it. */
   | { type: 'signal'; name: string; text: string | null }
+  /** In the Dota 2 match being played. `streakBefore` is the kill streak before this update. */
+  | { type: 'game'; event: GameHappening; hero: string | null; kills: number; deaths: number; streak: number; streakBefore: number }
   /** An `every` rule's turn has come round. Made by the engine itself. */
   | { type: 'every'; characterId: string; ruleId: string };
 
@@ -44,6 +47,8 @@ export interface RuleNeeds {
   returned: boolean;
   /** What is playing, for a rule or a line that asks. */
   music: boolean;
+  /** What happens in a game: the local listener Dota posts to. */
+  game: boolean;
 }
 
 export interface RuleContext {
@@ -61,7 +66,7 @@ function activeRules(character: Character): Rule[] {
 }
 
 export function ruleNeeds(characters: readonly Character[]): RuleNeeds {
-  const needs: RuleNeeds = { startStop: new Set(), running: new Set(), focus: false, time: false, every: false, returned: false, music: false };
+  const needs: RuleNeeds = { startStop: new Set(), running: new Set(), focus: false, time: false, every: false, returned: false, music: false, game: false };
   for (const character of characters) {
     if (character.enabled && usesMusic(character)) needs.music = true;
     for (const rule of activeRules(character)) {
@@ -71,6 +76,7 @@ export function ruleNeeds(characters: readonly Character[]): RuleNeeds {
       if (when.type === 'time') needs.time = true;
       if (when.type === 'every') needs.every = true;
       if (when.type === 'returned') needs.returned = true;
+      if (when.type === 'game') needs.game = true;
       for (const condition of rule.if) {
         if (condition.type === 'programRunning') needs.running.add(appStem(condition.program));
       }
@@ -101,6 +107,11 @@ export function triggerMatches(trigger: Trigger, event: RuleEvent, character: Ch
       return event.type === trigger.type;
     case 'signal':
       return event.type === 'signal' && event.name === trigger.name;
+    case 'game':
+      if (event.type !== 'game') return false;
+      // A streak rule fires on the kill that takes the streak up to its number, however many came at once.
+      if (trigger.event === 'streak') return event.event === 'kill' && event.streakBefore < trigger.streak && event.streak >= trigger.streak;
+      return event.event === trigger.event;
   }
 }
 
@@ -136,6 +147,13 @@ export function musicSlots(music: { track: string; artist: string } | null | und
   return slots;
 }
 
+/** `{kills}`, `{deaths}`, `{streak}` and, when Dota said, `{hero}`. */
+export function gameSlots(event: { hero: string | null; kills: number; deaths: number; streak: number }): Record<string, string | number> {
+  const slots: Record<string, string | number> = { kills: event.kills, deaths: event.deaths, streak: event.streak };
+  if (event.hero) slots.hero = heroName(event.hero);
+  return slots;
+}
+
 /** What `{slots}` in a line can be filled from, for this event. */
 function slotsFor(event: RuleEvent, character: Character, now: number, music: MusicNow | null): Record<string, string | number> {
   const playing = music?.playing ? music : null;
@@ -144,6 +162,7 @@ function slotsFor(event: RuleEvent, character: Character, now: number, music: Mu
   if ('program' in event) slots.program = event.program;
   if (event.type === 'returned') slots.minutes = Math.round(event.awayMinutes);
   if (event.type === 'signal' && event.text !== null) slots.text = event.text;
+  if (event.type === 'game') Object.assign(slots, gameSlots(event));
   return slots;
 }
 
@@ -152,7 +171,7 @@ function slotsFor(event: RuleEvent, character: Character, now: number, music: Mu
  * gives, and a likely value for what only an event could.
  */
 export function sampleSlots(character: Character, now: number): Record<string, string | number> {
-  return { name: character.name, time: clock(now), program: character.presence.apps[0] ?? 'notepad.exe', minutes: 15, track: 'Some Song', artist: 'Someone', text: 'something from outside' };
+  return { name: character.name, time: clock(now), program: character.presence.apps[0] ?? 'notepad.exe', minutes: 15, track: 'Some Song', artist: 'Someone', text: 'something from outside', hero: 'Pudge', kills: 7, deaths: 2, streak: 3 };
 }
 
 interface Planned {

@@ -58,6 +58,15 @@ describe('rule sentences', () => {
     expect(text(signal)).toBe('When signal **build-ok** comes → come out somewhere random for **10 s**');
   });
 
+  it('says what in Dota 2 it waits for', () => {
+    const game = (event: 'won' | 'lost' | 'kill' | 'death' | 'streak'): string => text({ ...base, when: { type: 'game', event, streak: 5 } }).split(' → ')[0] ?? '';
+    expect(game('won')).toBe('When you **win** a Dota 2 match');
+    expect(game('lost')).toBe('When you **lose** a Dota 2 match');
+    expect(game('kill')).toBe('When you get a **kill** in Dota 2');
+    expect(game('death')).toBe('When you **die** in Dota 2');
+    expect(game('streak')).toBe('When your Dota 2 kill streak reaches **5**');
+  });
+
   it('puts conditions and the wait in the quiet line', () => {
     expect(ruleDetail(base)).toBe('');
     const limited: Rule = {

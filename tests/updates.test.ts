@@ -121,12 +121,24 @@ describe('UpdateChecker', () => {
     expect(updates.available?.version).toBe('0.4.0');
   });
 
-  it('remembers across a restart, and forgets a version that has since been installed', async () => {
+  it('remembers across a restart, and forgets what it found once another version is installed', async () => {
     await checker().check();
-    const saved = JSON.parse(readFileSync(join(dir, 'update-state.json'), 'utf8')) as { checkedAt: number };
-    expect(saved.checkedAt).toBe(Date.now());
+    const saved = JSON.parse(readFileSync(join(dir, 'update-state.json'), 'utf8')) as { checkedAt: number; checkedAs: string };
+    expect(saved).toMatchObject({ checkedAt: Date.now(), checkedAs: '0.3.0' });
     expect(checker().available?.version).toBe('0.4.0');
-    expect(checker({ current: '0.4.0' }).available).toBeNull();
+    const updated = checker({ current: '0.4.0' });
+    expect(updated.available).toBeNull();
+    expect(updated.view.checkedAt).toBeNull();
+  });
+
+  it('looks afresh, a minute after starting, when the last look was made by another version', async () => {
+    writeFileSync(join(dir, 'update-state.json'), JSON.stringify({ checkedAt: Date.now() - 60_000, checkedAs: '0.4.0', newer: null }));
+    const updates = checker();
+    updates.arm();
+    await vi.advanceTimersByTimeAsync(FIRST_CHECK_DELAY_MS);
+    expect(asked).toHaveLength(1);
+    expect(updates.available?.version).toBe('0.4.0');
+    updates.stop();
   });
 
   it('keeps what it knew when GitHub cannot be reached, and says why', async () => {
@@ -165,7 +177,7 @@ describe('UpdateChecker', () => {
   });
 
   it('does not look again on a restart within the day', async () => {
-    writeFileSync(join(dir, 'update-state.json'), JSON.stringify({ checkedAt: Date.now() - 60_000, newer: null }));
+    writeFileSync(join(dir, 'update-state.json'), JSON.stringify({ checkedAt: Date.now() - 60_000, checkedAs: '0.3.0', newer: null }));
     const updates = checker();
     updates.arm();
     await vi.advanceTimersByTimeAsync(CHECK_EVERY_MS - 2 * 60_000);

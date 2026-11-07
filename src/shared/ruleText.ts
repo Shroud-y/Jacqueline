@@ -5,6 +5,7 @@
  */
 
 import { isCustomState, type Character, type Visual } from './character';
+import { DEFAULT_STREAK, type GameEventName } from './game';
 import type { Rule, RuleAction, RuleCondition, Trigger } from './rules';
 
 /** A run of a sentence; `strong` runs are what the user filled in. */
@@ -32,7 +33,17 @@ export const TRIGGER_LABELS: Record<Trigger['type'], string> = {
   musicStarted: 'Music starts playing',
   musicStopped: 'Music stops',
   trackChanged: 'The track changes',
-  signal: 'A signal comes from outside'
+  signal: 'A signal comes from outside',
+  game: 'Something happens in Dota 2'
+};
+
+/** The game events as the editor lists them. */
+export const GAME_EVENT_LABELS: Record<GameEventName, string> = {
+  won: 'You win the match',
+  lost: 'You lose the match',
+  kill: 'You get a kill',
+  death: 'You die',
+  streak: 'Your kill streak reaches'
 };
 
 export const CONDITION_LABELS: Record<RuleCondition['type'], string> = {
@@ -90,6 +101,19 @@ function triggerParts(trigger: Trigger): Part[] {
       return [plain('When the track changes')];
     case 'signal':
       return [plain('When signal '), strong(trigger.name), plain(' comes')];
+    case 'game':
+      switch (trigger.event) {
+        case 'won':
+          return [plain('When you '), strong('win'), plain(' a Dota 2 match')];
+        case 'lost':
+          return [plain('When you '), strong('lose'), plain(' a Dota 2 match')];
+        case 'kill':
+          return [plain('When you get a '), strong('kill'), plain(' in Dota 2')];
+        case 'death':
+          return [plain('When you '), strong('die'), plain(' in Dota 2')];
+        case 'streak':
+          return [plain('When your Dota 2 kill streak reaches '), strong(String(trigger.streak))];
+      }
   }
 }
 
@@ -200,6 +224,8 @@ export function defaultTrigger(type: Trigger['type'], character: Character): Tri
       return { type };
     case 'signal':
       return { type, name: 'build-ok' };
+    case 'game':
+      return { type, event: 'won', streak: DEFAULT_STREAK };
   }
 }
 

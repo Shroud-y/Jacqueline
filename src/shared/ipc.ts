@@ -41,6 +41,10 @@ export const IPC = {
   editorOpenRoot: 'editor:openRoot',
   /** Puts the command that sends a signal on the clipboard. */
   editorCopySignalCommand: 'editor:copySignalCommand',
+  /** Writes Dota 2's game state cfg. */
+  editorSetUpDota: 'editor:setUpDota',
+  /** Whether game events come in: invoke to ask, and main → editor whenever it changes. */
+  editorGameStatus: 'editor:gameStatus',
   /** Writes a starter stylesheet into a character's assets. */
   editorNewStylesheet: 'editor:newStylesheet',
   /** Writes a starter script into a character's assets. */

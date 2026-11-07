@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultCharacter, type Character } from '@shared/character';
 import type { Rule } from '@shared/rules';
-import type { Fired } from '@main/engine/ruleEngine';
+import type { Fired, RuleEvent } from '@main/engine/ruleEngine';
 import { RuleRunner } from '@main/engine/ruleRunner';
 import type { DesktopSensors } from '@main/sensors/win32';
 
@@ -310,7 +310,7 @@ describe('RuleRunner', () => {
         (listener as unknown as (s: typeof sessions) => void)(sessions);
         await vi.advanceTimersByTimeAsync(400);
       };
-      r.setExtraNeeds({ startStop: new Set(), running: new Set(), focus: false, time: false, returned: false, music: true });
+      r.setExtraNeeds({ startStop: new Set(), running: new Set(), focus: false, time: false, returned: false, music: true, game: false });
       await settle();
       expect(changes).toBe(0);
 
@@ -324,7 +324,7 @@ describe('RuleRunner', () => {
       expect(changes).toBe(2);
 
       // Nobody asks any more: not known is not playing.
-      r.setExtraNeeds({ startStop: new Set(), running: new Set(), focus: false, time: false, returned: false, music: false });
+      r.setExtraNeeds({ startStop: new Set(), running: new Set(), focus: false, time: false, returned: false, music: false, game: false });
       await settle();
       expect(changes).toBe(3);
       expect(r.musicNow()).toBeNull();
@@ -334,11 +334,52 @@ describe('RuleRunner', () => {
     it('watches for a script too', async () => {
       const d = desk();
       const { r, started } = watching(d);
-      r.setExtraNeeds({ startStop: new Set(), running: new Set(), focus: false, time: false, returned: false, music: true });
+      r.setExtraNeeds({ startStop: new Set(), running: new Set(), focus: false, time: false, returned: false, music: true, game: false });
       await settle();
       expect(started()).toBe(1);
       r.stop();
     });
+  });
+
+  it('listens for game events only while a rule or script waits for one, again from scratch when told', async () => {
+    const d = desk();
+    let open = 0;
+    let opened = 0;
+    const game: { send?: (event: Extract<RuleEvent, { type: 'game' }>) => void } = {};
+    const r = new RuleRunner({
+      loadSensors: async () => d.sensors,
+      watchGame: (onEvent) => {
+        open += 1;
+        opened += 1;
+        game.send = onEvent;
+        return () => (open -= 1);
+      },
+      idleSeconds: () => 0,
+      onFired: (one) => fired.push(one),
+      now: () => Date.now()
+    });
+    r.setCharacters([character([rule({ type: 'clicked' })])]);
+    await settle();
+    expect(opened).toBe(0);
+
+    r.setCharacters([character([rule({ type: 'game', event: 'won', streak: 3 })])]);
+    await settle();
+    expect(open).toBe(1);
+    game.send?.({ type: 'game', event: 'won', hero: null, kills: 0, deaths: 0, streak: 0, streakBefore: 0 });
+    expect(fired).toHaveLength(1);
+
+    r.restartGame();
+    await settle();
+    expect([open, opened]).toEqual([1, 2]);
+
+    r.setCharacters([]);
+    r.setExtraNeeds({ startStop: new Set(), running: new Set(), focus: false, time: false, returned: false, music: false, game: true });
+    await settle();
+    expect(open).toBe(1);
+    r.setExtraNeeds({ startStop: new Set(), running: new Set(), focus: false, time: false, returned: false, music: false, game: false });
+    await settle();
+    expect(open).toBe(0);
+    r.stop();
   });
 
   it('does nothing once stopped', async () => {

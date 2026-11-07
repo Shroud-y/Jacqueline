@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { z } from 'zod';
+import { gamePortSchema, gameTokenSchema } from '@shared/game';
 import type { Settings, SettingsResult } from '@shared/types';
 import { createLogger } from './logger';
 import { readJson, writeJsonAtomic } from './jsonFile';
@@ -13,7 +14,8 @@ const settingsSchema = z.object({
   startWithSystem: z.boolean(),
   muted: z.boolean(),
   quietHours: z.object({ enabled: z.boolean(), from: clockSchema, to: clockSchema }),
-  checkForUpdates: z.boolean()
+  checkForUpdates: z.boolean(),
+  gameEvents: z.object({ enabled: z.boolean(), port: gamePortSchema, token: gameTokenSchema })
 });
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -21,7 +23,9 @@ export const DEFAULT_SETTINGS: Settings = {
   startWithSystem: true,
   muted: false,
   quietHours: { enabled: false, from: '23:00', to: '08:00' },
-  checkForUpdates: true
+  checkForUpdates: true,
+  // Off: it opens a port, even if only to this computer, so the user asks for it.
+  gameEvents: { enabled: false, port: 47420, token: '' }
 };
 
 type Raw = Record<string, unknown>;

@@ -22,6 +22,8 @@ const TIMEOUT_MS = 15_000;
 
 const stateSchema = z.object({
   checkedAt: z.number().nullable(),
+  /** The version that looked. An answer given to another version says nothing about this one. */
+  checkedAs: z.string().max(40).optional(),
   newer: z.object({ version: z.string().max(40), url: z.string().max(500) }).nullable()
 });
 type StoredState = z.infer<typeof stateSchema>;
@@ -52,10 +54,8 @@ export class UpdateChecker {
     this.now = deps.now ?? Date.now;
     this.startedAt = this.now();
     this.state = this.read();
-    // A version that has since been installed is no longer news.
-    if (this.state.newer && !newerRelease({ tag_name: this.state.newer.version, html_url: this.state.newer.url, assets: [] }, deps.current)) {
-      this.state = { ...this.state, newer: null };
-    }
+    // Updated (or gone back) since the last look: what it found was about another version, so look afresh.
+    if (this.state.checkedAs !== deps.current) this.state = { checkedAt: null, newer: null };
   }
 
   get view(): UpdateView {
@@ -105,7 +105,7 @@ export class UpdateChecker {
       const release = releaseSchema.parse(JSON.parse(text));
       const newer = newerRelease(release, this.deps.current);
       if (newer && newer.version !== this.state.newer?.version) log.info(`${newer.version} is out (this is ${this.deps.current})`);
-      this.state = { checkedAt: this.now(), newer };
+      this.state = { checkedAt: this.now(), checkedAs: this.deps.current, newer };
       this.error = null;
       this.write();
     } catch (err) {

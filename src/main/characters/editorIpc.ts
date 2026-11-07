@@ -7,7 +7,7 @@ import { unknownSlots } from '@shared/lines';
 import { BEHAVIOUR_NAME, BEHAVIOUR_STARTER, SCRIPT_NAME, SCRIPT_STARTER } from '@shared/scriptTemplate';
 import { signalCommand, signalNameSchema } from '@shared/signal';
 import { STYLE_STARTER, STYLESHEET_NAME } from '@shared/stylesheet';
-import type { EditorApi, EditorResult, ScriptStatus, Settings, SettingsResult, SettingsView } from '@shared/types';
+import type { EditorApi, EditorResult, GameStatus, ScriptStatus, Settings, SettingsResult, SettingsView } from '@shared/types';
 import { sampleSlots, type Fired } from '../engine/ruleEngine';
 import { fillSlots } from '../engine/slots';
 import type { CharacterStore } from './store';
@@ -29,6 +29,9 @@ export interface EditorIpcDeps {
   /** What starts this app on a command line: the exe, and in a development run the project too. */
   executable: () => string[];
   copyText: (text: string) => void;
+  /** Switches game events on and writes Dota's cfg; with `pick`, into a folder the user chooses. */
+  setUpDota: (pick: boolean) => Promise<EditorResult<{ path: string }>>;
+  gameStatus: () => GameStatus;
   /** A zip to import; null when the user backs out. */
   pickZip: () => Promise<string | null>;
   /** Where to save an export; null when the user backs out. */
@@ -189,6 +192,13 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
       return { ok: true, command };
     },
 
+    setUpDota: (payload) => {
+      const parsed = z.object({ pick: z.boolean() }).safeParse(payload);
+      return parsed.success ? deps.setUpDota(parsed.data.pick) : refused;
+    },
+
+    gameStatus: () => deps.gameStatus(),
+
     newStylesheet: (payload) => {
       const parsed = idPayload.safeParse(payload);
       if (!parsed.success) return refused;
@@ -307,7 +317,7 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
 
 /** The handlers take what came over the wire, not what the editor's types promise it sent. */
 type EditorHandlers = {
-  [K in Exclude<keyof EditorApi, 'onChanged' | 'onSettings' | 'onScriptStatus' | 'pathForFile'>]: (payload?: unknown) => ReturnType<EditorApi[K]> | Awaited<ReturnType<EditorApi[K]>>;
+  [K in Exclude<keyof EditorApi, 'onChanged' | 'onSettings' | 'onScriptStatus' | 'onGameStatus' | 'pathForFile'>]: (payload?: unknown) => ReturnType<EditorApi[K]> | Awaited<ReturnType<EditorApi[K]>>;
 };
 
 const CHANNELS: { [K in keyof EditorHandlers]: string } = {
@@ -326,6 +336,8 @@ const CHANNELS: { [K in keyof EditorHandlers]: string } = {
   runningPrograms: IPC.editorRunningPrograms,
   openRoot: IPC.editorOpenRoot,
   copySignalCommand: IPC.editorCopySignalCommand,
+  setUpDota: IPC.editorSetUpDota,
+  gameStatus: IPC.editorGameStatus,
   newStylesheet: IPC.editorNewStylesheet,
   newScript: IPC.editorNewScript,
   scriptAllowed: IPC.editorScriptAllowed,

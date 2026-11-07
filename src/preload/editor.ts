@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { CharacterEntry } from '@shared/character';
-import type { EditorApi, ScriptStatus, SettingsView } from '@shared/types';
+import type { EditorApi, GameStatus, ScriptStatus, SettingsView } from '@shared/types';
 
 /**
  * The editor window's entire surface. Channel names are written out
@@ -24,6 +24,8 @@ const CHANNEL = {
   editorRunningPrograms: 'editor:runningPrograms',
   editorOpenRoot: 'editor:openRoot',
   editorCopySignalCommand: 'editor:copySignalCommand',
+  editorSetUpDota: 'editor:setUpDota',
+  editorGameStatus: 'editor:gameStatus',
   editorNewStylesheet: 'editor:newStylesheet',
   editorNewScript: 'editor:newScript',
   editorScriptAllowed: 'editor:scriptAllowed',
@@ -63,6 +65,15 @@ const api: EditorApi = {
   runningPrograms: () => ipcRenderer.invoke(CHANNEL.editorRunningPrograms),
   openRoot: () => ipcRenderer.invoke(CHANNEL.editorOpenRoot),
   copySignalCommand: (payload) => ipcRenderer.invoke(CHANNEL.editorCopySignalCommand, payload),
+  setUpDota: (payload) => ipcRenderer.invoke(CHANNEL.editorSetUpDota, payload),
+  gameStatus: () => ipcRenderer.invoke(CHANNEL.editorGameStatus),
+
+  onGameStatus(handler) {
+    const listener = (_event: unknown, status: GameStatus): void => handler(status);
+    ipcRenderer.on(CHANNEL.editorGameStatus, listener);
+    return () => ipcRenderer.off(CHANNEL.editorGameStatus, listener);
+  },
+
   newStylesheet: (payload) => ipcRenderer.invoke(CHANNEL.editorNewStylesheet, payload),
   newScript: (payload) => ipcRenderer.invoke(CHANNEL.editorNewScript, payload),
   scriptAllowed: (payload) => ipcRenderer.invoke(CHANNEL.editorScriptAllowed, payload),

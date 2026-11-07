@@ -11,7 +11,7 @@ import type { QuickJSWASMModule } from 'quickjs-emscripten-core';
 import type { Character } from '@shared/character';
 import { createLogger } from '../app/logger';
 import { BehaviourScript, type ScriptActions, type ScriptEvent, type ScriptNeeds } from './behaviourScript';
-import type { RuleEvent } from './ruleEngine';
+import { gameSlots, type RuleEvent } from './ruleEngine';
 
 const log = createLogger('scripts');
 
@@ -170,7 +170,7 @@ export class BehaviourScripts {
   }
 
   private publishNeeds(): void {
-    const needs: ScriptNeeds = { startStop: new Set(), running: new Set(), focus: false, minute: false, returned: false, music: false };
+    const needs: ScriptNeeds = { startStop: new Set(), running: new Set(), focus: false, minute: false, returned: false, music: false, game: false };
     for (const { script } of this.live.values()) {
       if (!script.running) continue;
       for (const stem of script.needs.startStop) needs.startStop.add(stem);
@@ -179,6 +179,7 @@ export class BehaviourScripts {
       needs.minute ||= script.needs.minute;
       needs.returned ||= script.needs.returned;
       needs.music ||= script.needs.music;
+      needs.game ||= script.needs.game;
     }
     this.deps.onNeeds(needs);
   }
@@ -232,6 +233,9 @@ function translate(event: RuleEvent): ScriptEvent | null {
       return { name: event.type, detail: { track: event.track, artist: event.artist, app: event.app } };
     case 'signal':
       return { name: 'signal', signal: event.name, detail: event.text === null ? { name: event.name } : { name: event.name, text: event.text } };
+    case 'game':
+      // The same values a rule's line gets, the hero by its usual name.
+      return { name: 'game', game: event.event, detail: { event: event.event, ...gameSlots(event) } };
     case 'every':
       return null;
   }

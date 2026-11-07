@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Settings, SettingsView, UpdateView } from '@shared/types';
 import { Checkbox, ClockInput, Group, Notice } from './fields';
+import GameEventsSection from './GameEventsSection';
 
 /** What applies to the whole app rather than to one character. */
 export default function SettingsPane(): JSX.Element | null {
@@ -94,6 +95,8 @@ export default function SettingsPane(): JSX.Element | null {
               <UpdateStatus updates={view.updates} on={settings.checkForUpdates} />
             </div>
           </Group>
+
+          <GameEventsSection value={settings.gameEvents} onChange={(gameEvents) => update({ gameEvents })} />
 
           <Group title="Files">
             <div>

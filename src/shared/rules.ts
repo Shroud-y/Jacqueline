@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { DEFAULT_STREAK, gameEventSchema, STREAK_MAX, STREAK_MIN } from './game';
 import { signalNameSchema } from './signal';
 
 const clockSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'must be a time like 23:00');
@@ -51,7 +52,12 @@ export const triggerSchema = z.discriminatedUnion('type', [
   /** The next track has come on. */
   z.object({ type: z.literal('trackChanged') }),
   /** `Jacqueline.exe --signal <name>` was run: a build script, a task, anything outside. */
-  z.object({ type: z.literal('signal'), name: signalNameSchema })
+  z.object({ type: z.literal('signal'), name: signalNameSchema }),
+  /**
+   * Something in the Dota 2 match being played: won, lost, a kill, a death, or
+   * a kill streak reaching `streak` (read only for that one).
+   */
+  z.object({ type: z.literal('game'), event: gameEventSchema, streak: z.number().int().min(STREAK_MIN).max(STREAK_MAX).default(DEFAULT_STREAK) })
 ]);
 
 /* ------------------------------------------------------------------ */
