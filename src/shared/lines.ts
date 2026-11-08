@@ -137,6 +137,26 @@ export function addLine(character: Character, group: string, text: string): Char
   return { ...character, lines: { ...character.lines, [group]: [...lines, { id: freeLineId(lines), text }] } };
 }
 
+/**
+ * Many lines at once, from pasted text: one a line, blank ones and the
+ * spaces around each dropped, as many as the group still has room for.
+ * Answers how many went in and how many did not fit.
+ */
+export function addLines(character: Character, group: string, pasted: string): { character: Character; added: number; left: number } {
+  const texts = pasted
+    .split(/\r?\n/)
+    .map((text) => text.trim().slice(0, LINE_TEXT_MAX))
+    .filter((text) => text !== '');
+  let next = character;
+  let added = 0;
+  for (const text of texts) {
+    if ((next.lines[group]?.length ?? 0) >= LINES_PER_GROUP_MAX) break;
+    next = addLine(next, group, text);
+    added += 1;
+  }
+  return { character: next, added, left: texts.length - added };
+}
+
 /** `weight: undefined` or `audio: undefined` in `patch` takes that off the line. */
 export function updateLine(character: Character, group: string, id: string, patch: Partial<Omit<Line, 'id'>>): Character {
   const lines = character.lines[group];

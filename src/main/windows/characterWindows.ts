@@ -18,7 +18,9 @@ import {
   layoutAnchor,
   layoutFrame,
   placeWindow,
+  pinFromRect,
   pointInRect,
+  positionFromPin,
   randomAnchorPosition,
   type Point,
   type Rect
@@ -123,6 +125,8 @@ export interface PresenceSource {
   isSilenced(): boolean;
   /** False for a character whose script the user has not allowed to run. */
   scriptAllowed(id: string): boolean;
+  /** Who is on screen may have changed: a window came up, was put away or closed. */
+  onVisibility?(): void;
 }
 
 interface Drag {
@@ -270,6 +274,11 @@ export class CharacterWindows {
     const live = this.live.get(id);
     const character = this.store.get(id);
     if (live && character && !live.win.isDestroyed()) live.win.webContents.send(IPC.stageUpdate, this.payload(character, live.geometry, live));
+  }
+
+  /** The characters on screen right now, by id. */
+  visibleIds(): string[] {
+    return [...this.live.values()].filter((live) => live.shown && !live.parked && !live.win.isDestroyed()).map((live) => live.id);
   }
 
   /** How many characters are on screen right now. */
@@ -532,6 +541,7 @@ export class CharacterWindows {
   /** On screen, without taking focus, and heard arriving. */
   private present(live: Live): void {
     live.shown = true;
+    this.presence.onVisibility?.();
     live.win.setBounds(live.geometry.window);
     // Never `show()` — that would take focus.
     live.win.showInactive();
@@ -567,6 +577,7 @@ export class CharacterWindows {
     // that was only being laid out.
     if (live.shown && live.onItsOwn) this.farewell(live.id);
     live.parked = true;
+    this.presence.onVisibility?.();
     if (this.drag?.id === live.id) this.cancelDrag();
     live.clickThrough.reset();
     if (!live.win.isDestroyed()) {
@@ -593,6 +604,7 @@ export class CharacterWindows {
     if (live.win.isDestroyed()) return;
     // Still waiting for its first frame: that shows it, as for any new window.
     if (live.shown || !live.revealTimer) this.present(live);
+    this.presence.onVisibility?.();
   }
 
   private close(live: Live): void {
@@ -603,6 +615,7 @@ export class CharacterWindows {
     if (live.shown && live.onItsOwn && !live.parked && !this.stopping) this.farewell(live.id);
     this.forget(live);
     if (!live.win.isDestroyed()) live.win.destroy();
+    this.presence.onVisibility?.();
   }
 
   /**
@@ -714,7 +727,18 @@ export class CharacterWindows {
   private geometry(character: Character): Geometry {
     const frame = layoutFrame(character.layout.elements);
     const anchor = layoutAnchor(character.layout.elements);
-    const stored = this.placedFor.get(character.id) ?? character.presence.position;
+    const brought = this.placedFor.get(character.id);
+    const { pin } = character.presence;
+    if (!brought && pin) {
+      // Its own screen, or, with that one gone, whichever is nearest where it last was: the same corner there.
+      const last = character.presence.position;
+      const display =
+        screen.getAllDisplays().find((entry) => entry.id === pin.display) ??
+        (last ? screen.getDisplayMatching({ x: Math.round(last.x), y: Math.round(last.y), width: Math.round(anchor.width), height: Math.round(anchor.height) }) : screen.getPrimaryDisplay());
+      const position = positionFromPin(pin, anchor, display.workArea);
+      return { frame, anchor, position, window: placeWindow(frame, anchor, position) };
+    }
+    const stored = brought ?? character.presence.position;
     // The display the character is on — or, if that display has gone, the
     // nearest one, which is what makes an unplugged monitor a clamp and not a
     // character stranded off screen.
@@ -902,11 +926,14 @@ export class CharacterWindows {
 
     const bounds = live.win.getBounds();
     const position = anchorOnScreen(live.geometry.frame, live.geometry.anchor, bounds);
-    // Put down by hand: wherever it was brought out to, this is its place now.
+    // Put down by hand: wherever it was brought out to, this is its place now — pinned to the nearest corner of its screen.
     this.placedFor.delete(live.id);
+    const rect = { x: position.x, y: position.y, width: live.geometry.anchor.width, height: live.geometry.anchor.height };
+    const display = screen.getDisplayMatching({ x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) });
+    const pin = pinFromRect(rect, display);
     // Saving goes back round through `sync`, which clamps it to the display
     // it was dropped on and moves the window there.
-    const result = this.store.save({ ...character, presence: { ...character.presence, position } });
+    const result = this.store.save({ ...character, presence: { ...character.presence, position, pin } });
     if (!result.ok) {
       log.warn(`could not save where "${id}" was put: ${result.error}`);
       this.update(live, character);

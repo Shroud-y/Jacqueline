@@ -7,7 +7,7 @@ import { unknownSlots } from '@shared/lines';
 import { BEHAVIOUR_NAME, BEHAVIOUR_STARTER, SCRIPT_NAME, SCRIPT_STARTER } from '@shared/scriptTemplate';
 import { signalCommand, signalNameSchema } from '@shared/signal';
 import { STYLE_STARTER, STYLESHEET_NAME } from '@shared/stylesheet';
-import type { ActivityView, CheckItem, EditorApi, EditorResult, GameStatus, ScriptStatus, Settings, SettingsResult, SettingsView } from '@shared/types';
+import type { ActivityView, CheckItem, EditorApi, EditorResult, LiveView, GameStatus, ScriptStatus, Settings, SettingsResult, SettingsView } from '@shared/types';
 import { sampleSlots, type Fired } from '../engine/ruleEngine';
 import { fillSlots } from '../engine/slots';
 import type { CharacterStore } from './store';
@@ -25,6 +25,7 @@ export interface EditorIpcDeps {
   /** Carries out a rule's actions now, as if it had fired. */
   runNow: (fired: Fired) => void;
   runningPrograms: () => Promise<string[]>;
+  live: () => LiveView;
   activity: (id: string) => ActivityView;
   /** Which character's activity the editor wants as it happens; null for none. */
   watchActivity: (id: string | null) => void;
@@ -186,6 +187,8 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
 
     runningPrograms: () => deps.runningPrograms(),
 
+    live: () => deps.live(),
+
     activity: (payload) => {
       const parsed = idPayload.safeParse(payload);
       return parsed.success ? deps.activity(parsed.data.id) : { entries: [], rules: {} };
@@ -342,7 +345,7 @@ export function editorHandlers(store: CharacterStore, deps: EditorIpcDeps): { [K
 
 /** The handlers take what came over the wire, not what the editor's types promise it sent. */
 type EditorHandlers = {
-  [K in Exclude<keyof EditorApi, 'onChanged' | 'onSettings' | 'onScriptStatus' | 'onGameStatus' | 'onActivity' | 'pathForFile'>]: (payload?: unknown) => ReturnType<EditorApi[K]> | Awaited<ReturnType<EditorApi[K]>>;
+  [K in Exclude<keyof EditorApi, 'onChanged' | 'onSettings' | 'onScriptStatus' | 'onGameStatus' | 'onActivity' | 'onLive' | 'pathForFile'>]: (payload?: unknown) => ReturnType<EditorApi[K]> | Awaited<ReturnType<EditorApi[K]>>;
 };
 
 const CHANNELS: { [K in keyof EditorHandlers]: string } = {
@@ -359,6 +362,7 @@ const CHANNELS: { [K in keyof EditorHandlers]: string } = {
   testLine: IPC.editorTestLine,
   testRule: IPC.editorTestRule,
   runningPrograms: IPC.editorRunningPrograms,
+  live: IPC.editorLive,
   activity: IPC.editorActivity,
   watchActivity: IPC.editorWatchActivity,
   checkRule: IPC.editorCheckRule,

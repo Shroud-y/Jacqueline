@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 
 import { assetUrl } from '@shared/assetUrl';
 import { customStates, type Character, type Visual } from '@shared/character';
 import { GAME_EVENTS, STREAK_MAX, STREAK_MIN } from '@shared/game';
+import { applyTemplate, RULE_TEMPLATES } from '@shared/ruleTemplates';
 import { SIGNAL_NAME } from '@shared/signal';
 import type { ActivityView, CheckItem } from '@shared/types';
 import { MAX_WAIT_SECONDS, MOOD_NAME, showSecondsFor, WEEK, type Rule, type ShowPlace, type RuleAction, type RuleCondition, type Trigger } from '@shared/rules';
@@ -81,15 +82,46 @@ export default function BehaviourTab({ character, characters }: { character: Cha
     setOpenId(rule.id);
   };
 
+  // A rule to start from, with its group of lines: the list shows only while choosing.
+  const [picking, setPicking] = useState(false);
+  const fromTemplate = (templateId: string): void => {
+    const made = applyTemplate(character, templateId);
+    if (!made) return;
+    characters.update(made.character);
+    setPicking(false);
+    setOpenId(made.rule.id);
+  };
+  const templates = picking ? (
+    <ul className="templates" aria-label="Rules to start from">
+      {RULE_TEMPLATES.map((template) => (
+        <li key={template.id}>
+          <button type="button" className="template" onClick={() => fromTemplate(template.id)}>
+            <span className="template-title">{template.title}</span>
+            <span className="template-hint">{template.hint}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  ) : null;
+  const templateButton = (
+    <button type="button" className="button quiet" aria-expanded={picking} onClick={() => setPicking(!picking)}>
+      {picking ? 'Not now' : 'From a template…'}
+    </button>
+  );
+
   if (rules.length === 0) {
     return (
       <div className="behaviour">
         <div className="blank">
           <h1>No rules yet</h1>
           <p>A rule says when the character does something: when a program starts, at a time of day, when it is clicked.</p>
-          <button type="button" className="button primary" onClick={add}>
-            Add a rule
-          </button>
+          <div className="rules-start">
+            <button type="button" className="button primary" onClick={add}>
+              Add a rule
+            </button>
+            {templateButton}
+          </div>
+          {templates}
         </div>
         <div className="behaviour-script">
           <BehaviourScriptSection character={character} characters={characters} />
@@ -119,9 +151,13 @@ export default function BehaviourTab({ character, characters }: { character: Cha
           />
         ))}
       </div>
-      <button type="button" className="button primary rules-add" onClick={add}>
-        Add a rule
-      </button>
+      <div className="rules-start rules-add">
+        <button type="button" className="button primary" onClick={add}>
+          Add a rule
+        </button>
+        {templateButton}
+      </div>
+      {templates}
       <div className="behaviour-script">
         <BehaviourScriptSection character={character} characters={characters} />
       </div>

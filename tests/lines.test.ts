@@ -3,6 +3,7 @@ import { characterSchema, defaultCharacter, type Character } from '@shared/chara
 import {
   addGroup,
   addLine,
+  addLines,
   freeGroupName,
   freeLineId,
   groupNameProblem,
@@ -120,5 +121,23 @@ describe('usesMusic and text written into a rule', () => {
     const rule = { id: 'r', name: '', enabled: true, when: { type: 'clicked' as const }, if: [], then: [{ type: 'sayText' as const, text: 'Nice, {track}.' }], cooldownSec: 0 };
     expect(usesMusic({ ...base, rules: [rule] })).toBe(true);
     expect(usesMusic({ ...base, rules: [{ ...rule, enabled: false }] })).toBe(false);
+  });
+});
+
+describe('addLines', () => {
+  it('makes one line of each pasted one, without the blank ones or their spaces', () => {
+    const base = defaultCharacter('c', 'C');
+    const { character, added, left } = addLines(base, 'greet', '  Hi.\r\n\nHello, {name}.  \n   \nYo.');
+    expect(character.lines.greet?.map((line) => line.text)).toEqual(['Hi.', 'Hello, {name}.', 'Yo.']);
+    expect(new Set(character.lines.greet?.map((line) => line.id)).size).toBe(3);
+    expect([added, left]).toEqual([3, 0]);
+  });
+
+  it('stops where the group is full and says how many did not fit', () => {
+    const base = defaultCharacter('c', 'C');
+    const many = Array.from({ length: 499 }, (_, i) => `line ${i}`).join('\n');
+    const first = addLines(base, 'g', many).character;
+    const { added, left } = addLines(first, 'g', 'a\nb\nc');
+    expect([added, left]).toEqual([1, 2]);
   });
 });

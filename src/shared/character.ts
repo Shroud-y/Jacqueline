@@ -151,6 +151,20 @@ const presenceSchema = z.object({
    * the text around in the editor never makes the character jump.
    */
   position: z.object({ x: z.number().finite(), y: z.number().finite() }).nullable(),
+  /**
+   * The same place as meant: that screen, that corner, that far in. Set when
+   * the character is put down, and preferred over `position`, which stays as
+   * the fallback for a character placed before there were pins.
+   */
+  pin: z
+    .object({
+      display: z.number().int(),
+      corner: z.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right']),
+      dx: z.number().finite(),
+      dy: z.number().finite()
+    })
+    .nullable()
+    .default(null),
   hideOnFullscreen: z.boolean()
 });
 
@@ -280,7 +294,7 @@ export function defaultCharacter(id: string, name: string): Character {
         { id: 'speech', type: 'speech', x: 0, y: 40, width: 240, height: 160, style: { ...DEFAULT_TEXT_STYLE, align: 'right' }, reveal: 'typewriter' }
       ]
     },
-    presence: { mode: 'always', apps: [], position: null, hideOnFullscreen: false },
+    presence: { mode: 'always', apps: [], position: null, pin: null, hideOnFullscreen: false },
     rules: [],
     behaviourScript: null,
     lines: {},

@@ -1,5 +1,6 @@
 import { useEffect, useState, type DragEvent } from 'react';
 import type { Character, CharacterEntry } from '@shared/character';
+import type { LiveView } from '@shared/types';
 import ActivityTab from './ActivityTab';
 import AppearanceTab from './AppearanceTab';
 import AudioTab from './AudioTab';
@@ -38,6 +39,22 @@ export default function Editor(): JSX.Element {
     setSettingsOpen(false);
   };
 
+  // Who is on screen and talking now, for the marks beside their names.
+  const [live, setLive] = useState<LiveView>({ visible: [], speaking: [] });
+  useEffect(() => {
+    const api = window.jacquelineEditor;
+    if (!api) return;
+    let cancelled = false;
+    void api.live().then((view) => {
+      if (!cancelled) setLive(view);
+    });
+    const off = api.onLive(setLive);
+    return () => {
+      cancelled = true;
+      off();
+    };
+  }, []);
+
   // Something is always selected while there is anything to select.
   const selected = entries?.find((entry) => entry.id === selectedId) ?? entries?.[0] ?? null;
 
@@ -73,7 +90,13 @@ export default function Editor(): JSX.Element {
         <div className="sidebar-head">Characters</div>
         <nav className="sidebar-list" aria-label="Characters">
           {entries?.map((entry) => (
-            <SidebarItem key={entry.id} entry={entry} selected={!settingsOpen && entry.id === selected?.id} onSelect={() => select(entry.id)} />
+            <SidebarItem
+              key={entry.id}
+              entry={entry}
+              selected={!settingsOpen && entry.id === selected?.id}
+              live={live.speaking.includes(entry.id) ? 'speaking' : live.visible.includes(entry.id) ? 'visible' : null}
+              onSelect={() => select(entry.id)}
+            />
           ))}
         </nav>
         <button type="button" className="button quiet sidebar-new" onClick={() => void create()}>
@@ -114,10 +137,18 @@ export default function Editor(): JSX.Element {
   );
 }
 
-function SidebarItem({ entry, selected, onSelect }: { entry: CharacterEntry; selected: boolean; onSelect: () => void }): JSX.Element {
+interface SidebarItemProps {
+  entry: CharacterEntry;
+  selected: boolean;
+  /** On screen right now, or talking. */
+  live: 'visible' | 'speaking' | null;
+  onSelect: () => void;
+}
+
+function SidebarItem({ entry, selected, live, onSelect }: SidebarItemProps): JSX.Element {
   const state = !entry.ok ? 'broken' : entry.character.enabled ? 'on' : 'off';
   const name = entry.ok ? entry.character.name : entry.id;
-  const status = state === 'off' ? ', off' : state === 'broken' ? ', cannot be read' : '';
+  const status = (state === 'off' ? ', off' : state === 'broken' ? ', cannot be read' : '') + (live === 'speaking' ? ', talking' : live === 'visible' ? ', on screen' : '');
   return (
     <button
       type="button"
@@ -130,6 +161,7 @@ function SidebarItem({ entry, selected, onSelect }: { entry: CharacterEntry; sel
     >
       {entry.ok ? <Thumbnail character={entry.character} /> : <span className="thumb thumb-broken" aria-hidden="true">!</span>}
       <span className="sidebar-name">{name}</span>
+      {live ? <span className="sidebar-live" data-live={live} title={live === 'speaking' ? 'Talking' : 'On screen'} aria-hidden="true" /> : null}
     </button>
   );
 }

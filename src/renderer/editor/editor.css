@@ -1921,3 +1921,75 @@ input {
   margin: 0;
   color: var(--text-2);
 }
+
+/* On screen now (a quiet dot), or talking (the accent): the only colour in the list besides the thumbnails. */
+.sidebar-live {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+
+.sidebar-live[data-live='speaking'] {
+  background: var(--accent);
+}
+
+/* Add a rule, or start from one of the templates. */
+.rules-start {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.rules-start.rules-add {
+  justify-content: flex-start;
+}
+
+.templates {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+  max-width: 760px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.template {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--ease);
+}
+
+.template:hover {
+  background: var(--hover);
+}
+
+.template:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.template-title {
+  font-weight: 600;
+}
+
+.template-hint {
+  color: var(--text-2);
+  font-size: 13px;
+}

@@ -178,6 +178,9 @@ export interface EditorApi {
   testLine(payload: { id: string; group: string; line: string }): Promise<EditorResult>;
   /** Does what a rule does now — whatever its trigger, conditions and wait — with slots filled as for a line tried. */
   testRule(payload: { id: string; rule: string }): Promise<EditorResult>;
+  /** Who is on screen and who is talking now; and a change of either, as it happens. */
+  live(): Promise<LiveView>;
+  onLive(handler: (view: LiveView) => void): () => void;
   /** Recent activity for one character, and when each of its rules fired. */
   activity(payload: { id: string }): Promise<ActivityView>;
   /** Which character's new activity to be told about as it happens; null for none. */
@@ -227,6 +230,12 @@ export interface EditorApi {
   /** Where on disk a file dropped on the window is. Not IPC — answered by the preload itself. */
   pathForFile(file: File): string;
   openFolder(payload: { id: string }): Promise<EditorResult>;
+}
+
+/** Who is on screen and who is talking, for the marks in the editor's list. */
+export interface LiveView {
+  visible: string[];
+  speaking: string[];
 }
 
 /** One line of the Activity log. */

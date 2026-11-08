@@ -8,8 +8,11 @@ import {
   defaultAnchorPosition,
   layoutAnchor,
   layoutFrame,
+  pinFromRect,
   placeWindow,
+  positionFromPin,
   randomAnchorPosition,
+  shiftPin,
   type Rect
 } from '@shared/layout';
 
@@ -133,5 +136,40 @@ describe('randomAnchorPosition', () => {
     const position = randomAnchorPosition(huge, anchor, screen, () => 0.999);
     expect(position.x + anchor.width).toBeLessThanOrEqual(screen.x + screen.width);
     expect(position.x).toBeGreaterThanOrEqual(screen.x);
+  });
+});
+
+describe('pins', () => {
+  const display = { id: 7, workArea: { x: 0, y: 0, width: 1920, height: 1040 } };
+  const size = { width: 240, height: 240 };
+
+  it('pins to the nearest corner, by the distances to its edges', () => {
+    expect(pinFromRect({ x: 1656, y: 776, ...size }, display)).toEqual({ display: 7, corner: 'bottom-right', dx: 24, dy: 24 });
+    expect(pinFromRect({ x: 10, y: 20, ...size }, display)).toEqual({ display: 7, corner: 'top-left', dx: 10, dy: 20 });
+    expect(pinFromRect({ x: 1600, y: 30, ...size }, display).corner).toBe('top-right');
+  });
+
+  it('keeps that corner when the screen changes size or the taskbar moves', () => {
+    const pin = pinFromRect({ x: 1656, y: 776, ...size }, display);
+    // The same corner of a smaller screen with the taskbar on top: still 24 px in from the right and the bottom.
+    expect(positionFromPin(pin, size, { x: 0, y: 40, width: 1280, height: 680 })).toEqual({ x: 1016, y: 456 });
+    // Round trip on the screen it was pinned on.
+    expect(positionFromPin(pin, size, display.workArea)).toEqual({ x: 1656, y: 776 });
+  });
+
+  it('never puts it off the screen, however far in the pin says', () => {
+    const pin = { display: 7, corner: 'top-left' as const, dx: 5000, dy: -50 };
+    expect(positionFromPin(pin, size, display.workArea)).toEqual({ x: 1680, y: 0 });
+  });
+
+  it('keeps what is left of a cropped picture where it was', () => {
+    const before = { x: 0, y: 0, width: 240, height: 240 };
+    // Cut 40 px off the right and 20 off the bottom.
+    const after = { x: 0, y: 0, width: 200, height: 220 };
+    const pinned = { display: 7, corner: 'bottom-right' as const, dx: 24, dy: 24 };
+    expect(shiftPin(pinned, before, after)).toEqual({ ...pinned, dx: 64, dy: 44 });
+    const topLeft = { display: 7, corner: 'top-left' as const, dx: 10, dy: 10 };
+    // Cut 30 off the left: the rest starts 30 px further in.
+    expect(shiftPin(topLeft, before, { x: 30, y: 0, width: 210, height: 240 })).toEqual({ ...topLeft, dx: 40 });
   });
 });

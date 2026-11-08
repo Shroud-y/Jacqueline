@@ -3,7 +3,7 @@ import { assetUrl } from '@shared/assetUrl';
 import { HANDLES, freeElementId, moveBox, placeBeside, resizeBox, snapBox, type Handle } from '@shared/canvas';
 import { DEFAULT_TEXT_STYLE, type Character, type LayoutElement } from '@shared/character';
 import { clampCropRect, cropFromRects, cropGeometry, fullRect, isCropped, mirrorCrop, moveCropRect, NO_CROP, visibleRect } from '@shared/crop';
-import { layoutAnchor, layoutFrame, type Rect } from '@shared/layout';
+import { layoutAnchor, layoutFrame, shiftPin, type Rect } from '@shared/layout';
 import { SAMPLE_LINE, isFontFile } from '@shared/textStyle';
 import type { AssetInfo } from '@shared/types';
 import TextElement from '../../shared/TextElement';
@@ -282,13 +282,15 @@ export default function LayoutTab({ character, characters }: { character: Charac
     const crop = flip ? mirrorCrop(onScreen) : onScreen;
     const { crop: _before, ...rest } = characterBox;
     const next: LayoutElement = isCropped(crop) ? { ...rest, ...visible, crop } : { ...rest, ...visible };
-    const { position } = character.presence;
+    const { position, pin } = character.presence;
     characters.update({
       ...character,
       layout: { ...character.layout, elements: elements.map((entry) => (entry.id === next.id ? next : entry)) },
       presence: {
         ...character.presence,
-        position: position ? { x: position.x + visible.x - characterBox.x, y: position.y + visible.y - characterBox.y } : null
+        position: position ? { x: position.x + visible.x - characterBox.x, y: position.y + visible.y - characterBox.y } : null,
+        // What is left of the picture stays where it was on screen, whichever corner it is pinned to.
+        pin: pin ? shiftPin(pin, characterBox, visible) : null
       }
     });
   };

@@ -44,6 +44,7 @@ const handlers = (): ReturnType<typeof editorHandlers> =>
     sayNow: (character, text, line) => said.push({ id: character.id, text, line: line.id }),
     runNow: (fired) => ran.push({ id: fired.character.id, rule: fired.rule.id, slots: fired.slots }),
     runningPrograms: async () => ['code.exe', 'dota2.exe'],
+    live: () => ({ visible: ['a'], speaking: [] }),
     activity: (id) => ({ entries: [{ id: 1, at: 0, characterId: id, ruleId: null, event: null, outcome: 'note', text: 'hi' }], rules: {} }),
     watchActivity: (id) => {
       watched.push(id);

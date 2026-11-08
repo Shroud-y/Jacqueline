@@ -139,3 +139,62 @@ export function defaultAnchorPosition(anchor: Rect, workArea: Rect): Point {
     workArea
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* Pinned to a corner                                                  */
+/* ------------------------------------------------------------------ */
+
+export type Corner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
+/**
+ * Where a character is, the way a person means it: on that screen, so far
+ * from that corner. A screen that changes size, scale or taskbar keeps the
+ * character where it was meant to be, and one that is gone puts it in the same
+ * corner of the nearest.
+ */
+export interface Pin {
+  /** Electron's display id. */
+  display: number;
+  corner: Corner;
+  /** From the corner's side edge to the character's nearest side, in pixels. */
+  dx: number;
+  /** From the corner's top or bottom edge to the character's nearest one. */
+  dy: number;
+}
+
+/** The pin for a character whose anchor is at `rect` on screen, by whichever corner of the work area is nearest its middle. */
+export function pinFromRect(rect: Rect, display: { id: number; workArea: Rect }): Pin {
+  const area = display.workArea;
+  const right = rect.x + rect.width / 2 > area.x + area.width / 2;
+  const bottom = rect.y + rect.height / 2 > area.y + area.height / 2;
+  return {
+    display: display.id,
+    corner: `${bottom ? 'bottom' : 'top'}-${right ? 'right' : 'left'}`,
+    dx: Math.round(right ? area.x + area.width - (rect.x + rect.width) : rect.x - area.x),
+    dy: Math.round(bottom ? area.y + area.height - (rect.y + rect.height) : rect.y - area.y)
+  };
+}
+
+/** Where the anchor's top-left goes for a pin, in this work area: inside it, whatever the offsets say. */
+export function positionFromPin(pin: Pin, size: { width: number; height: number }, workArea: Rect): Point {
+  const right = pin.corner.endsWith('right');
+  const bottom = pin.corner.startsWith('bottom');
+  const x = right ? workArea.x + workArea.width - size.width - pin.dx : workArea.x + pin.dx;
+  const y = bottom ? workArea.y + workArea.height - size.height - pin.dy : workArea.y + pin.dy;
+  return clampAnchor({ x, y }, { x: 0, y: 0, ...size }, workArea);
+}
+
+/**
+ * The same pin for an anchor that changed shape in place — a crop — so the
+ * part that stays put on screen stays put: `before` and `after` are the
+ * anchor in the layout's own space.
+ */
+export function shiftPin(pin: Pin, before: Rect, after: Rect): Pin {
+  const right = pin.corner.endsWith('right');
+  const bottom = pin.corner.startsWith('bottom');
+  return {
+    ...pin,
+    dx: Math.round(right ? pin.dx + before.x + before.width - (after.x + after.width) : pin.dx + after.x - before.x),
+    dy: Math.round(bottom ? pin.dy + before.y + before.height - (after.y + after.height) : pin.dy + after.y - before.y)
+  };
+}

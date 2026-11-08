@@ -3,6 +3,7 @@ import type { AssetKind, Character, Line } from '@shared/character';
 import {
   addGroup,
   addLine,
+  addLines,
   freeGroupName,
   groupNameProblem,
   LINE_TEXT_MAX,
@@ -228,11 +229,22 @@ function GroupPane({ character, characters, group, onRenamed }: GroupPaneProps):
             className="input"
             type="text"
             aria-label="New line"
-            placeholder={full ? `A group holds ${LINES_PER_GROUP_MAX} lines at most.` : 'Type a line and press Enter'}
+            placeholder={full ? `A group holds ${LINES_PER_GROUP_MAX} lines at most.` : 'Type a line and press Enter, or paste many, one a line'}
             disabled={full}
             value={draft}
             maxLength={LINE_TEXT_MAX}
             onChange={(event) => setDraft(event.target.value)}
+            onPaste={(event) => {
+              // A paste of several lines becomes as many lines; a single line pastes as usual.
+              const pasted = event.clipboardData.getData('text');
+              if (!/\r?\n/.test(pasted.trim())) return;
+              event.preventDefault();
+              const made = addLines(character, group, `${draft}${pasted}`);
+              if (made.added === 0) return;
+              characters.update(made.character);
+              setDraft('');
+              if (made.left > 0) characters.report(`${made.left} of the pasted lines did not fit: a group holds ${LINES_PER_GROUP_MAX} at most.`);
+            }}
             onKeyDown={(event) => {
               if (event.key !== 'Enter') return;
               event.preventDefault();

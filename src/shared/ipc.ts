@@ -35,6 +35,9 @@ export const IPC = {
   editorTestLine: 'editor:testLine',
   /** editor → main: do what a rule does, now. */
   editorTestRule: 'editor:testRule',
+  /** editor → main, invoke: who is on screen and talking; main → editor: the same, when it changes. */
+  editorLive: 'editor:live',
+  editorLiveChanged: 'editor:liveChanged',
   /** editor → main, invoke: a character's recent activity; which one to be told about; main → editor: a new entry. */
   editorActivity: 'editor:activity',
   editorWatchActivity: 'editor:watchActivity',

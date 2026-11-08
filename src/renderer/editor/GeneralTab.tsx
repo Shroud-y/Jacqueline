@@ -60,12 +60,14 @@ export default function GeneralTab({ character, onChange }: { character: Charact
       <Group title="Place">
         <div>
           <div className="prose">
-            {presence.position
-              ? `At ${Math.round(presence.position.x)}, ${Math.round(presence.position.y)}. Drag the character to move it.`
-              : 'In the bottom-right corner of the main screen. Drag the character to move it.'}
+            {presence.pin
+              ? `In the ${presence.pin.corner} corner of its screen, ${presence.pin.dx} px in from the side and ${presence.pin.dy} px from the ${presence.pin.corner.split('-')[0]}. It stays there when the screen changes size or scale. Drag the character to move it.`
+              : presence.position
+                ? `At ${Math.round(presence.position.x)}, ${Math.round(presence.position.y)}. Drag the character to move it, and it keeps to the nearest corner from then on.`
+                : 'In the bottom-right corner of the main screen. Drag the character to move it.'}
           </div>
-          {presence.position ? (
-            <button type="button" className="button quiet under-prose" onClick={() => setPresence({ position: null })}>
+          {presence.position || presence.pin ? (
+            <button type="button" className="button quiet under-prose" onClick={() => setPresence({ position: null, pin: null })}>
               Back to the corner
             </button>
           ) : null}

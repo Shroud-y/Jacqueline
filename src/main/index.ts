@@ -7,7 +7,7 @@ import { ASSET_EXTENSIONS, type Character } from '@shared/character';
 import { IPC } from '@shared/ipc';
 import { ruleTitle } from '@shared/ruleText';
 import { parseSignalArgs, signalFromData } from '@shared/signal';
-import type { ActivityView, CheckItem, GameStatus, Settings, SettingsView } from '@shared/types';
+import type { ActivityView, CheckItem, GameStatus, LiveView, Settings, SettingsView } from '@shared/types';
 
 import { configureLogger, createLogger } from './app/logger';
 import { characterMenu, trayMenu, trayTooltip, type MenuAction, type MenuState } from './app/menus';
@@ -143,7 +143,8 @@ async function bootstrap(): Promise<void> {
     isOnStage: (id) => director.isOnStage(id),
     isMusicPlaying: () => rules.musicNow()?.playing === true,
     isSilenced,
-    scriptAllowed: (id) => scriptTrust.isAllowed(id)
+    scriptAllowed: (id) => scriptTrust.isAllowed(id),
+    onVisibility: () => sendLive()
   });
 
   const director = new SpeechDirector();
@@ -151,6 +152,7 @@ async function bootstrap(): Promise<void> {
   const speaking = new Set<string>();
   director.onChange((id) => {
     windows.refresh();
+    sendLive();
     const now = director.isSpeaking(id);
     if (speaking.has(id) && !now) scripts.speechEnded(id);
     if (now) speaking.add(id);
@@ -161,6 +163,12 @@ async function bootstrap(): Promise<void> {
   const history = new RecentHistory();
   /** Signals rules send each other go this many deep at most: a circle of them stops rather than runs forever. */
   const SIGNAL_HOPS_MAX = 4;
+  // Assigned once the editor exists; until then nobody is listening.
+  let sendLive = (): void => undefined;
+  const liveView = (): LiveView => ({
+    visible: windows.visibleIds(),
+    speaking: characters.list().flatMap((entry) => (director.isSpeaking(entry.id) ? [entry.id] : []))
+  });
   // What happened and what came of it, for the editor's Activity tab.
   const activity = new Activity();
   const actionDeps: ActionDeps = {
@@ -297,6 +305,15 @@ async function bootstrap(): Promise<void> {
   settings.onChange((next) => reconcileAutostart(next.startWithSystem));
 
   let watchedActivity: string | null = null;
+  // Who is on screen and talking, told to the editor only when it changes.
+  let lastLive = '';
+  sendLive = () => {
+    const view = liveView();
+    const said = JSON.stringify(view);
+    if (said === lastLive) return;
+    lastLive = said;
+    editor.send(IPC.editorLiveChanged, view);
+  };
   activity.onAdd((entry) => {
     if (watchedActivity !== null && (entry.characterId === watchedActivity || entry.characterId === null)) editor.send(IPC.editorActivityAdded, entry);
   });
@@ -376,6 +393,7 @@ async function bootstrap(): Promise<void> {
         }
       }),
     gameStatus: () => game.status,
+    live: liveView,
     activity: (id) => {
       const character = characters.get(id);
       const times: ActivityView['rules'] = {};

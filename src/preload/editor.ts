@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { CharacterEntry } from '@shared/character';
-import type { ActivityEntry, EditorApi, GameStatus, ScriptStatus, SettingsView } from '@shared/types';
+import type { ActivityEntry, EditorApi, LiveView, GameStatus, ScriptStatus, SettingsView } from '@shared/types';
 
 /**
  * The editor window's entire surface. Channel names are written out
@@ -21,6 +21,8 @@ const CHANNEL = {
   editorPreview: 'editor:preview',
   editorTestLine: 'editor:testLine',
   editorTestRule: 'editor:testRule',
+  editorLive: 'editor:live',
+  editorLiveChanged: 'editor:liveChanged',
   editorActivity: 'editor:activity',
   editorWatchActivity: 'editor:watchActivity',
   editorActivityAdded: 'editor:activityAdded',
@@ -66,6 +68,14 @@ const api: EditorApi = {
   preview: (payload) => ipcRenderer.invoke(CHANNEL.editorPreview, payload),
   testLine: (payload) => ipcRenderer.invoke(CHANNEL.editorTestLine, payload),
   testRule: (payload) => ipcRenderer.invoke(CHANNEL.editorTestRule, payload),
+  live: () => ipcRenderer.invoke(CHANNEL.editorLive),
+
+  onLive(handler) {
+    const listener = (_event: unknown, view: LiveView): void => handler(view);
+    ipcRenderer.on(CHANNEL.editorLiveChanged, listener);
+    return () => ipcRenderer.off(CHANNEL.editorLiveChanged, listener);
+  },
+
   activity: (payload) => ipcRenderer.invoke(CHANNEL.editorActivity, payload),
   watchActivity: (payload) => ipcRenderer.invoke(CHANNEL.editorWatchActivity, payload),
 

@@ -55,7 +55,9 @@ away; there is no Save button. **Ctrl+Z** takes the last change back and
   While this tab is open the character shows sample text on your desktop, so
   you can see it where it will be. **Crop** trims the picture or video: drag its
   edges, the file stays whole, and what is cut off takes no mouse.
-- **Behaviour** — rules. Each one reads as a sentence: *When **dota2.exe**
+- **Behaviour** — rules. **From a template…** starts one with its lines
+  already written — hello when a program starts, bedtime, a click, welcome
+  back, now and then, a build — to change from there. Each one reads as a sentence: *When **dota2.exe**
   starts → say a line from **greet***. Open one to change it:
   - **When**: a program starts, closes or comes to the front; every day at a
     time; every so often (somewhere between N and M minutes); you come back
@@ -93,7 +95,8 @@ away; there is no Save button. **Ctrl+Z** takes the last change back and
   gives you a commented file listing everything it can do. It runs in a
   sandbox (QuickJS) with no internet and no files, 50 ms per event and 16 MB
   at most; errors show in the editor with their line.
-- **Lines** — groups of lines a rule can pick from. Each line can have a
+- **Lines** — groups of lines a rule can pick from. Paste several at once and
+  each becomes a line. Each line can have a
   weight (how often it comes up) and a sound. The same line is never said
   twice in a row. A line can mention what happened with a slot: `{name}`
   (the character's), `{time}`, `{program}` (for rules about a program) and
@@ -174,6 +177,15 @@ has the port, change it under **Port** and set up Dota 2 again.
 On the desktop: **drag** a character anywhere (other monitors too), **click**
 it to set off its "clicked" rules, click while it is talking to dismiss the
 line, **right-click** to hide it for a while or turn it off.
+
+Where you put a character down, it keeps to the nearest corner of that screen,
+so far in from its edges: a screen that changes resolution or scale, or a
+taskbar that moves, leaves it where you meant it. With that screen unplugged it
+waits in the same corner of the nearest one, and goes back when the screen does.
+**General → Place** says where it is pinned.
+
+In the list of characters, a dot marks who is on screen now, and an amber
+one who is talking.
 
 **Settings** at the bottom of the editor's list: start with Windows, mute
 everyone, quiet hours (nobody says anything between two times; characters stay
